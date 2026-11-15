@@ -9,10 +9,10 @@ Conventional Commits, popis česky:
 ```
 
 - **typ:** `feat`, `fix`, `docs`, `refactor`, `style`, `test`, `chore`, `release`
-- **scope** (volitelný): `skill` (SKILL.md), `reference` (reference/), `nastroje` (tools/), `web` (template/), `readme`, `plugin` (.claude-plugin/)
+- **scope** (volitelný): `skill` (SKILL.md), `reference` (reference/), `nastroje` (tools/), `web` (template/), `readme`, `plugin` (`skills/.claude-plugin/`, katalog `.claude-plugin/marketplace.json`)
 - popis malým písmenem, bez tečky na konci, max ~72 znaků; detaily do těla commitu
 - jeden commit = jedna logická změna; nemíchat víc funkcí do jednoho
-- verze zvlášť: `release: 0.3.7` (bump `.claude-plugin/plugin.json` + `skills/dejiny-domu/VERZE`)
+- verze zvlášť: `release: 0.3.7` (bump `skills/.claude-plugin/plugin.json` + `skills/dejiny-domu/VERZE`)
 
 Příklady:
 
@@ -26,6 +26,12 @@ release: 0.3.6
 Kontrolu formátu dělá hook `tests/commit_msg.py`; po naklonování ho zapni přes
 `ln -sf ../../tests/commit_msg.py .git/hooks/commit-msg`. Je v Pythonu a v `tests/`, protože adresář pluginů Anthropicu
 nepřijme shellové skripty mimo skill (dřív `.githooks/`).
+
+## Plugin
+Plugin je složka `skills/` (manifest `skills/.claude-plugin/plugin.json`, ikona tamtéž), ne kořen repa:
+adresář pluginů Anthropicu mimo skill přijme jen Markdown, text, JSON, YAML a obrázky (testy `.py` ne). Katalog pro
+`/plugin marketplace add` zůstává v kořeni (`.claude-plugin/marketplace.json`, `source: ./skills`). V adresáři je
+přihlášený s cestou `skills`. Kontrola: `claude plugin validate skills`.
 
 ## Knihovny webu (template/web)
 V šabloně jsou `package.sablona.json` a `npmrc.sablona` (adresář pluginů nepřijme `package.json` s polem `scripts`
@@ -44,7 +50,7 @@ Nejnižší Node = nejvyšší `engines.node` v locku (teď undici ≥ 22.19): o
 
 ## Vydání verze
 
-1. Verze v `.claude-plugin/plugin.json`, `skills/dejiny-domu/VERZE` a README („Aktuální verze“) → commit `release: X.Y.Z`.
+1. Verze v `skills/.claude-plugin/plugin.json`, `skills/dejiny-domu/VERZE` a README („Aktuální verze“) → commit `release: X.Y.Z`.
 2. Tag `vX.Y.Z` a push (větev i tag).
 3. GitHub release se shrnutím pro uživatele (novinky, opravy, jak aktualizovat projekt), česky, bez interních
    detailů: `gh release create vX.Y.Z --title "X.Y.Z – …" --notes "$(cat poznamky.md)"`
