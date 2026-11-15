@@ -23,14 +23,13 @@ docs(reference): městský dům 20. století
 release: 0.3.6
 ```
 
-Kontrolu formátu dělá `skills/dejiny-domu/tests/commit_msg.py`; po naklonování ho zapni obalem:
-`printf '#!/bin/sh\nexec python3 "$(git rev-parse --show-toplevel)/skills/dejiny-domu/tests/commit_msg.py" "$1"\n' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg`
+Kontrolu formátu dělá `tests/commit_msg.py`; po naklonování ho zapni obalem:
+`printf '#!/bin/sh\nexec python3 "$(git rev-parse --show-toplevel)/tests/commit_msg.py" "$1"\n' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg`
 
 ## Plugin
-Plugin je celé repo (`.claude-plugin/plugin.json`), v adresáři pluginů Anthropicu přihlášený z kořene.
-Adresář od neověřených autorů mimo `skills/` přijme jen Markdown, text, JSON, YAML a obrázky (ne `.py`) a nikde
-nic, co začíná `#!` – ani nástroje ve `skills/` (spouštějí se přes `python3`/`bash`). Testy proto ve
-`skills/dejiny-domu/tests/` (instalují se uživatelům, neškodí). Do kořene repa nedávat kód; v šabloně webu žádný `package.json` se `scripts` ani `.npmrc` (proto `*.sablona`). Kontrola: `claude plugin validate .`
+Plugin je celé repo (`.claude-plugin/plugin.json`). Adresář pluginů Anthropicu ho 15. 11. odmítl: od neověřených
+organizací nebere skripty vůbec (ani ve `skills/`), o ověření zatím nejde požádat. Z pokusů zůstalo: nástroje bez `#!`
+(spouštějí se přes `python3`/`bash`) a v šabloně webu `*.sablona` místo `package.json` a `.npmrc`. Nic z toho nevracet.
 
 ## Knihovny webu (template/web)
 V šabloně jsou `package.sablona.json` a `npmrc.sablona` (adresář pluginů nepřijme `package.json` s polem `scripts`
@@ -43,7 +42,7 @@ Nejnižší Node = nejvyšší `engines.node` v locku (teď undici ≥ 22.19): o
 
 ## Před vydáním verze
 
-`python3 -m unittest discover skills/dejiny-domu/tests` – testy `zapis.py`, `kontrola.py`, `export_web.py` a `novy_projekt.py` (bez sítě, pár sekund). Spouštěj i po každé změně těch nástrojů.
+`python3 -m unittest discover tests` – testy `zapis.py`, `kontrola.py`, `export_web.py` a `novy_projekt.py` (bez sítě, pár sekund). Spouštěj i po každé změně těch nástrojů.
 
 `python3 -I skills/dejiny-domu/tools/zdravi.py` – všechny portály musí projít (výpadek zkus znovu za chvíli).
 
