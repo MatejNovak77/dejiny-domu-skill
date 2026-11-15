@@ -22,6 +22,9 @@ for _s in (sys.stdout, sys.stderr):   # UTF-8 výstup i na Windows bez -X utf8 (
 
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VYNECHAT = ("node_modules", "dist", ".astro", "__pycache__")   # složky šablony, které se nekopírují
+# Soubory šablony pod jiným jménem: adresář pluginů Anthropicu nepřijme package.json se „scripts“ ani .npmrc
+# od neověřených autorů; v projektu musí mít správné jméno.
+PREJMENOVAT = {"package.sablona.json": "package.json", "npmrc.sablona": ".npmrc"}
 
 
 def copy(src, out):
@@ -55,16 +58,17 @@ def copy_tree(src, dst, backup=None):
         rel = os.path.relpath(base, src)
         os.makedirs(os.path.join(dst, rel), exist_ok=True)
         for f in files:
-            new, out = os.path.join(base, f), os.path.join(dst, rel, f)
+            cil = PREJMENOVAT.get(f, f)
+            new, out = os.path.join(base, f), os.path.join(dst, rel, cil)
             if not os.path.lexists(out):
                 copy(new, out)
             elif backup and (os.path.islink(out) or not filecmp.cmp(new, out, shallow=False)):
-                keep = os.path.join(backup, os.path.normpath(os.path.join(rel, f)))
+                keep = os.path.join(backup, os.path.normpath(os.path.join(rel, cil)))
                 os.makedirs(os.path.dirname(keep), exist_ok=True)
                 if not os.path.islink(out):
                     shutil.copy2(out, keep)
                 copy(new, out)
-                changed.append(os.path.normpath(os.path.join(rel, f)))
+                changed.append(os.path.normpath(os.path.join(rel, cil)))
     return changed
 
 

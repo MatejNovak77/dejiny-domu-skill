@@ -1184,6 +1184,21 @@ class TestNovyProjekt(Projekt):
         self.assertTrue(self.text("pracovni", zalohy[0], "vyrez.py").endswith("# vlastní úprava\n"))
         self.assertNotIn("vlastní úprava", self.text("tools", "vyrez.py"))   # nástroj je zase ze skillu
 
+    def test_sablony_webu_dostanou_spravne_jmeno(self):
+        """package.json a .npmrc jsou ve skillu pod jiným jménem (adresář pluginů), v projektu pod původním."""
+        sablona = os.path.join(SKILL, "template", "web", "package.sablona.json")
+        self.assertEqual(self.text("web", "package.json"), open(sablona, encoding="utf-8", newline="").read())
+        self.assertTrue(os.path.isfile(self.path("web", ".npmrc")))
+        self.assertFalse(os.path.lexists(self.path("web", "package.sablona.json")))
+        self.assertFalse(os.path.lexists(self.path("web", "npmrc.sablona")))
+        with open(self.path("web", "package.json"), "a", encoding="utf-8") as f:
+            f.write("\n")   # starší verze v projektu → aktualizace ji zazálohuje pod jménem package.json
+        p = self.aktualizuj()
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        zalohy = [d for d in os.listdir(self.path("pracovni")) if d.startswith("zaloha_web_")]
+        self.assertTrue(os.path.isfile(self.path("pracovni", zalohy[0], "package.json")))
+        self.assertEqual(self.text("web", "package.json"), open(sablona, encoding="utf-8", newline="").read())
+
     def test_aktualizace_beze_zmen_nezalohuje(self):
         p = self.aktualizuj()
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)

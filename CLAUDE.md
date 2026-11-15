@@ -23,12 +23,18 @@ docs(reference): městský dům 20. století
 release: 0.3.6
 ```
 
-Kontrolu formátu dělá hook `.githooks/commit-msg`; po naklonování ho zapni přes `git config core.hooksPath .githooks`.
+Kontrolu formátu dělá hook `tests/commit_msg.py`; po naklonování ho zapni přes
+`ln -sf ../../tests/commit_msg.py .git/hooks/commit-msg`. Je v Pythonu a v `tests/`, protože adresář pluginů Anthropicu
+nepřijme shellové skripty mimo skill (dřív `.githooks/`).
 
 ## Knihovny webu (template/web)
+V šabloně jsou `package.sablona.json` a `npmrc.sablona` (adresář pluginů nepřijme `package.json` s polem `scripts`
+ani `.npmrc` od neověřených autorů); `novy_projekt.py` je v projektu přejmenuje na `package.json` a `.npmrc`.
+Lock proto generuj v projektu založeném ze šablony a `package-lock.json` (a změněný `package.json` jako
+`package.sablona.json`) zkopíruj zpět do šablony.
 `package-lock.json` generuj **npm 10** (`npx -y npm@10 install`): npm 11 vynechá volitelné `@emnapi/*` a `npm ci`
 v npm 10 pak skončí chybou (audit D03). Ověř `npm ci` v npm 10 i 11, `npm audit` a `npm run build` na skutečném projektu.
-Nejnižší Node = nejvyšší `engines.node` v locku (teď undici ≥ 22.19): oprav `package.json` (`engines`) i `SKILL.md`.
+Nejnižší Node = nejvyšší `engines.node` v locku (teď undici ≥ 22.19): oprav `package.sablona.json` (`engines`) i `SKILL.md`.
 
 ## Před vydáním verze
 
