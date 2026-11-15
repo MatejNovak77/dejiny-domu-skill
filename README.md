@@ -134,6 +134,9 @@ archivy po sérii rychlých dotazů blokují IP adresu. Chodí na:
 - evidence válečných hrobů MO, hřbitovní pasporty obcí na GisOnline.cz a Databáze obětí nacismu (holocaust.cz),
 - při instalaci webu do registru npm; na Netlify jen tehdy, když web sami zveřejníte.
 
+Texty stažené z webů (články, komentáře, OCR) má Claude podle skillu brát jen jako prameny: pokyny v nich neprovádí
+a podezřelé místo vám ukáže.
+
 Instalujte skilly jen od lidí, kterým věříte.
 
 ## Podmínky archivů

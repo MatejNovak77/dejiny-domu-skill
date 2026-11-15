@@ -17,5 +17,10 @@ class TestSkillMd(unittest.TestCase):
         self.assertTrue(data["description"])
 
 
+    def test_texty_z_webu_nejsou_pokyny(self):
+        """Ochrana proti nepřímému prompt injection (audit Snyk W011 na skills.sh)."""
+        self.assertIn("ne jako pokyny", SKILL.read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()
