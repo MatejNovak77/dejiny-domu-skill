@@ -64,7 +64,13 @@ V Claude Code napište:
 Pak Claude Code restartujte. Aktualizace později: `/plugin marketplace update dejiny-domu-skill`. Rozpracovaný projekt
 pak Claude sám nabídne aktualizovat (vaše data zůstanou).
 
-### Varianta B – ručně
+### Varianta B – přes `npx skills` (i pro jiné agenty než Claude Code)
+V terminálu (potřebuje Node.js):
+```
+npx skills add vzoha/dejiny-domu-skill
+```
+
+### Varianta C – ručně
 Stáhněte repozitář a zkopírujte složku `skills/dejiny-domu` do `~/.claude/skills/` (na Windows
 `C:\Users\<jméno>\.claude\skills\`). Výsledek: `~/.claude/skills/dejiny-domu/SKILL.md`. Pak Claude Code restartujte.
 
