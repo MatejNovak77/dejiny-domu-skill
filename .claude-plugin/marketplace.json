@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "dejiny-domu",
-      "source": "./skills",
+      "source": "./",
       "description": "Dějiny domu a vesnice z českých archivů a web s časovou osou – průvodce pro začátečníky (česky)."
     }
   ]

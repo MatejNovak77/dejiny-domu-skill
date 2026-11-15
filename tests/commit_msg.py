@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
 """Hook commit-msg: kontrola Conventional Commits (viz CLAUDE.md).
 
-Zapnutí po naklonování: ln -sf ../../tests/commit_msg.py .git/hooks/commit-msg
-(V Pythonu a v tests/, protože adresář pluginů Anthropicu nepřijme shellové skripty mimo skill.)
+Zapnutí po naklonování viz CLAUDE.md (obal v .git/hooks/commit-msg volá tenhle soubor).
+V Pythonu, v tests/ a bez #!: adresář pluginů Anthropicu mimo skills/ nepřijme skripty ani soubory začínající #!.
 """
 import re
 import sys

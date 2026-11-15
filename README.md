@@ -98,7 +98,7 @@ skills/dejiny-domu/
   tools/             nástroje v Pythonu (archivy, Archiv ČÚZK, RÚIAN, staré obrázky a mapy, výřezy, rámečky,
                      kontrola dat, export do webu)
   template/          šablona projektu: prázdná data a web (Astro)
-.claude-plugin/      katalog pro instalaci jako plugin (plugin samotný je skills/)
+.claude-plugin/      instalace jako plugin
 ```
 
 ## Komunitní sdílení (volitelné)

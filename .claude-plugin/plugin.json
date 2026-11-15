@@ -10,8 +10,5 @@
   "homepage": "https://www.historiedomu.cz",
   "repository": "https://github.com/vzoha/dejiny-domu-skill",
   "documentationUrl": "https://github.com/vzoha/dejiny-domu-skill#readme",
-  "privacyPolicyUrl": "https://github.com/vzoha/dejiny-domu-skill#bezpe%C4%8Dnost",
-  "skills": [
-    "./dejiny-domu"
-  ]
+  "privacyPolicyUrl": "https://github.com/vzoha/dejiny-domu-skill#bezpe%C4%8Dnost"
 }
