@@ -132,9 +132,15 @@ def main():
         if k not in cited:
             warn.append(f"zápis {k}: necituje ho žádný dům ani událost obce (doplnit do 'r')")
 
+    podle_url = {}
     for k, sv in svazky.items():
         if c := chyba_odkazu(sv.get("url")):
             err.append(f"svazek {k}: {c}")
+        if re.search(r"\d{3,}|[0-9a-f]{8}-", sv.get("url") or ""):   # odkaz na konkrétní knihu, ne úvod portálu
+            podle_url.setdefault(sv["url"].rstrip("/"), []).append(k)
+    for url, ks in podle_url.items():
+        if len(ks) > 1:   # snímky z jiné knihy, než byla otevřená, dostanou její odkaz
+            warn.append(f"svazky {', '.join(ks)} mají stejný odkaz {url} – je to opravdu jedna kniha?")
     mapy = jload("mapy.json", [])
     for m in mapy:
         if c := chyba_odkazu(m.get("url")):

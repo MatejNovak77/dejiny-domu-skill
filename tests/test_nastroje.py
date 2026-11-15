@@ -324,6 +324,12 @@ class TestKontrola(Projekt):
         self.assertEqual(rc, 1)
         self.assertIn("svazek 'trebon_9999' není v data/svazky.json", out)
 
+    def test_svazky_se_stejnym_odkazem(self):
+        self.napln()
+        self.zapis("svazky", "trebon_4251", dict(SVAZEK, svazek="Sčítání lidu 1900"))
+        rc, out = self.kontrola()
+        self.assertIn("svazky trebon_4250, trebon_4251 mají stejný odkaz", out)
+
     def test_hlavni_dum_neexistuje(self):
         self.napln()
         self.nastroj("zapis.py", "web", "hlavni_dum", "-", vstup='"99"')
