@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Zesílený snímek pro čtení vybledlého písma (inkoust i tužka, mikrofilm i barevný sken).
 
 Použití:

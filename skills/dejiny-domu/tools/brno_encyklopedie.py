@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Encyklopedie dějin města Brna (encyklopedie.brna.cz, Muzeum města Brna): co víme o ulici a domě.
 
 Použití:

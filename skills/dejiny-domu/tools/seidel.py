@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Fotografie z Fotoateliéru Seidel v Českém Krumlově (Fotobanka Musea Fotoateliér Seidel), Šumava a Pošumaví 1880–1960.
 
 Dva druhy nálezů:

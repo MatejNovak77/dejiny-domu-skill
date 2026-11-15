@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Matriky a archiválie SOA Praha (eBadatelna, ebadatelna.soapraha.cz) bez prohlížeče a bez přihlášení.
 
 Použití (z kořene projektu):

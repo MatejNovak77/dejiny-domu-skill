@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Staré plány a letecké snímky Prahy z IPR Praha (gs-pub.praha.eu) – celá série se stejným výřezem.
 
 Mapy jsou georeferencované v S-JTSK, takže všechny obrázky série mají stejný výřez a na webu je jde prolínat

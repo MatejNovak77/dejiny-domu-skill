@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Kontrola verze na začátku konverzace: nainstalovaný skill × projekt × nejnovější vydání na GitHubu.
 Použití: python3 -I <skill>/tools/verze.py [<složka projektu>]
 

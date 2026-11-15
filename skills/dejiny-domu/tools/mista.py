@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Místa pro mapu na webu: okolní body (kaple, mlýn, hamr, sousední ves) v data/mista.json a poloha domů.
 
 Použití:

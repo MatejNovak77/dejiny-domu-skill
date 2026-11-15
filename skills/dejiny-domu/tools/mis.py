@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Fotky, plány a mapy NPÚ v Metainformačním systému (MIS, iispp.npu.cz/mis_public) – jen popis a odkaz, ne soubory.
 
 Použití:

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Obrázky obce z Europeany (sbírky evropských muzeí, knihoven a archivů), s licencí u každého předmětu.
 
 Hledá v okolí obce podle polohy z RÚIAN (předměty se souřadnicemi) i podle názvů (český, německý):

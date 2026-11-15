@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Matriky SOA Třeboň (digi.ceskearchivy.cz) bez prohlížeče.
 
 Použití (z kořene projektu):

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Památky a evidované objekty obce z Památkového katalogu NPÚ (pamatkovykatalog.cz).
 
 Soupis obsahuje kulturní památky i objekty, které památkáři jen evidují (kaple, mlýny, domy bez ochrany).

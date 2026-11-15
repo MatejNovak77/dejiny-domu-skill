@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Hřbitovní pasporty obcí na GisOnline.cz (TopGis): hroby a zemřelí se jménem, narozením, úmrtím a pohřbem.
 
 Pokrývá 20. století, kam online archivy nesahají. Číslo popisné u hrobu není: shoda se jménem obyvatele je vodítko,

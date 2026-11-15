@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Staré fotky, pohlednice, kresby a mapy obce z Wikimedia Commons, každý soubor s licencí, autorem a datem.
 
 Kategorii obce najde přes Wikidata (vlastnost „kategorie na Commons“), stejnojmenné obce rozliší polohou z RÚIAN.

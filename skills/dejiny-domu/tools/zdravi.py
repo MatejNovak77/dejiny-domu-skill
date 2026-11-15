@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Kontrola portálů: funguje každý nástroj ještě proti živému portálu?
 
 Archivy mění adresy a API bez ohlášení. Nástroj spustí každý nástroj na pevném, známém svazku (čtení + jeden malý

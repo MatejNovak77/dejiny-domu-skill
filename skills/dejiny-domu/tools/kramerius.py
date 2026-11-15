@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Kramerius: hledání ve fulltextu (NK nebo jiná knihovna přes Českou digitální knihovnu), text stránky, autoři díla.
 
 Použití:

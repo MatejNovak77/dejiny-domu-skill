@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Přidá nebo nahradí jednu položku v datech projektu – formát souboru zůstane stejný (odsazení 1, české znaky, konce
 řádků LF), takže změna v historii je jen ta jedna položka.
 

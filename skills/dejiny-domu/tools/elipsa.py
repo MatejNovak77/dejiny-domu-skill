@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Dům na mapě označený tmavě modrou elipsou s bílou září – do PDF a na web, aby čtenář dům našel na každé mapě.
 
 Použití (z kořene projektu):

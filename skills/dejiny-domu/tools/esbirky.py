@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Fotografie, pohlednice, kresby a předměty obce ve sbírkách muzeí a galerií (eSbírky, Národní muzeum).
 
 eSbírky spojují sbírky desítek muzeí (Národní muzeum, krajská a městská muzea). Hledání webu je volné

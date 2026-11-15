@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """ANNO (Rakouská národní knihovna) – fulltext v novinách 1700–1950. Jen REST API, bez prohlížeče.
 Volitelně ANNO_TITLE=<zkratka listu> omezí hledání na jeden list.
 Usage: anno.py "TEXT QUERY" [yearFrom] [yearTo] [maxpages] [--snip]

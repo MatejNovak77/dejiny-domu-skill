@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Slušný přístup k webům archivů: společný limit rychlosti a zastavení, když server dá najevo, že ho zatěžujeme.
 
 Archivy (MZA Brno, SOA Litoměřice…) banují IP adresu po sérii rychlých dotazů. Ban dopadne na uživatele

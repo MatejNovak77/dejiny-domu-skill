@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Zaniklá místa u obce z portálu Zaniklé obce a objekty (zanikleobce.cz): vsi, samoty, mlýny, dvory, cihelny, kaple.
 
 Hlavně pohraničí zaniklé po roce 1945, ale i mlýny a dvory ve vnitrozemí. U místa bývají dobové fotky a pohlednice,

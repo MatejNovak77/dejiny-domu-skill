@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Archivní fondy obce ve všech archivech ČR (Národní archivní portál, ústřední evidence Národního archivního dědictví).
 Snímky tu nejsou, jen co existuje a kde: archiv, název fondu, roky. Podklad pro dotaz archivu (`archivni_dotazy.md`).
 

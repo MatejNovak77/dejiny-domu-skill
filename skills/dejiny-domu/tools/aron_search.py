@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Hledání svazků na portálu ARON (SOA Zámrsk, fond Sbírka matrik Východočeského kraje).
 Použití: aron_search.py "<text v popisu, např. obec>" [filtr názvu fondu] [max]
   Víc slov oddělených čárkou musí být v popisu všechna: "Vinice,Hořice" = Vinice ve farnosti Hořice

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Pražské policejní přihlášky 1850–1914 (Národní archiv, digi.nacr.cz/prihlasky2) bez prohlížeče.
 
 Použití (z kořene projektu):

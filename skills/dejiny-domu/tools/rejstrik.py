@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Firmy, družstva a společenství vlastníků se sídlem v domě (ARES Ministerstva financí, veřejný rejstřík).
 
 K dějinám domu po roce 1990: společenství vlastníků jednotek (SVJ) a jeho datum vzniku ≈ kdy se prodávaly

@@ -1,4 +1,3 @@
-#!/bin/bash
 # matricula_dl.sh URL OUT  -- stáhne obrázek z img.data.matricula-online.eu (URL s csrf+ctrl z prohlížeče)
 # Do OUT zapíše jen skutečný JPEG; při chybě vrátí 1 a starý OUT nechá být.
 tok=$(echo "$1" | sed -E 's/.*csrf=([^&]+).*/\1/')

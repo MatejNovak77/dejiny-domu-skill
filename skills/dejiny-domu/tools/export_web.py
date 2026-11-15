@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Export dat projektu (data/*) do webu ve složce web/.
 
 Čte data/domy.py, data/zaznamy.json, data/svazky.json, data/prepisy.json, data/zvyrazneni.json,

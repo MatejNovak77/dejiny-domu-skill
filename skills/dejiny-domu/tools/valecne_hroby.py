@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Válečné hroby a pomníky padlých obce a padlí vojáci podle jména (Centrální evidence válečných hrobů MO,
 evidencevh.mo.gov.cz).
 

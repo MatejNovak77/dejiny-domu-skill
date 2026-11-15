@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Snímek matriky ve formátu Zoomify (SOA Litoměřice) v plném rozlišení – bez prohlížeče a bez cookies.
 
 ZA Opava (images.archives.cz) od listopadu 2026 nástroje nepouští (HTTP 503 hned na první snímek) – snímek odtud

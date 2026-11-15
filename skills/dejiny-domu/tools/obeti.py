@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Oběti nacistické perzekuce podle ulice a čísla domu (Databáze obětí, holocaust.cz, Institut Terezínské iniciativy).
 
 Databáze má Židy deportované z českých zemí (a Romy z tábora v Letech) se jménem, narozením, transporty, osudem

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Pohlednice z AKON (Ansichtskarten Online, Rakouská národní knihovna) 1896–1925: celá monarchie, Čechy, Morava, Slezsko.
 
 Prohledává otevřená data ÖNB Labs (34 846 pohlednic ve volném díle, z Česka asi 1 700, hlavně města a lázně):

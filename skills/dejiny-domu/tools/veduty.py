@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Veduty, pohlednice, fotografie a mapy obce z digitálních knihoven (Česká digitální knihovna: MZK, UK, další).
 
 Grafické sbírky a mapy MZK (Mollova sbírka, grafiky.mzk.cz, mapy.mzk.cz) i sbírky jiných knihoven v jednom hledání.

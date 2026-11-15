@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Staré mapy z Geolabu UJEP (geolab.cz/stare-mapy): I. a II. vojenské mapování, Müllerovo mapování, část III. mapování.
 
 Listy nejsou georeferencované: list s obcí najdi v kladu (obrázek s čísly listů a názvy měst), pak náhled listu

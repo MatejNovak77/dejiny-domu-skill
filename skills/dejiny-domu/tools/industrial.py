@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Průmyslové stavby obce z Industriální topografie VCPD FA ČVUT (industrialnitopografie.cz).
 
 Mlýny, pivovary, cihelny, továrny, doly, mosty, vodárny: dějiny objektu, datace, stav a literatura.

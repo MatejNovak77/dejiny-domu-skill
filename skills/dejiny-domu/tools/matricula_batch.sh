@@ -1,4 +1,3 @@
-#!/bin/bash
 # matricula_batch.sh URLFILE PREFIX  (URLFILE: řádky "<snímek> <url obrázku>" vytažené z prohlížeče) -> stáhne PREFIX_<pg>.jpg (+ _s.jpg zmenšeninu 1900px)
 # Při první chybě skončí s kódem 1 (URL z prohlížeče obvykle vyprší všechny naráz – další pokusy by jen zatěžovaly server).
 M=magick   # ImageMagick 6 nemá magick, jen convert (na Windows je convert.exe jiný program, tam ne)

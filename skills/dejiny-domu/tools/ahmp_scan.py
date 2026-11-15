@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Matriky AHMP (Praha) – stáhne snímek slepením dlaždic Zoomify.
 Použití: ahmp_scan.py XID SCAN OUT.jpg [down] [x0,y0,x1,y1]   (down=0 plné rozlišení, 1 = poloviční…; oblast ve zlomcích)
 XID svazku vypíše ahmp_search.sh. Trvalý odkaz: https://katalog.ahmp.cz/pragapublica/permalink?xid=<XID>&scan=<N>"""

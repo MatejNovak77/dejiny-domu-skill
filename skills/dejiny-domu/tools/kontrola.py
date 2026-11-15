@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Kontrola konzistence dat projektu. Spouštějte po každé větší změně a před stavbou webu.
 
 Použití: kontrola.py

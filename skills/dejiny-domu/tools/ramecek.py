@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Rámeček zvýraznění – které místo výřezu čteme (data/zvyrazneni.json).
 
 Použití:

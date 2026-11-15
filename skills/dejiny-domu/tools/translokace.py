@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Translokační plány židovských obydlí 1727–1728 (Národní archiv, MZA a VÚGTK, www.vugtk.cz/plany).
 
 Plány ~200 měst a vsí v Čechách a na Moravě, kde žili Židé: zakreslují domy, synagogy, kostel a vzdálenost

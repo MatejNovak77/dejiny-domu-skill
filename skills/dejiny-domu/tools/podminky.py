@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Podmínky portálů: co smí nástroj stáhnout a který obrázek smí do výstupu (tools/podminky.json).
 
 Lidská verze s vysvětlením: reference/podminky.md. Jen veřejné zdroje, stav 3. 11. 2026, není to právní rada.

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Tisk 20. století z Krameria NK (ndk.cz): hledání, úryvky z neveřejných stran, OCR veřejných stran a hledání adres.
 
 Většina tisku 1900–2000 je „private“, ale s DNNT – čitelná po přihlášení na ndk.cz (reference/portaly.md → DNNT).

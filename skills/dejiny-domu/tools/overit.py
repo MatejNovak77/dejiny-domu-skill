@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Ověření čtení (např. po pomocníkovi): výřez zápisu rozdělený na dvě poloviny 1900 px.
 Použití: overit.py <snímek.jpg> x0,y0,x1,y1 <prefix> [v]  (v = dělit vodorovně)"""
 import glob,os,shutil,sys,subprocess

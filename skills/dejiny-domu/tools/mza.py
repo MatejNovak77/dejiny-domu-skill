@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Matriky MZA Brno (Acta Publica, www.mza.cz/actapublica) bez prohlížeče a bez přihlášení.
 
 Použití (z kořene projektu `python3 -I tools/mza.py …`, na Windows `python -I -X utf8 tools/mza.py …`):

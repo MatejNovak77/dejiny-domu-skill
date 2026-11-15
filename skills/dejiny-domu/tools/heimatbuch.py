@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Heimatbücher a jiná německá literatura o obci z katalogu Německé národní knihovny (DNB).
 
 Vysídlení Němci po roce 1945 vydali ke stovkám obcí Čech, Moravy a Slezska Heimatbücher, Ortschroniken a seznamy

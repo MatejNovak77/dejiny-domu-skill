@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Hook PreToolUse (Claude Code): síťový přístup k archivům jen přes slusne.py (společný limit rychlosti).
 
 Zastaví v Bashi:

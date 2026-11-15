@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Sčítání lidu v Brně 1850–1921 (Archiv města Brna, Digitální archiv digiarchiv.brno.cz).
 
 Operáty jsou po domech: ulice a číslo, jak je psal sčítací komisař (do 1900 německy: „Adlergasse“, „Kröna“,

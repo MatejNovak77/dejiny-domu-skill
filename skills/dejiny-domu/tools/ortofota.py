@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Letecké snímky (ortofoto) kolem domu po letech od 1998 – celá série se stejným výřezem.
 
 Ukáže, jak se dům a dvůr měnily v posledních desetiletích: přístavby, zbořené stodoly, nové domy v sousedství.

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Matriky SOA Plzeň na portálu Porta fontium (portafontium.eu) bez prohlížeče.
 
 Použití (z kořene projektu `python3 -I tools/portafontium.py …`, na Windows `python -I -X utf8 tools/portafontium.py …`):

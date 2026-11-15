@@ -1,4 +1,3 @@
-#!/bin/bash
 # Matriky AHMP (Praha): ahmp_search.sh "dotaz" -> vypíše svazky Sbírky matrik (popis | farnost | XID, počet snímků).
 # Používá starý katalog katalog.ahmp.cz/pragapublica (nový digi.ahmp.cz má ochranu proti robotům – nepoužívat).
 # Katalog řadí výsledky pokaždé jinak, takže se stránky překrývají a část svazků vypadne. Hledání se proto opakuje

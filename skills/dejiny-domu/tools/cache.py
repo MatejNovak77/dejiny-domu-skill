@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Sdílená mezipaměť obrázků z archivů – každý snímek nebo dlaždice se z archivu stáhne jen jednou.
 
 Ukládá ji brzda tools/slusne.py: obrázek stažený přes brzdu (nástroje, vlastní skripty, pomocníci) se uloží podle

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Založí nový projekt dějin domu / obce ze šablony skillu.
 
 Použití: python3 <skill>/tools/novy_projekt.py <cílová složka> [--bez-webu]

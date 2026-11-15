@@ -28,9 +28,9 @@ Kontrolu formátu dělá `skills/dejiny-domu/tests/commit_msg.py`; po naklonová
 
 ## Plugin
 Plugin je celé repo (`.claude-plugin/plugin.json`), v adresáři pluginů Anthropicu přihlášený z kořene.
-Adresář od neověřených autorů mimo `skills/` přijme jen Markdown, text, JSON, YAML a obrázky (ne `.py`, nic
-s `#!`), proto jsou testy v `skills/dejiny-domu/tests/` (instalují se uživatelům, neškodí). Do kořene repa nedávat
-kód; v šabloně webu žádný `package.json` se `scripts` ani `.npmrc` (proto `*.sablona`). Kontrola: `claude plugin validate .`
+Adresář od neověřených autorů mimo `skills/` přijme jen Markdown, text, JSON, YAML a obrázky (ne `.py`) a nikde
+nic, co začíná `#!` – ani nástroje ve `skills/` (spouštějí se přes `python3`/`bash`). Testy proto ve
+`skills/dejiny-domu/tests/` (instalují se uživatelům, neškodí). Do kořene repa nedávat kód; v šabloně webu žádný `package.json` se `scripts` ani `.npmrc` (proto `*.sablona`). Kontrola: `claude plugin validate .`
 
 ## Knihovny webu (template/web)
 V šabloně jsou `package.sablona.json` a `npmrc.sablona` (adresář pluginů nepřijme `package.json` s polem `scripts`

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Download page image (or enlarged region around hit) from ANNO via snippet API hash.
 Usage: anno_snap.py DOCID "QUERY" OUTFILE [page] [mode=full|ctx] [width]
 mode ctx = hit area expanded (+/-600px vertically, whole column width)"""

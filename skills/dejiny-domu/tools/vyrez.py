@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Výřez zápisu ze staženého snímku stránky (z jakéhokoli portálu).
 
 Použití:

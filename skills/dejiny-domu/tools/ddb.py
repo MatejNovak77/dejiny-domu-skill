@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Obrázky obce z Deutsche Digitale Bibliothek (DDB): fotky, diapozitivy, pohlednice, kresby a plány z německých muzeí,
 archivů a knihoven (Foto Marburg, Humboldtova univerzita, Sudetoněmecké muzeum…), s licencí u každého předmětu.
 

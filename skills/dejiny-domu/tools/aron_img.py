@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Stažení snímku matriky z portálu ARON (SOA Zámrsk, aron.vychodoceskearchivy.cz).
 
 Použití:

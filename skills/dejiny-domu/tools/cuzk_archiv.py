@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Staré mapy z Archivu ČÚZK (ags.cuzk.gov.cz/archiv) bez prohlížeče: stabilní katastr, indikační skici, pozemkový katastr,
 seznam leteckých měřických snímků.
 

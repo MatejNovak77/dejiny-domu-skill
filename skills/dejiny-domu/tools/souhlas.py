@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Souhlas uživatele s podmínkami portálů s citlivými údaji o obětech (obeti.py).
 
 Databáze obětí žádá při vstupu o potvrzení podmínek (osobní odpovědnost za nakládání s údaji). Nástroj prohlížeč nemá,
