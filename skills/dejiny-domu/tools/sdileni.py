@@ -9,18 +9,21 @@ Použití (z kořene projektu `python3 -I tools/sdileni.py …`):
   sdileni.py prehled                     -> co je nového k nasdílení, souhlas uživatele (data/sdileni.json)
   sdileni.py souhlas <ano|mapa|ne> [jméno] -> rozhodnutí uživatele: ano = mapa i index (jméno nebo přezdívka v indexu;
                                             bez něj anonymně), mapa = jen orientační body bez jmen, ne = nic
+  sdileni.py obec <část obce> [okres]    -> obec domu s kódem RÚIAN pro mapu (knihy pak najde i podle obce); bez zadání
+                                            se vezme z OBEC v data/domy.py, je-li v RÚIAN jednoznačná
   sdileni.py kanal <gh|schranka>         -> jak odesílat: gh = pod účtem GitHub (výchozí, je-li přihlášený),
                                             schranka = vždy anonymně přes sběrnou schránku (účet nebude vidět)
   sdileni.py navrh                       -> pracovni/sdileni/: body pro mapu a zápisy pro index (osoby a ostatní doplní Claude)
-  sdileni.py odeslat [mapa|index]        -> pull request do mapy a/nebo indexu; s účtem GitHub (gh) pod ním,
-                                            bez něj přes sběrnou schránku Mapy matrik; jen se souhlasem
+  sdileni.py odeslat [mapa|index] [--znovu] -> pull request do mapy a/nebo indexu; s účtem GitHub (gh) pod ním,
+                                            bez něj přes sběrnou schránku Mapy matrik; jen se souhlasem;
+                                            --znovu pošle i odeslané body (mapa doplní knihám rozsah let a obce)
 
 Čtení jde přes brzdu (tools/slusne.py) a ukládá se na den do ~/.cache/dejiny_domu_sdileni/. Ven jde jen to, co uživatel
 schválí: orientační body (bez jmen) a přepisy zápisů starších zákonných lhůt (narození 100 let, sňatky a úmrtí 75 let),
 bez výřezů, fotek a závěrů o domě a lidech. Podporované archivy: mapa SOA Plzeň, Praha, Zámrsk, Třeboň, Litoměřice,
 ZA Opava, MZA a AHMP; index SOA Plzeň, Praha a AHMP. Ostatní nástroj vynechá a řekne to.
 """
-import collections, datetime, json, os, re, shutil, subprocess, sys, tempfile, time, unicodedata, urllib.error, urllib.request
+import collections, datetime, json, os, re, shutil, subprocess, sys, tempfile, time, unicodedata, urllib.error, urllib.parse, urllib.request
 import os as _os, sys as _sys; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); import slusne  # noqa: E402 – brzda (tools/slusne.py)
 
 MAPA = "https://ondrnovy.github.io/mapa-matrik/v1"
@@ -84,7 +87,7 @@ def slug(text):
 # ---------- kniha v projektu -> mapa a index ----------
 
 # Archivy mapy (tabulka ARCHIVY_MAPY sběrné schránky): portál a adresy svazku -> id knihy. Archiv indexu jen u těch,
-# které index matrik zná (ARCHIVY_INDEXU schránky). AHMP má v indexu id z prvních 8 znaků xid, mapa stejné kvůli párování.
+# které index matrik zná (ARCHIVY_INDEXU schránky). Kniha AHMP je v mapě pod celým xid velkými, v indexu pod prvními 8 znaky malými.
 Archiv = collections.namedtuple("Archiv", "portal index vzory")
 ARCHIVY = {k: Archiv(*v) for k, v in {
     "soa-plzen": ("portafontium", "portafontium", (r"portafontium\.eu/register/soap-pn/([a-z0-9-]+)",
@@ -95,17 +98,22 @@ ARCHIVY = {k: Archiv(*v) for k, v in {
     "soa-litomerice": ("digi-soalitomerice", None, (r"digi\.soalitomerice\.cz/.*?[?&]xid=([0-9a-fA-F]{8}-?(?:[0-9a-fA-F]{4}-?){3}[0-9a-fA-F]{12})",)),
     "za-opava": ("digi-archives", None, (r"digi\.archives\.cz/.*?[?&]xid=([0-9a-fA-F]{8}-?(?:[0-9a-fA-F]{4}-?){3}[0-9a-fA-F]{12})",)),
     "mza-brno": ("actapublica", None, (r"mza\.cz/actapublica/matrika/detail/(\d+)",)),
-    "ahmp": ("pragapublica", "ahmp", (r"ahmp\.cz/.*?xid=([0-9a-fA-F]{8})",)),
+    "ahmp": ("pragapublica", "ahmp", (r"ahmp\.cz/.*?xid=([0-9a-fA-F]{32})",)),
 }.items()}
 
 
 def kniha_z_url(url):
-    """(archiv mapy, archiv indexu nebo None, kniha) z adresy svazku; None pro archivy, které zatím nepodporujeme."""
+    """(archiv mapy, archiv indexu nebo None, kniha v mapě) z adresy svazku; None pro archivy, které zatím nepodporujeme."""
     for kod, archiv in ARCHIVY.items():
         for vzor in archiv.vzory:
             if m := re.search(vzor, url or ""):
-                return kod, archiv.index, uuid_s_pomlckami(m.group(1).lower())
+                return kod, archiv.index, m.group(1).upper() if kod == "ahmp" else uuid_s_pomlckami(m.group(1).lower())
     return None
+
+
+def kniha_indexu(k):
+    """Id knihy v indexu matrik z (archiv mapy, archiv indexu, kniha v mapě): u AHMP prvních 8 znaků xid malými."""
+    return k[2][:8].lower() if k[0] == "ahmp" else k[2]
 
 
 def uuid_s_pomlckami(kniha):
@@ -113,6 +121,10 @@ def uuid_s_pomlckami(kniha):
     if re.fullmatch(r"[0-9a-f]{32}", kniha):
         return "-".join((kniha[:8], kniha[8:12], kniha[12:16], kniha[16:20], kniha[20:]))
     return kniha
+
+
+def farnost_z_podpisu(podpis):
+    return re.sub(r"\s+\d+\w*$", "", podpis) or podpis
 
 
 def podpis_knihy(popis):
@@ -228,7 +240,7 @@ def najdi(obec, rok=None, druh=None):
         for n in vol.get("notes") or []:
             print(f"  pozn.: {n}")
         archiv_idx = ARCHIVY[ref["archive"]].index if ref["archive"] in ARCHIVY else None
-        k = archiv_idx and idx.get(f"{archiv_idx}/{ref['portal_id']}")
+        k = archiv_idx and idx.get(f"{archiv_idx}/{kniha_indexu((ref['archive'], archiv_idx, ref['portal_id']))}")
         if k:
             print(f"  v indexu matrik: {k.get('precteno', '?')} přečtených zápisů{', OCR ' + str(k['ocr_stran']) + ' stran' if k.get('ocr_stran') else ''} "
                   f"(sdileni.py kniha {vol.get('url') or ref['portal_id']})")
@@ -254,7 +266,7 @@ def kniha(klic_nebo_url):
     if not archiv_idx:
         print("Index matrik tenhle archiv zatím nemá.")
         return 0
-    radky = precteno_knihy(archiv_idx, kn)
+    radky = precteno_knihy(archiv_idx, kniha_indexu(k))
     print(f"Index matrik: {len(radky)} přečtených zápisů" + (":" if radky else " – po přečtení je nasdílej (sdileni.py prehled)."))
     for r in radky:
         print(f"  sn. {r.get('snimek')}: {r.get('typ')} {r.get('datum')} {r.get('obec')} – {r.get('osoby')}")
@@ -270,9 +282,97 @@ def nastaveni():
 
 
 def uloz_nastaveni(n):
+    for k, v in n.get("odeslano", {}).items():   # po odeslat --znovu bez dvojitých klíčů
+        n["odeslano"][k] = list(dict.fromkeys(v))
     with open(NASTAVENI, "w", encoding="utf-8") as f:
         json.dump(n, f, ensure_ascii=False, indent=1)
         f.write("\n")
+
+
+# ---------- obec domu (places a place_codes knihy v mapě) ----------
+
+RUIAN = "https://ags.cuzk.cz/arcgis/rest/services/RUIAN/Prohlizeci_sluzba_nad_daty_RUIAN/MapServer"
+
+
+def ruian_q(vrstva, where, pole):
+    q = urllib.parse.urlencode({"where": where, "outFields": pole, "returnGeometry": "false", "f": "json"})
+    t = stahni(f"{RUIAN}/{vrstva}/query?{q}")
+    return [f["attributes"] for f in (json.loads(t).get("features", []) if t else [])]
+
+
+def casti_obce(nazev):
+    """Části obcí RÚIAN toho jména s obcí a okresem: [{"kod", "nazev", "obec", "okres"}]."""
+    casti = ruian_q(11, "nazev='{}'".format(nazev.replace("'", "''")), "kod,nazev,obec")
+    if not casti:
+        return []
+    obce = {o["kod"]: o for o in ruian_q(12, f"kod IN ({','.join(str(c['obec']) for c in casti)})", "kod,nazev,okres")}
+    okresy = {o["kod"]: o["nazev"] for o in ruian_q(15, f"kod IN ({','.join(str(o['okres']) for o in obce.values())})", "kod,nazev")} if obce else {}
+    return [{"kod": c["kod"], "nazev": c["nazev"], "obec": obce.get(c["obec"], {}).get("nazev", ""),
+             "okres": okresy.get(obce.get(c["obec"], {}).get("okres"), "")} for c in casti]
+
+
+def vyber_cast(nazev, okres=""):
+    """(část obce, kandidáti): jednoznačná část obce toho jména (v okrese, je-li zadán), jinak None a kandidáti."""
+    kandidati = casti_obce(nazev)
+    v_okrese = [c for c in kandidati if not okres or norm(c["okres"]) == norm(okres)]
+    return (v_okrese[0] if len(v_okrese) == 1 else None), kandidati
+
+
+def obec_z_domy():
+    """(část obce, okres) z OBEC v data/domy.py: nazev a okres z pole obec („Horní Lhota, okres Pelhřimov (k. ú. …)“)."""
+    p = os.path.join(DATA, "domy.py")
+    if not os.path.exists(p):
+        return "", ""
+    ns = {}
+    try:
+        exec(open(p, encoding="utf-8-sig").read(), ns)
+    except Exception:
+        return "", ""
+    o = ns.get("OBEC") or {}
+    okres = re.search(r"okres\s+([^,()]+?)\s*(?:[,()]|$)", o.get("obec") or "")
+    return (o.get("nazev") or "").strip(), okres.group(1).strip() if okres else ""
+
+
+def obec_domu(n):
+    """{"nazev", "kod"} obce domu pro mapu: z data/sdileni.json, jinak z domy.py, je-li v RÚIAN jednoznačná (uloží se)."""
+    if n.get("obec"):
+        return n["obec"]
+    nazev, okres = obec_z_domy()
+    if not nazev:
+        return None
+    cast, kandidati = vyber_cast(nazev, okres)
+    if not cast:
+        print(f"Obec domu „{nazev}“ RÚIAN {'nezná' if not kandidati else 'nemá jednoznačnou'} – knihy pošlu bez obce. "
+              f"Zadej ji: sdileni.py obec <část obce> [okres]", file=sys.stderr)
+        return None
+    n["obec"] = {"nazev": cast["nazev"], "kod": cast["kod"]}
+    return n["obec"]
+
+
+def obec(nazev, okres=""):
+    cast, kandidati = vyber_cast(nazev, okres)
+    if not cast:
+        print(f"Část obce „{nazev}“{f' v okrese {okres}' if okres else ''} RÚIAN jednoznačně nezná. Kandidáti:")
+        for c in kandidati:
+            print(f"  {c['kod']}\t{c['nazev']}\tobec {c['obec']}\tokres {c['okres']}")
+        return 1
+    n = nastaveni()
+    n["obec"] = {"nazev": cast["nazev"], "kod": cast["kod"]}
+    uloz_nastaveni(n)
+    print(f"Obec domu: {cast['nazev']} (kód části obce {cast['kod']}, obec {cast['obec']}, okres {cast['okres']})")
+    return 0
+
+
+def knihy_obce(ob, sv):
+    """Klíče svazků, ke kterým patří obec domu: jmenuje ji popis svazku nebo zápis z té knihy (kniha čtená kvůli
+    jiné farnosti, třeba místo narození předka, obec domu nedostane). Město po částech („Horní Lhota-Zámek“) i bez části."""
+    if not ob:
+        return set()
+    vzor = re.compile("|".join(rf"(?<![a-z]){re.escape(j)}(?![a-z])" for j in {norm(ob["nazev"]), norm(ob["nazev"].split("-")[0])}))
+    p = os.path.join(DATA, "zaznamy.json")
+    texty = [(k, s.get("svazek") or "") for k, s in sv.items()]
+    texty += [(z.get("svazek"), f"{z.get('nazev', '')} {z.get('shrnuti', '')}") for z in (json.load(open(p, encoding="utf-8")) if os.path.exists(p) else [])]
+    return {k for k, t in texty if vzor.search(norm(t))}
 
 
 def bod(klic, snimek, *pole):
@@ -298,8 +398,8 @@ def rok_z(datum):
     return int(roky[-1]) if roky else None
 
 
-def nove(n=None):
-    """Body (z fronty i ze zápisů) a zápisy, které ještě neodešly."""
+def nove(n=None, znovu=False):
+    """Body (z fronty i ze zápisů) a zápisy, které ještě neodešly; znovu = body i odeslané (doplní rozsah a obce knih)."""
     n = n or nastaveni()
     sv = svazky()
     zaznamy = json.load(open(os.path.join(DATA, "zaznamy.json"), encoding="utf-8")) if os.path.exists(os.path.join(DATA, "zaznamy.json")) else []
@@ -320,7 +420,7 @@ def nove(n=None):
     if os.path.exists(FRONTA):
         body += [json.loads(l) for l in open(FRONTA, encoding="utf-8") if l.strip()]
     klic = lambda b: f"{b['svazek']}:{b['scan']}:{b.get('type')}:{b.get('year')}:{b.get('place')}:{b.get('letters')}"
-    hotove = set(n["odeslano"]["body"])
+    hotove = set() if znovu else set(n["odeslano"]["body"])
     body = list({klic(b): b for b in body if klic(b) not in hotove}.values())
     zapisy = [z for z in zapisy if z["klic"] not in set(n["odeslano"]["zapisy"])]
     return body, zapisy, mimo, klic
@@ -372,7 +472,7 @@ def navrh():
     with open(os.path.join(NAVRH, "zapisy.jsonl"), "w", encoding="utf-8") as f:
         for z in zapisy:
             k = kniha_z_url((svazky().get(z["svazek"]) or {}).get("url"))
-            f.write(json.dumps({"klic": z["klic"], "archiv": k[1], "kniha": k[2], "snimek": str(z["snimek"]), "typ": z.get("druh"),
+            f.write(json.dumps({"klic": z["klic"], "archiv": k[1], "kniha": kniha_indexu(k), "snimek": str(z["snimek"]), "typ": z.get("druh"),
                                 "datum": "", "obec": "", "osoby": "", "ostatni": "", "jistota": "",
                                 "_shrnuti": z.get("shrnuti"), "_orig": prepisy[z["klic"]].get("orig"), "_datum": z.get("datum")},
                                ensure_ascii=False) + "\n")
@@ -421,10 +521,11 @@ def pr(d, vetev, login, repo, titulek, telo, soubory):
     return gh("pr", "create", "--repo", repo, "--base", "main", "--head", f"{login}:{vetev}", "--title", titulek, "--body", telo, cwd=d)
 
 
-def odeslat_mapu(body, klic):
+def odeslat_mapu(body, klic, ob=None):
     sv = svazky()
     d, vetev, login = klon(REPO_MAPA)
     zmenene, odeslane = set(), []
+    s_obci = knihy_obce(ob, sv)
     for b in body:
         s = sv.get(b["svazek"]) or {}
         k = kniha_z_url(s.get("url"))
@@ -437,30 +538,35 @@ def odeslat_mapu(body, klic):
             podpis = podpis_knihy(s.get("svazek")) or k[2]
             vol = {"schema": 1, "archive": k[0], "portal": ARCHIVY[k[0]].portal,
                    "portal_id": k[2], "url": s.get("url"), "signature": podpis,
-                   "parish": re.sub(r"\s+\d+\w*$", "", podpis) or podpis, "records": {}, "points": [],
+                   "parish": farnost_z_podpisu(podpis), "records": {}, "points": [],
                    "sources": [{"by": login, "date": datetime.date.today().isoformat()}]}
             if s.get("snimku"):
                 vol["scans"] = int(s["snimku"])
         p = {x: b[x] for x in ("scan", "type", "year", "year_to", "months", "page", "place", "letters", "note") if b.get(x) not in (None, "")}
         p["by"] = login
-        if any(all(q.get(x) == p.get(x) for x in ("scan", "type", "year", "place", "letters")) for q in vol["points"]):
-            odeslane.append(klic(b))
-            continue
-        vol["points"].append(p)
-        vol["points"].sort(key=lambda q: q["scan"])
+        puvodni = json.dumps(vol, sort_keys=True)
+        if not any(all(q.get(x) == p.get(x) for x in ("scan", "type", "year", "place", "letters")) for q in vol["points"]):
+            vol["points"].append(p)
+            vol["points"].sort(key=lambda q: q["scan"])
+        if b["svazek"] in s_obci:   # obec domu ke knize; existující kód se nepřepisuje (jako schránka)
+            if ob["nazev"] not in vol.setdefault("places", []):
+                vol["places"].append(ob["nazev"])
+            vol.setdefault("place_codes", {}).setdefault(ob["nazev"], ob["kod"])
         rozsah = rozsah_knihy(s.get("svazek"))   # rozsah z katalogu, aby kniha byla v mapě i pro roky bez bodů
         if p.get("type") in ("N", "O", "Z") and p.get("year"):   # i rok bodu, kdyby byl mimo katalog
             rozsah[p["type"]] = f'{rozsah.get(p["type"], "")} {p["year"]}'
         for druh, roky_druhu in rozsah.items():   # existující rozsah se jen rozšíří (jako ve schránce)
             roky = [int(r) for r in re.findall(r"\d{4}", vol["records"].get(druh, "") + " " + roky_druhu)]
             vol["records"][druh] = f"{min(roky)}–{max(roky)}" if min(roky) != max(roky) else str(min(roky))
+        odeslane.append(klic(b))
+        if json.dumps(vol, sort_keys=True) == puvodni:   # bod, rozsah i obce už v mapě jsou
+            continue
         with open(path, "w", encoding="utf-8") as f:
             json.dump(vol, f, ensure_ascii=False, indent=1)
             f.write("\n")
         zmenene.add(os.path.relpath(path, d))
-        odeslane.append(klic(b))
     if not zmenene:
-        print("Mapa: nic nového (body už v mapě jsou).")
+        print("Mapa: nic nového (body, rozsahy i obce už v mapě jsou).")
         return odeslane
     url = pr(d, vetev, login, REPO_MAPA, f"Body od {login}: {len(odeslane)}",
              f"Orientační body přečtené při práci na dějinách domu (skill dejiny-domu, tools/sdileni.py). Knih: {len(zmenene)}.", sorted(zmenene))
@@ -495,7 +601,7 @@ def odeslat_index(n):
         os.makedirs(kd, exist_ok=True)
         ky = os.path.join(kd, "kniha.yaml")
         if not os.path.exists(ky):
-            s = next((v for k, v in sv.items() if k[1] == z["archiv"] and k[2] == z["kniha"]), {})
+            s = next((v for k, v in sv.items() if k[1] == z["archiv"] and kniha_indexu(k) == z["kniha"]), {})
             nazev = (s.get("svazek") or z["kniha"]).replace('"', "'")
             with open(ky, "w", encoding="utf-8") as f:
                 f.write(f'archiv: "{z["archiv"]}"\nkniha: "{z["kniha"]}"\nnazev: "{nazev}"\nurl: "{s.get("url", "")}"\n'
@@ -535,6 +641,8 @@ def ma_github():
 def odeslat_schrankou(n, body, klic, se_zapisy):
     """Bez účtu GitHub: body a zápisy jedním požadavkem do sběrné schránky Mapy matrik, ta založí PR."""
     sv = svazky()
+    ob = obec_domu(n)
+    s_obci = knihy_obce(ob, sv)
     data = {"nastroj": "dejiny-domu/sdileni.py", "body": [], "zapisy": []}
     poslane_body = []
     for b in body:
@@ -548,6 +656,9 @@ def odeslat_schrankou(n, body, klic, se_zapisy):
             p["scans"] = int(s["snimku"])
         if rozsah := rozsah_knihy(s.get("svazek")):
             p["records"] = rozsah
+        p["parish"] = farnost_z_podpisu(p["signature"])
+        if b["svazek"] in s_obci:
+            p.update(places=[ob["nazev"]], place_codes={ob["nazev"]: ob["kod"]})
         data["body"].append(p)
         poslane_body.append(klic(b))
     poslane_zapisy = []
@@ -555,7 +666,7 @@ def odeslat_schrankou(n, body, klic, se_zapisy):
         zapisy, cetl, _ = pripravene_zapisy(n)
         nazvy = {kniha_z_url(s.get("url")): s for s in sv.values() if kniha_z_url(s.get("url"))}
         for z in zapisy:
-            s = next((v for k, v in nazvy.items() if k[1] == z["archiv"] and k[2] == z["kniha"]), {})
+            s = next((v for k, v in nazvy.items() if k[1] == z["archiv"] and kniha_indexu(k) == z["kniha"]), {})
             data["zapisy"].append({**{k: z[k] for k in ("archiv", "kniha", "snimek", "datum", "typ", "obec", "osoby", "ostatni", "jistota")},
                                    "cetl": cetl, "nazev": (s.get("svazek") or "")[:200], "url": s.get("url", "")})
             poslane_zapisy.append(z["klic"])
@@ -577,7 +688,7 @@ def odeslat_schrankou(n, body, klic, se_zapisy):
     return poslane_body, poslane_zapisy
 
 
-def odeslat(co=None):
+def odeslat(co=None, znovu=False):
     n = nastaveni()
     if n.get("souhlas") not in ("ano", "mapa"):
         sys.exit("Bez souhlasu uživatele nic neodesílám (sdileni.py prehled, reference/sdileni.md).")
@@ -585,7 +696,7 @@ def odeslat(co=None):
         if co == "index":
             sys.exit("Souhlas je jen pro mapu (sdileni.py souhlas mapa) – do indexu nic neodesílám.")
         co = "mapa"
-    body, _, _, klic = nove(n)
+    body, _, _, klic = nove(n, znovu)
     if n.get("kanal") == "schranka" or not ma_github():   # anonymně, nebo bez účtu GitHub: přes sběrnou schránku
         zapisy_jsou = co in (None, "index") and os.path.exists(os.path.join(NAVRH, "zapisy.jsonl"))
         b, z = odeslat_schrankou(n, body if co in (None, "mapa") else [], klic, zapisy_jsou)
@@ -598,7 +709,7 @@ def odeslat(co=None):
             os.remove(FRONTA)
         return 0
     if co in (None, "mapa") and body:
-        n["odeslano"]["body"] += odeslat_mapu(body, klic)
+        n["odeslano"]["body"] += odeslat_mapu(body, klic, obec_domu(n))
         uloz_nastaveni(n)
     if co in (None, "index") and os.path.exists(os.path.join(NAVRH, "zapisy.jsonl")):
         n["odeslano"]["zapisy"] += odeslat_index(n)
@@ -626,12 +737,15 @@ def main(a):
         return prehled()
     if prikaz == "souhlas" and args:
         return souhlas(args[0], " ".join(args[1:]))
+    if prikaz == "obec" and args:
+        return obec(args[0], " ".join(args[1:]))
     if prikaz == "kanal" and args:
         return kanal(args[0])
     if prikaz == "navrh":
         return navrh()
     if prikaz == "odeslat":
-        return odeslat(args[0] if args else None)
+        co = [x for x in args if x != "--znovu"]
+        return odeslat(co[0] if co else None, "--znovu" in args)
     print(__doc__)
     return 2
 

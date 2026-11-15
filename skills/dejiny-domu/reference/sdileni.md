@@ -43,6 +43,10 @@ Nemá-li mapa obec ani knihu, postupuj jako dřív (portály v `portaly.md`).
 - **Body z listování** zapiš jen tam, kde se v knize orientuješ a nic nezapisuješ – začátek roku nebo vsi, začátek
   rejstříku, skok ve stránkování: `python3 -I tools/sdileni.py bod <klíč svazku> <snímek> rok=1785 ves=Lhota strana=fol. 12`
   (`rejstrik=A–C` u rejstříku). Jeden příkaz na snímek, který jsi stejně otevřel; bez jmen osob.
+- **Obec domu** jde ke knize s kódem části obce z RÚIAN (mapa pak knihu najde i podle obce, i stejnojmenné obce
+  rozliší). Nástroj ji vezme z `OBEC` v `data/domy.py` a přidá jen ke knize, kterou obec jmenuje popis svazku
+  nebo zápis z ní. Když RÚIAN obec nezná nebo jich zná víc, nástroj to řekne: `python3 -I tools/sdileni.py obec
+  <část obce> [okres]`. Body poslané dřív bez obce pošle znovu `sdileni.py odeslat mapa --znovu`.
 - **Zápisy pro index** jsou zápisy se záznamem v `zaznamy.json` a přepisem v `prepisy.json`, starší lhůt indexu
   (narození 100 let, sňatky a úmrtí 75 let).
 

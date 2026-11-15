@@ -43,7 +43,8 @@ class SdileniTest(unittest.TestCase):
                          ("soa-praha", "soapraha", "4888"))
         self.assertEqual(sdileni.kniha_z_url("https://ebadatelna.soapraha.cz/d/11973/15")[2], "11973")
         self.assertEqual(sdileni.kniha_z_url("https://katalog.ahmp.cz/pragapublica/permalink?xid=144286C6CCB648968F0C7879316827D0"),
-                         ("ahmp", "ahmp", "144286c6"))
+                         ("ahmp", "ahmp", "144286C6CCB648968F0C7879316827D0"))
+        self.assertEqual(sdileni.kniha_indexu(("ahmp", "ahmp", "144286C6CCB648968F0C7879316827D0")), "144286c6")   # index: 8 znaků
         self.assertIsNone(sdileni.kniha_z_url("https://aron.vychodoceskearchivy.cz/apu/abc"))
         self.assertIsNone(sdileni.kniha_z_url("https://www.mza.cz/actapublica/"))
 
@@ -59,7 +60,7 @@ class SdileniTest(unittest.TestCase):
             ("https://digi.soalitomerice.cz/da/permalink?xid=6e4224c5253a499fa16337279f1a0daf", ("soa-litomerice", None, "6e4224c5-253a-499f-a163-37279f1a0daf")),
             ("https://aron.vychodoceskearchivy.cz/apu/1b2c3d4e-0000-4a5b-8c9d-0123456789ab",
              ("soa-zamrsk", None, "1b2c3d4e-0000-4a5b-8c9d-0123456789ab")),
-            ("https://katalog.ahmp.cz/pragapublica/permalink?xid=168D806EE15440A2BA47401D7F3EAA53&scan=1", ("ahmp", "ahmp", "168d806e")),
+            ("https://katalog.ahmp.cz/pragapublica/permalink?xid=168D806EE15440A2BA47401D7F3EAA53&scan=1", ("ahmp", "ahmp", "168D806EE15440A2BA47401D7F3EAA53")),
         ]:
             self.assertEqual(sdileni.kniha_z_url(url), cekam, url)
 
@@ -160,6 +161,58 @@ class SdileniTest(unittest.TestCase):
         finally:
             sdileni.odeslat_schrankou, sdileni.ma_github = puvodni
         self.assertEqual(volano, [(2, False)])                       # dva body, žádné zápisy do indexu
+
+
+    def test_obec_z_domy(self):
+        with open(f"{sdileni.DATA}/domy.py", "w", encoding="utf-8") as f:
+            f.write('OBEC = dict(nazev="Horní Lhota", obec="Horní Lhota, okres Pelhřimov (k. ú. Horní Lhota u Kamenice)")\n')
+        self.assertEqual(sdileni.obec_z_domy(), ("Horní Lhota", "Pelhřimov"))
+
+    def test_knihy_obce(self):
+        json.dump([{"klic": "a", "svazek": "tr", "nazev": "Křest Josefa, Horní Lhota čp. 12, 1850"}],
+                  open(f"{sdileni.DATA}/zaznamy.json", "w"))
+        sv = {"tr": {"svazek": "Matrika narozených Kamenice 1842–1857, kniha 6"},           # obec jen v zápisu
+              "ka": {"svazek": "Matrika N Kamenice 1842–1857 (Horní Lhota a další obce)"},
+              "pc": {"svazek": "Matrika N Pacov 1842–1857"}}                                  # kniha jiné farnosti
+        self.assertEqual(sdileni.knihy_obce({"nazev": "Horní Lhota", "kod": 12345}, sv), {"tr", "ka"})
+        self.assertEqual(sdileni.knihy_obce(None, sv), set())
+
+    def test_schranka_posle_farnost_a_obec(self):
+        json.dump({"tr": {"url": "https://digi.ceskearchivy.cz/127297", "svazek": "Matrika narozených Rynárec 1842–1857, kniha 6 (Horní Lhota)"},
+                   "pc": {"url": "https://digi.ceskearchivy.cz/127298", "svazek": "Matrika N Pacov 1842–1857, kniha 3"}},
+                  open(f"{sdileni.DATA}/svazky.json", "w"))
+        n = sdileni.nastaveni()
+        n["obec"] = {"nazev": "Horní Lhota", "kod": 12345}
+        poslano = []
+
+        class Odpoved:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return b'{"mapa": null, "index": null}'
+        puvodni = sdileni.urllib.request.urlopen, sdileni.brzda
+        sdileni.urllib.request.urlopen = lambda req, timeout: poslano.append(json.loads(req.data)) or Odpoved()
+        sdileni.brzda = lambda url: None
+        try:
+            body = [{"svazek": "tr", "scan": 9, "type": "N", "year": 1850}, {"svazek": "pc", "scan": 4, "type": "N", "year": 1850}]
+            sdileni.odeslat_schrankou(n, body, lambda x: x["svazek"], False)
+        finally:
+            sdileni.urllib.request.urlopen, sdileni.brzda = puvodni
+        tr, pc = poslano[0]["body"]
+        self.assertEqual((tr["signature"], tr["parish"], tr["places"], tr["place_codes"]),
+                         ("Rynárec 6", "Rynárec", ["Horní Lhota"], {"Horní Lhota": 12345}))
+        self.assertEqual(pc["parish"], "Pacov")
+        self.assertNotIn("places", pc)                               # obec domu jen ke knize, která ji jmenuje
+
+    def test_odeslat_znovu(self):
+        sdileni.souhlas("mapa")
+        sdileni.kanal("schranka")
+        b, _, _, klic = sdileni.nove()
+        n = sdileni.nastaveni()
+        n["odeslano"]["body"] = [klic(x) for x in b] * 2
+        sdileni.uloz_nastaveni(n)
+        self.assertEqual(len(sdileni.nastaveni()["odeslano"]["body"]), len(b))   # bez dvojitých klíčů
+        self.assertEqual(sdileni.nove()[0], [])
+        self.assertEqual(len(sdileni.nove(znovu=True)[0]), len(b))   # --znovu pošle i odeslané
 
 
 if __name__ == "__main__":
