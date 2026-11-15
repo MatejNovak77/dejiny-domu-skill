@@ -50,7 +50,7 @@ výměnek čp. 30 a statek čp. 1 v Lništi (obec Slavče, okres České Budějo
   dost kreditů; tarif Pro stačí na vyzkoušení.
 - Programy **Python 3, Node.js, ImageMagick a git**. Claude zkontroluje, co chybí, a pomůže s instalací.
 - Volitelně účet na [Netlify](https://www.netlify.com) (zdarma), pokud chcete web zveřejnit.
-- Volitelně osobní klíč [Europeany](https://pro.europeana.eu/page/get-api) (zdarma) na staré obrázky obce
+- Volitelně osobní klíč [Europeany](https://pro.europeana.eu/page/get-api) (zdarma) na staré obrázky obce. Klíč zůstane uložený u vás a posílá se jen Europeaně.
   z evropských sbírek. Claude vám řekne, kde ho získat.
 
 ## Instalace
