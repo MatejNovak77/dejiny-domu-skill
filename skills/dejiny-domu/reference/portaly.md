@@ -288,6 +288,15 @@ na obec, hospodu nebo dům existuje, z kterého roku (razítko „gelaufen 1912�
 - Kdo pohlednici koupí, má originál a smí ho naskenovat; obrázek je volné dílo, když autor fotky (fotograf,
   vydavatel) zemřel před víc než 70 lety, u neznámého autora 70 let od vydání.
 
+## Místní historické weby a fotoalba obcí – přes vyhledávač
+Staré fotky a pohlednice malých obcí často nejsou v žádné sbírce, ale na webu obce, místního spolku, regionálního
+dějepisného webu nebo ve zpravodaji (výzvy „sbíráme staré fotografie“). Nástroje skillu je nenajdou.
+- Hledej vyhledávačem `<obec> stará fotografie pohlednice` (případně i `<obec> náměstí historie`, německý název);
+  otevírej jen nalezené stránky, nic neprocházej plošně.
+- Dům na pohledu urči podle mapy a dnešního stavu (střecha, štít, sousedé), jistotu nech potvrdit uživatele.
+- **Obrázek do výstupu ne:** patří autorovi webu nebo sběrateli. Do výstupu jen popis a odkaz na stránku
+  („pohlednice náměstí kolem roku 1910, dům vlevo, web …“), obrázek jen s jeho svolením.
+
 ## Street View s časovou osou (Google Maps, Mapy.com Panorama) – jen uživatel
 Jak dům vypadal v posledních ~15 letech, které online archivy nepokrývají: přístavba, nová okna a omítka, zbořená
 stodola, kdy zmizel nápis obchodu. Google má v Česku ročníky asi od 2009 (ikona hodin vlevo nahoře, „Zobrazit další
@@ -503,6 +512,10 @@ Databáze míst, kde se točily filmy a seriály, často až na adresu s čísle
 - `link <kniha> <snímek>` → trvalý odkaz, `svazek <kniha>` → `svazky.json` (klíč `pf_<kniha>`).
 - Bez prohlížečového User-Agentu portál vrací 403 (nástroj ho posílá). Jmenné hledání portál nemá – indexy jsou jen uvnitř knih
   (`*i`, `ooi`, `+i` v seznamu knih fary).
+- **Fotografie a kroniky** hledá uživatel v prohlížeči. Odkaz potřebuje celou sadu parametrů formuláře, jinak vrátí prázdný
+  seznam i tam, kde výsledky jsou (prázdno bez toho neznamená „nic není“):
+  `https://www.portafontium.eu/searching/photo?mode=0&field_archives=All&search_api_views_fulltext=&search_api_views_fulltext_1=<obec>&field_doc_place_field_doc_place_location_latlon_op=-&search_api_views_fulltext_2=&search_api_aggregation_3=&field_doc_dates_field_doc_dates_from=&field_sign=`
+  (kroniky: `/searching/chronicle` se stejnými parametry). Fotek z české strany je málo, hlavně z větších měst.
 
 ## SOA Praha (eBadatelna, ebadatelna.soapraha.cz) – `tools/ebadatelna.py`
 - **Archiv v listopadu 2026 oznámil**, že automatizované nástroje eBadatelnu přetěžují, a dočasně zavedl limity
