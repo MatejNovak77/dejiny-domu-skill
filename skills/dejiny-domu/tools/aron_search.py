@@ -78,7 +78,8 @@ def scitani(obec):
     for i in items:
         popis = (i.get("description") or "").strip()
         p = popis.lower()
-        jmeno_obce = p == obec_l or p.startswith(obec_l + " (") or p.startswith(obec_l + " -")
+        # „Obec“, „Obec (…)“, „Obec - čp. 1-13“, „Obec čp. 1-48“ (bez pomlčky: Velká Čermná, Spyta)
+        jmeno_obce = p == obec_l or re.match(re.escape(obec_l) + r"\s*([(\-,]|č\.? ?p)", p)
         if (jmeno_obce and re.search(r", 1[89]\d\d$", i["name"])) or ("sčítání lidu" in p and obec_l in p):
             kandidati.append(i)
     radky = []

@@ -85,6 +85,7 @@ def adresni_mista(dotaz, pole, obec=""):
     vzory = [f"{d},%"]
     if ulice and cislo.isdigit():
         vzory += [f"{ulice} %/{cislo},%",   # „Ulice čo“ – v RÚIAN je „Ulice čp/čo, Část obce, …“
+                  f"{ulice} {cislo}/%,%",   # „Ulice čp“ u domu s čo („Dlouhá 12“ → „Dlouhá 12/3, …“)
                   # obec bez ulic: „č.p. 12, 39301 Pavlov“; osada pod jinou obcí: „Švihov 47, 53825 Miřetice“
                   f"č.p. {cislo}, % {ulice}", f"č.p. {cislo}, % {ulice},%"]
     for podminka in ("adresa LIKE '{}'", "UPPER(adresa) LIKE UPPER('{}')"):

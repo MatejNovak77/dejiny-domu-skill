@@ -243,11 +243,11 @@ Archiv ČÚZK je na https://ags.cuzk.gov.cz/archiv/ (staré archivnimapy.cuzk.cz
   majitelů (nové domy, dělení parcel). Doplňky mají data přímo na listu, poslední datum ověř tam. V některých
   k. ú. se pozdější změny kreslily i do originální mapy – i tam rozhoduje datum na listu, ne rok reambulace.
 - **Indikační skica** (služba `skici`, předpona S0X) = pracovní mapa se jmény držitelů a změnami. Je v aplikaci ČÚZK,
-  ale **patří Národnímu archivu (Čechy) nebo MZA (Morava) – na snímcích je vodoznak „NA + ZA“**. **Barvy čísel jsou tu
-  jinak než na originální mapě: v budově je červeně číslo popisné („N. 1“) a černě číslo stavební parcely** (originální
-  mapa a otisk čísla popisná nemají). Pozemkové parcely jsou na původní skice červeně (rozliší je jen „N.“ a tvar plochy),
-  na nové skice z reambulace černě. Při záměně čteš celou ves obráceně; ověř
-  přes `mapa pk` s adresními body (níže). Čti z ní (čísla domů, držitelé), ale výřez nepřikládej do e-mailu, PDF ani
+  ale **patří Národnímu archivu (Čechy) nebo MZA (Morava) – na snímcích je vodoznak „NA + ZA“**. **Barvy čísel se mezi
+  skicami liší** (často červeně číslo popisné „N. 1“ a černě stavební parcela, jinde naopak; originální mapa a otisk čísla
+  popisná nemají). Které je které, urči na každé skice znovu: číslo shodné se stavební parcelou originální mapy je parcela,
+  druhé čp. Při záměně čteš celou ves obráceně. Čp. tří sousedních domů porovnej s dnešními (`mapa pk` s adresními body,
+  níže): jiná čísla v jiném sledu = dům byl přečíslován. Čti z ní (čísla domů, držitelé), ale výřez nepřikládej do e-mailu, PDF ani
   na web bez souhlasu archivu (`podminky.md`). Přikládej originální mapu nebo pozemkový katastr.
   **Držitel** bývá jménem i číslem („Brabetz … N 11“, Lniště 1827), na vsi i ve městě ale často **jen číslem:
   „N° 22“ = patří majiteli domu čp. 22** (Zruč nad Sázavou 1838 celé náměstí bez jmen). Jméno pak dá písemný operát
