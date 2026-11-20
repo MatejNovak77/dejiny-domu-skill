@@ -50,8 +50,8 @@ výměnek čp. 30 a statek čp. 1 v Lništi (obec Slavče, okres České Budějo
   dost kreditů; tarif Pro stačí na vyzkoušení.
 - Programy **Python 3, Node.js, ImageMagick a git**. Claude zkontroluje, co chybí, a pomůže s instalací.
 - Volitelně účet na [Netlify](https://www.netlify.com) (zdarma), pokud chcete web zveřejnit.
-- Volitelně osobní klíč [Europeany](https://pro.europeana.eu/page/get-api) (zdarma) na staré obrázky obce. Klíč zůstane uložený u vás a posílá se jen Europeaně.
-  z evropských sbírek. Claude vám řekne, kde ho získat.
+- Volitelně osobní klíč [Europeany](https://pro.europeana.eu/page/get-api) (zdarma) na staré obrázky obce
+  z evropských sbírek. Klíč zůstane uložený u vás a posílá se jen Europeaně. Claude vám řekne, kde ho získat.
 
 ## Instalace
 
@@ -127,9 +127,11 @@ archivy po sérii rychlých dotazů blokují IP adresu. Chodí na:
   kde archiv nástroje nepouští (ZA Opava, snímky eBadatelny), otevřete snímek v prohlížeči vy,
 - mapy a úřední data (Archiv ČÚZK, ortofota ČÚZK a krajů, RÚIAN, CENIA, Geolab, IPR Praha, OpenStreetMap, ARES
   a obchodní rejstřík),
-- noviny a knihy (ANNO, Kramerius, Česká digitální knihovna),
+- noviny a knihy (ANNO, Kramerius, Česká digitální knihovna, vlastivědné knihy v Německé národní knihovně,
+  Encyklopedie dějin města Brna),
+- Mapa matrik a index matrik (čtení; sdílení jen s vaším souhlasem),
 - památky a sbírky (Památkový katalog NPÚ, eSbírky, Fotobanka Seidel, Industriální topografie,
-  translokační plány ČVUT, Wikimedia Commons, Europeana, Deutsche Digitale Bibliothek, pohlednice AKON
+  translokační plány ČVUT, Wikimedia Commons a Wikidata, Europeana, Deutsche Digitale Bibliothek, pohlednice AKON
   Rakouské národní knihovny, zanikleobce.cz),
 - evidence válečných hrobů MO, hřbitovní pasporty obcí na GisOnline.cz a Databáze obětí nacismu (holocaust.cz),
 - při instalaci webu do registru npm; na Netlify jen tehdy, když web sami zveřejníte.
