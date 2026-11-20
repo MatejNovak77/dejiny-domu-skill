@@ -128,7 +128,7 @@ archivy po sérii rychlých dotazů blokují IP adresu. Chodí na:
 - mapy a úřední data (Archiv ČÚZK, ortofota ČÚZK a krajů, RÚIAN, CENIA, Geolab, IPR Praha, OpenStreetMap, ARES
   a obchodní rejstřík),
 - noviny a knihy (ANNO, Kramerius, Česká digitální knihovna),
-- památky a sbírky (Památkový katalog a MIS NPÚ, eSbírky, Fotobanka Seidel, Industriální topografie,
+- památky a sbírky (Památkový katalog NPÚ, eSbírky, Fotobanka Seidel, Industriální topografie,
   translokační plány ČVUT, Wikimedia Commons, Europeana, Deutsche Digitale Bibliothek, pohlednice AKON
   Rakouské národní knihovny, zanikleobce.cz),
 - evidence válečných hrobů MO, hřbitovní pasporty obcí na GisOnline.cz a Databáze obětí nacismu (holocaust.cz),

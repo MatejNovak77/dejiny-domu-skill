@@ -58,7 +58,6 @@ KONTROLY = [
     ("anno", "rakouské noviny", ["anno.py", "Chischka", "1880", "1890", "1"], r"ANNOP_", None),
     ("pamatky", "památky obce", ["pamatky.py", "Lniště"], r"^  680990 \| boží muka", None),
     ("pamatky", "detail památky", ["pamatky.py", "detail", "680990"], r"k\. ú\. Mohuřice", None),
-    ("mis", "dokumentace NPÚ", ["mis.py", "hledej", "Lniště"], r"^1618605 \|", None),
     ("narp", "archivní fondy", ["narp.py", "Slavče", "3"], r"d8e1f538-559e-44e8-b781-b5b3377be52b", None),
     ("valecne_hroby", "pomník padlých", ["valecne_hroby.py", "obec", "Slavče"], r"Jakub Bícha, \* 1881", None),
     ("hroby", "hřbitovní pasport", ["hroby.py", "najdi", "Brod nad Dyjí"], r"projekt 353", None),

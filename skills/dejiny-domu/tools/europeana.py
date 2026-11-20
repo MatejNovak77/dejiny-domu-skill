@@ -1,13 +1,13 @@
 """Obrázky obce z Europeany (sbírky evropských muzeí, knihoven a archivů), s licencí u každého předmětu.
 
 Hledá v okolí obce podle polohy z RÚIAN (předměty se souřadnicemi) i podle názvů (český, německý):
-fotky, pohlednice, kresby a mapy. České památky z NPÚ najde i mis.py, Deutsche Fotothek a Foto Marburg i ddb.py;
-Europeana přidá hlavně rakouská, maďarská a další zahraniční muzea a Mapovou sbírku PřF UK.
+fotky, pohlednice, kresby a mapy. České památky NPÚ jsou podrobněji v MIS (ručně), Deutsche Fotothek
+a Foto Marburg najde i ddb.py; Europeana přidá hlavně rakouská, maďarská a další zahraniční muzea a Mapovou sbírku PřF UK.
 
 Použití:
   europeana.py "<obec>" | "<Ulice čp, Obec>" | <šířka,délka> ["<německý název>" …] [od-do] [--km 2] [--volne] [--npu]
       – id | rok | název | instituce | licence | odkaz; --volne = jen licence pro placený výstup,
-        --npu = i fotky a evidenční listy NPÚ (jinak je vynechá, podrobněji je ukáže mis.py)
+        --npu = i fotky a evidenční listy NPÚ (jinak je vynechá, podrobněji v MIS, ručně)
   europeana.py detail <id>      – popis, místo, datace, autor, instituce, licence, obrázek, citace
 Potřebuje osobní API klíč (zdarma): https://pro.europeana.eu/page/get-api → účet Europeany → Request a personal API key;
 ulož ho do ~/.config/europeana/api-key nebo do proměnné EUROPEANA_API_KEY."""
@@ -22,7 +22,7 @@ API = "https://api.europeana.eu/record/v2"
 WEB = "https://www.europeana.eu/item"
 KLIC = os.path.join(os.path.expanduser("~"), ".config", "europeana", "api-key")
 VYCHOZI_KM = 2
-NPU = "The National Heritage Institute"   # památky NPÚ (MIS) najde podrobněji mis.py, v Europeaně zahltí okolí
+NPU = "The National Heritage Institute"   # v Europeaně NPÚ zahltí okolí
 NEJVIC = 100
 PRIRODOVEDNE = '-what:(specimen OR herbarium OR "preserved specimen" OR botany OR zoology OR geology OR mineral)'   # herbáře a nerosty se souřadnicemi sběru zahltí hledání podle polohy
 SOURADNICE = re.compile(r"-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?")
@@ -201,7 +201,7 @@ def main(argv):
         return
     print(f"Obrázky v Europeaně: {celkem}{f', vypisuji {len(predmety)} nejrelevantnějších podle roku' if celkem > len(predmety) else ''}")
     print("\n".join(radek(p) for p in predmety))
-    print(f"\n{'' if a.npu else 'Bez NPÚ (podrobněji mis.py, tady --npu). '}Deutsche Fotothek a Foto Marburg najde i ddb.py.\n"
+    print(f"\n{'' if a.npu else 'Bez NPÚ (podrobněji ručně v MIS na iispp.npu.cz/vyhledavani, tady --npu). '}Deutsche Fotothek a Foto Marburg najde i ddb.py.\n"
           "Obrázek do výstupu podle licence (europeana.py detail <id>): PDM, CC0, CC BY, CC BY-SA ano; NC a „práva vyhrazena“ ne.")
 
 

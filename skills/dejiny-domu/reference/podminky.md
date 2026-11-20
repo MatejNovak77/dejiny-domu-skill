@@ -58,7 +58,7 @@ Vždy uveďte archiv, fond, signaturu, číslo snímku a trvalý odkaz. Zjiště
 | Industriální topografie VCPD FA ČVUT | Nástroj | ano | neřeší | souhlas | ano | „Všechna práva vyhrazena“, o placeném užití web mlčí: zjištění vlastními slovy s citací (autor záznamu, název, Industriální topografie VCPD FA ČVUT, datum, číslo V…) a odkaz, texty a fotky jen se souhlasem VCPD. Web a robots.txt bez omezení, API jen číst (8. 11. 2026) |
 | Archeologická mapa ČR (AMČR, Digitální archiv) | Ručně | ano | prohlížet ano | nevýdělečně, s autorem | ano | Data CC BY-NC 4.0: za peníze jen prohlížet a zjištění s citací, data, plány a obrázky nepřebírat. API komerčně jen s předchozí písemnou smlouvou (api.aiscr.cz, 8. 11. 2026) |
 | Území s archeologickými nálezy (NPÚ, `pamatky.py uan`) | Nástroj | ano | ano | ano | ano | Data CC BY-SA 4.0, uveďte „NPÚ, Státní archeologický seznam ČR“ |
-| NPÚ MIS a Carmen (fotky, plány, průzkumy) | MIS nástroj (popis a odkaz), Carmen ručně | ano | souhlas | souhlas | ano | Carmen chrání ověření proti robotům, export z MIS reCAPTCHA. Fotky a plány jsou dílo NPÚ. Zveřejnit jen se smlouvou, na web nejvýš 200×300 px nebo s vodoznakem, v tisku licence od 1 500 Kč. Kopie k neveřejnému užití se objednává |
+| NPÚ MIS a Carmen (fotky, plány, průzkumy) | Ručně | ne | souhlas | souhlas | ano | robots.txt zakazuje Claude-User celý web (20. 11. 2026), Carmen navíc chrání ověření proti robotům. Fotky a plány jsou dílo NPÚ. Zveřejnit jen se smlouvou, na web nejvýš 200×300 px nebo s vodoznakem, v tisku licence od 1 500 Kč. Kopie k neveřejnému užití se objednává |
 | Národní archiv (Digitální badatelna) | Ručně | ano | neřeší | souhlas | ano | Ověření „nejsem robot“ řešíte vy. Zveřejnit jen se souhlasem |
 | Archiv hl. m. Prahy | Nástroj | ano | souhlas | souhlas | ano | Objednávka s účelem, užití zdarma. Na web nejvýš 500 px s vodoznakem |
 | FamilySearch | Ručně | ano | ano, pro klienta | souhlas | ano | Genealog smí bádat pro klienta a předat mu výsledek. Stahovat jen ručně, roboti zakázáni |
@@ -100,7 +100,7 @@ Vždy uveďte archiv, fond, signaturu, číslo snímku a trvalý odkaz. Zjiště
 
 ## Jak se tím řídí nástroje skillu
 - `tools/podminky.json` je stejná tabulka pro nástroje. `slusne.py` ji kontroluje před každým požadavkem: portál, který stahování nedovoluje, skončí hláškou „PODMÍNKY: …“ s návodem, jak dál. Takhle stojí `trebon.py`, `portafontium.py`, `ebadatelna.py` a v `mza.py` vše kromě hledání knih (stránku knihy chrání ALTCHA). Zůstávají ve skillu pro případ, že archiv dá souhlas.
-- Pravidla platí i pro část webu (`vyjimky` podle adresy, třeba Carmen na iispp.npu.cz). Přesměrování na ověření proti robotům (`/challenge`, `/captcha`) nástroj zastaví hláškou „OCHRANA: …“, nikdy ho neřeší.
+- Pravidla platí i pro část webu (`vyjimky` podle adresy). Přesměrování na ověření proti robotům (`/challenge`, `/captcha`) nástroj zastaví hláškou „OCHRANA: …“, nikdy ho neřeší.
 - `python3 -I tools/podminky.py <adresa>` vypíše pravidla pro portál.
 - `vyrez.py` po uložení řekne, jestli obrázek smí na veřejný web. Otevřený web obrázek bez souhlasu vynechá (u zápisu zůstane přepis a odkaz), `kontrola.py` to vypíše. Na neveřejný web (za heslem) smí. Souhlas archivu zapište k zápisu nebo mapě do pole `souhlas` (kdo a kdy).
 - Hlášku „PODMÍNKY“ neobcházejte jiným nástrojem, curl ani prohlížečem řízeným skriptem.
