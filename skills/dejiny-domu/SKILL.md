@@ -140,9 +140,9 @@ Když portál nemá nástroj ani čitelné API (mapové aplikace, prohlížeče 
 **použij sám prohlížeč přes skill `agent-browser`**, nenechávej to na uživateli. **Neplatí** pro portály, které podle
 `reference/podminky.md` nástrojům stahování nedovolují nebo mají ochranu proti robotům: tam kliká uživatel.
 Samotný robots.txt tě nezastaví: na dotaz uživatele bádáš jako on při klikání, ne jako plošný robot. Proto ber jen to,
-co hledáš, nic dvakrát a co nejméně požadavků. Nástroje se představují jako Claude-User (stahování na dotaz uživatele)
-a `slusne.py` dodrží robots.txt, který jmenuje Claude-User. Zákaz pro ClaudeBota (trénink modelů) nebo GPTBota se tě
-netýká. V prohlížeči platí totéž: robots.txt s Claude-User respektuj. Pasti:
+co hledáš, nic dvakrát a co nejméně požadavků. Nástroje se představují za agenta, který je spustil (Claude Code
+Claude-User, Codex ChatGPT-User), a `slusne.py` dodrží robots.txt, který toho agenta jmenuje. Zákaz pro roboty na
+trénink modelů (ClaudeBot, GPTBot) se tě netýká. V prohlížeči platí totéž: robots.txt se svým agentem respektuj. Pasti:
 - Playwright hlásí „Executable doesn't exist“ → spusť s nainstalovaným chromiem:
   `agent-browser --executable-path "$(ls -d ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | tail -1)" open <url>`
   (když už běží démon, nejdřív `agent-browser close`).

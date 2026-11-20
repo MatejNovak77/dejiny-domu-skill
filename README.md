@@ -64,7 +64,7 @@ V Claude Code napište:
 Pak Claude Code restartujte. Aktualizace později: `/plugin marketplace update dejiny-domu-skill`. Rozpracovaný projekt
 pak Claude sám nabídne aktualizovat (vaše data zůstanou).
 
-### Varianta B – přes `npx skills` (i pro jiné agenty než Claude Code)
+### Varianta B – přes `npx skills` (i pro jiné agenty, např. Codex)
 V terminálu (potřebuje Node.js):
 ```
 npx skills add vzoha/dejiny-domu-skill

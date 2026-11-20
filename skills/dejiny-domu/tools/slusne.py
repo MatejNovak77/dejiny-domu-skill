@@ -18,8 +18,9 @@ Nástroje v tools/ to mají zapnuté samy (`slusne.instaluj()` na začátku). Vl
   python3 -I tools/slusne.py odblokuj <web>                       -> zrušit blokaci (jen když víš, že šlo o omyl)
 Před každým požadavkem se navíc kontrolují podmínky portálu (tools/podminky.json, reference/podminky.md):
 portál, který nástrojům stahování nedovoluje, skončí hláškou „PODMÍNKY: …“ s návodem, jak dál.
-Nástroje se představují jako Claude-User (stahování na dotaz uživatele, ne plošný robot) a dodržují robots.txt
-skupiny, která jmenuje Claude-User. Zákaz pro ClaudeBota (trénink), Claude-SearchBota nebo GPTBota se jich netýká,
+Nástroje se představují za agenta, který je spustil (stahování na dotaz uživatele, ne plošný robot): v Claude Code
+Claude-User, v Codexu ChatGPT-User, jinak SLUSNE_ROBOT. Dodržují robots.txt skupiny, která toho agenta jmenuje.
+Zákaz pro roboty na trénink a vyhledávání (ClaudeBot, Claude-SearchBot, GPTBot, OAI-SearchBot) se jich netýká,
 obecné `User-agent: *` taky ne (reference/podminky.md). robots.txt se stahuje 1× za den do stejné složky.
 Stav je ve ~/.cache/dejiny-domu/slusne/ (jinde: proměnná SLUSNE_DIR).
 """
@@ -48,7 +49,21 @@ BLOKACE = 30 * 60
 STOPKY = (BLOKACE, 2 * 3600, 8 * 3600)   # blok po 1., 2. a 3. (i každém dalším) odmítnutí webu během OKNO
 OKNO = 24 * 3600
 BAN_TEXT = {"digi.archives.cz": re.compile(rb"zablokov[a\xc3\xa1]n|byl[a ]+zablokov|blocked|nestandardn", re.I)}   # 200 s textem bloku
-ROBOT = "Claude-User"
+
+
+def robot(env=None):
+    """Za koho se nástroje představují: za agenta, který je spustil. robots.txt pak platí pro jeho skupinu.
+    Codex dává příkazům CODEX_THREAD_ID; OpenAI pro stahování na dotaz uživatele používá ChatGPT-User.
+    Codex se kontroluje první: spuštěný z terminálu Claude Code zdědí i CLAUDECODE."""
+    env = os.environ if env is None else env
+    if env.get("SLUSNE_ROBOT"):
+        return env["SLUSNE_ROBOT"]
+    if env.get("CODEX_THREAD_ID") or env.get("CODEX_SESSION_ID"):
+        return "ChatGPT-User"
+    return "Claude-User"
+
+
+ROBOT = robot()
 UA = f"Mozilla/5.0 (compatible; {ROBOT}; dejiny-domu skill, on user request; +https://github.com/vzoha/dejiny-domu-skill)"
 ROBOTS_PLATNOST = 24 * 3600
 PRIPONA = re.compile(r"\.(jpe?g|png|gif|webp|tiff?|jp2|dzi)$", re.I)   # jen v cestě: MZA má stránku knihy na …?image=…jp2
@@ -187,7 +202,7 @@ def _stahni_robots(host, https, port):
 
 
 def robots_povoli(host, cesta, https=True, port=None):
-    """Povolí robots.txt webu Claude-User tuhle cestu? Rozhoduje jen skupina, která Claude-User jmenuje."""
+    """Povolí robots.txt webu ROBOTovi tuhle cestu? Rozhoduje jen skupina, která ROBOTa jmenuje."""
     soubor = _soubor(host, "robots")
     try:
         cerstvy = time.time() - os.path.getmtime(soubor) < ROBOTS_PLATNOST

@@ -230,7 +230,7 @@ class SlusneTest(unittest.TestCase):
         self.assertIsNone(slusne.blokace("127.0.0.1"))
 
     def test_robots_zakaz_pro_claude_user_plati(self):
-        Server.robots = "User-agent: Claude-User\nDisallow: /tajne\n"
+        Server.robots = f"User-agent: {slusne.ROBOT}\nDisallow: /tajne\n"
         with self.assertRaises(slusne.RobotsZakazuje):
             self.get("/tajne/1")
         self.assertEqual(Server.pocet, 0)
@@ -243,14 +243,20 @@ class SlusneTest(unittest.TestCase):
 
     def test_robots_jednou_za_den(self):
         self.get("/a")
-        Server.robots = "User-agent: Claude-User\nDisallow: /\n"   # změna se projeví až po dni
+        Server.robots = f"User-agent: {slusne.ROBOT}\nDisallow: /\n"   # změna se projeví až po dni
         self.assertEqual(self.get("/b"), b"ok")
 
     def test_predstavi_se_jako_claude_user(self):
         urllib.request.urlopen(urllib.request.Request(self.url + "/ok", headers={"User-Agent": "Mozilla/5.0 (vlastni)"}),
                                timeout=10).read()
         self.assertEqual(Server.ua, slusne.UA)
-        self.assertIn("Claude-User", slusne.UA)
+        self.assertIn(slusne.ROBOT, slusne.UA)
+
+    def test_robot_podle_agenta(self):
+        self.assertEqual(slusne.robot({"CLAUDECODE": "1"}), "Claude-User")
+        self.assertEqual(slusne.robot({"CLAUDECODE": "1", "CODEX_THREAD_ID": "x"}), "ChatGPT-User")
+        self.assertEqual(slusne.robot({"SLUSNE_ROBOT": "Jiny-User", "CODEX_THREAD_ID": "x"}), "Jiny-User")
+        self.assertEqual(slusne.robot({}), "Claude-User")
 
     def test_curl_vlastni_user_agent_nahradi(self):
         self.assertEqual(slusne._bez_user_agentu(["-s", "-A", "x", "-H", "User-Agent: y", "-H", "Accept: z",
