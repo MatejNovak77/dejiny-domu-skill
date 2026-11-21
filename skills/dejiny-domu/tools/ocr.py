@@ -726,26 +726,27 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None):
         else os.path.basename(os.path.normpath(vstup))
     vystup = vystup or os.path.join(ROOT, "pracovni", "ocr", dokument)
     sablona = p["prikaz"]
-    with zamek_slozky(vystup):
-        if sablona:
-            ma_model = any("{model}" in x for x in sablona)
-            model = p["model"] if ma_model else NEOVERENY
-            if ma_model:
-                rozloz_model(model)
-            else:
-                print("Varování: vlastní příkaz nemá {model} – model je „neověřený“ (skill ho nezná).",
-                      file=sys.stderr)
-            cesta = {"druh": "prikaz", "prikaz": sablona, "verze": p["prikaz_verze"]}
-            model_overen, modely_sha, tess, tdir = False, None, None, None
-        else:
-            model = p["model"]
+    # kontroly (Tesseract, modely) před zámkem: bez nich nevznikne prázdná výstupní složka
+    if sablona:
+        ma_model = any("{model}" in x for x in sablona)
+        model = p["model"] if ma_model else NEOVERENY
+        if ma_model:
             rozloz_model(model)
-            varuj_model(model)
-            tess, verze = _tesseract()
-            tdir, modely_sha = priprav_modely(tess, model, nast)
-            cesta, model_overen = {"druh": "tesseract", "verze": verze}, True
-        render = ({"dpi": p["dpi"], "format": "jpeg-gray-q92", "pdftoppm": verze_poppleru(pdftoppm)}
-                  if druh == "pdf" else None)
+        else:
+            print("Varování: vlastní příkaz nemá {model} – model je „neověřený“ (skill ho nezná).",
+                  file=sys.stderr)
+        cesta = {"druh": "prikaz", "prikaz": sablona, "verze": p["prikaz_verze"]}
+        model_overen, modely_sha, tess, tdir = False, None, None, None
+    else:
+        model = p["model"]
+        rozloz_model(model)
+        varuj_model(model)
+        tess, verze = _tesseract()
+        tdir, modely_sha = priprav_modely(tess, model, nast)
+        cesta, model_overen = {"druh": "tesseract", "verze": verze}, True
+    render = ({"dpi": p["dpi"], "format": "jpeg-gray-q92", "pdftoppm": verze_poppleru(pdftoppm)}
+              if druh == "pdf" else None)
+    with zamek_slozky(vystup):
         mpath = os.path.join(vystup, MANIFEST)
         txt = {f[:-4] for f in os.listdir(vystup) if f.endswith(".txt")}
         stary = None
@@ -1018,13 +1019,20 @@ def main(argv):
             raise Chyba("--vystup jde jen s jedním vstupem.")
         if volby.get("model"):
             rozloz_model(volby["model"])
-        chyby = 0
-        for v in vstupy:
-            chyby += zpracuj(v, nast, volby.get("model"), volby.get("vystup"), volby.get("strany"))
+        chyby, nehotove = 0, []
+        for v in vstupy:   # vadný vstup nezastaví ostatní; nenainstalované (2) a Ctrl-C (130) ano
+            try:
+                chyby += zpracuj(v, nast, volby.get("model"), volby.get("vystup"), volby.get("strany"))
+            except Chyba as e:
+                if e.kod != 1:
+                    raise
+                print(f"CHYBA: {v}: {e}", file=sys.stderr)
+                nehotove.append(v)
         if chyby:
             print(f"Nehotové strany: {chyby}. Spusť znovu – dodělá jen chybějící.", file=sys.stderr)
-            return 1
-        return 0
+        if nehotove:
+            print(f"Nehotové vstupy: {', '.join(nehotove)}.", file=sys.stderr)
+        return 1 if chyby or nehotove else 0
     except Chyba as e:
         print(e if e.kod == 130 else f"CHYBA: {e}", file=sys.stderr)
         return e.kod

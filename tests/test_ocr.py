@@ -293,6 +293,7 @@ class TestDetekce(Zaklad):
         rc, _, err = self.spust(self.obrazky("a.jpg"))
         self.assertEqual(rc, 2)
         self.assertIn(ocr.navod("tesseract"), err)
+        self.assertFalse(os.path.exists(self.vystup("skeny")))   # kontrola před zámkem: žádná prázdná složka
         rc, out, _ = self.spust("stav")
         self.assertEqual(rc, 2)
         self.assertIn("tesseract: CHYBÍ", out)
@@ -372,6 +373,7 @@ class TestSlozkyModelu(Zaklad):
         rc, _, err = self.spust(self.pdf(1), "--model", "xyz")
         self.assertEqual(rc, 2)
         self.assertIn("skill tento model nezná", err)
+        self.assertFalse(os.path.exists(self.vystup("kniha")))
         self.assertIn(self.uziv, err)
         rc, out, _ = self.spust("stav", "--model", "xyz")
         self.assertEqual(rc, 2)
@@ -496,6 +498,21 @@ class TestVstupy(Zaklad):
             self.assertFalse(ok, nazev)
             self.assertEqual(proc, cekany, nazev)
             self.assertLess(time.time() - zacatek, 1, nazev)
+
+    def test_vic_vstupu_pokracuje(self):
+        neni = os.path.join(self.tmp, "dokumenty", "neexistuje.pdf")
+        rc, _, err = self.spust(neni, self.obrazky("a.jpg"))
+        self.assertEqual(rc, 1)
+        self.assertTrue(os.path.exists(self.vystup("skeny", "a.txt")))
+        self.assertIn("Nehotové vstupy: " + neni, err)
+
+    def test_vic_vstupu_nenainstalovano(self):
+        del self.programy["tesseract"]
+        rc, _, err = self.spust(self.obrazky("a.jpg"), self.obrazky("b.jpg", slozka="druha"))
+        self.assertEqual(rc, 2)
+        self.assertEqual(err.count("Chybí Tesseract"), 1)
+        self.assertFalse(os.path.exists(self.vystup("skeny")) or os.path.exists(self.vystup("druha")))
+        self.assertEqual(self.fake.tesseract_obrazky(), [])
 
     def test_strany_rozsah(self):
         for r in ("3-2", "0-1", "6-7", "x", "1-"):
