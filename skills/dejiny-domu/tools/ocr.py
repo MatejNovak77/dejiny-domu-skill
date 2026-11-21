@@ -17,7 +17,7 @@ Použití (z kořene projektu):
 Exit: 0 vše hotovo, 1 selhání nebo nesoulad, 2 něco není nainstalované.
 Samotné OCR nic nestahuje.
 """
-import concurrent.futures, contextlib, glob, hashlib, json, ntpath, os, re, shutil, struct, subprocess, sys, tempfile
+import concurrent.futures, contextlib, glob, hashlib, itertools, json, ntpath, os, re, shutil, struct, subprocess, sys, tempfile
 
 for _s in (sys.stdout, sys.stderr):   # UTF-8 výstup i na Windows bez -X utf8 (cp1250 neumí třeba „→“)
     if hasattr(_s, "reconfigure"):
@@ -83,6 +83,22 @@ class Chyba(Exception):
 def spust(argv, **kw):
     """Jediné místo, kde nástroj spouští programy (testy ho nahrazují)."""
     return subprocess.run(argv, **kw)
+
+
+def spust_prikaz(argv):
+    """Vlastní příkaz uživatele. Po Ctrl-C počká, až příkaz sám skončí (terminál mu přerušení poslal taky; další
+    Ctrl-C ho ukončí hned), a teprve pak přerušení pustí dál – jinak by osiřelý proces četl smazanou dávku."""
+    proc = subprocess.Popen(argv, cwd=ROOT)
+    try:
+        return proc.wait()
+    except KeyboardInterrupt:
+        print("Přerušeno – čekám, až vlastní příkaz skončí (další Ctrl-C ho ukončí hned).", file=sys.stderr, flush=True)
+        try:
+            proc.wait()
+        except KeyboardInterrupt:
+            proc.kill()
+            proc.wait()
+        raise
 
 
 def vychozi_soubezne():
@@ -767,9 +783,14 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None):
         print(f"{dokument}: hotovo {len(hotove)}, zbývá {len(todo)} → {vystup}", flush=True)
         if not todo:
             return 0
-        if sablona:
-            return _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup, novy, mpath)
-        return _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup)
+        try:
+            if sablona:
+                return _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup, novy, mpath)
+            return _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup)
+        except KeyboardInterrupt:
+            h = len({f[:-4] for f in os.listdir(vystup) if f.endswith(".txt")} & {s["jmeno"] for s in vyber})
+            raise Chyba(f"Přerušeno: {dokument} hotovo {h} z {len(vyber)} stran ({vystup}). "
+                        "Další spuštění dodělá zbytek.", 130)
 
 
 def _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup):
@@ -780,19 +801,25 @@ def _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup)
             text = tesseract_strana(tess, obr, model, tdir)
         zapis_stranu(vystup, s["jmeno"], uprav_text(text, p["stare_znaky"]))
 
-    chyby, n = 0, 0
+    # v poolu nejvýš `soubezne` stran, nic nečeká ve frontě: po Ctrl-C se čeká jen na právě běžící strany
+    chyby, n, fronta, bezi = 0, 0, iter(todo), {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=p["soubezne"]) as ex:
-        budouci = {ex.submit(jedna, s): s for s in todo}
-        for b in concurrent.futures.as_completed(budouci):
-            n += 1
-            s = budouci[b]
-            try:
-                b.result()
-            except Exception as e:   # jedna vadná strana nezastaví ostatní
-                chyby += 1
-                print(f"  {s['jmeno']}: CHYBA {e}", file=sys.stderr, flush=True)
-                continue
-            print(f"  {s['jmeno']} ({n}/{len(todo)})", flush=True)
+        while True:
+            for s in itertools.islice(fronta, p["soubezne"] - len(bezi)):
+                bezi[ex.submit(jedna, s)] = s
+            if not bezi:
+                break
+            hotove, _ = concurrent.futures.wait(bezi, return_when=concurrent.futures.FIRST_COMPLETED)
+            for b in hotove:
+                s = bezi.pop(b)
+                n += 1
+                try:
+                    b.result()
+                except Exception as e:   # jedna vadná strana nezastaví ostatní
+                    chyby += 1
+                    print(f"  {s['jmeno']}: CHYBA {e}", file=sys.stderr, flush=True)
+                    continue
+                print(f"  {s['jmeno']} ({n}/{len(todo)})", flush=True)
     return chyby
 
 
@@ -810,9 +837,9 @@ def _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup, man, 
             argv = prikaz_argv(sablona, slozka, vyst, model)
             print(f"  vlastní příkaz: dávka {i // p['davka'] + 1}, strany {davka[0]['jmeno']}–{davka[-1]['jmeno']}",
                   flush=True)
-            r = spust(argv, cwd=ROOT)
-            if r.returncode != 0:
-                raise Chyba(f"vlastní příkaz skončil kódem {r.returncode}; dávka zahozena, hotové dávky zůstaly.")
+            rc = spust_prikaz(argv)
+            if rc != 0:
+                raise Chyba(f"vlastní příkaz skončil kódem {rc}; dávka zahozena, hotové dávky zůstaly.")
             texty, spojeny = vysledky_davky(vyst, [s["jmeno"] for s in davka], os.path.basename(slozka))
             if spojeny:
                 print("Varování: vlastní příkaz dal jeden spojený text – pořadí stran v něm nelze ověřit "
@@ -999,8 +1026,11 @@ def main(argv):
             return 1
         return 0
     except Chyba as e:
-        print(f"CHYBA: {e}", file=sys.stderr)
+        print(e if e.kod == 130 else f"CHYBA: {e}", file=sys.stderr)
         return e.kod
+    except KeyboardInterrupt:
+        print("Přerušeno.", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":

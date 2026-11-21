@@ -9,6 +9,7 @@ DATA = os.path.join(KOREN, "tests", "data")
 sys.path.insert(0, os.path.join(SKILL, "tools"))
 import ocr  # noqa: E402
 PUVODNI_NAJDI = ocr.najdi
+PUVODNI_SPUST_PRIKAZ = ocr.spust_prikaz
 
 TIFF1 = os.path.join(DATA, "ocr_jedna.tif")
 TIFF2 = os.path.join(DATA, "ocr_vicestrankovy.tif")
@@ -26,6 +27,7 @@ class FalesnySpust:
         self.sysdir = sysdir
         self.volani = []
         self.selhat = set()      # jména obrázků (bez přípony), na kterých tesseract selže
+        self.prerusit = set()    # jména obrázků, na kterých přijde Ctrl-C (KeyboardInterrupt)
         self.prikaz = None       # funkce(argv) -> návratový kód
 
     def __call__(self, argv, **kw):
@@ -46,6 +48,8 @@ class FalesnySpust:
             jmeno = os.path.splitext(os.path.basename(obr))[0]
             if jmeno in self.selhat:
                 return ok(err=b"Error in pixReadStream", rc=1)
+            if jmeno in self.prerusit:
+                raise KeyboardInterrupt
             with open(obr, encoding="utf-8") as f:
                 obsah = f.read().strip()
             return ok(f"Menſch {obsah} {argv[-1]}\r\n\f".encode())
@@ -86,6 +90,7 @@ class Zaklad(unittest.TestCase):
         self.fake = FalesnySpust(self.sysdir)
         self.programy = {"tesseract": "/x/tesseract", "pdftoppm": "/x/pdftoppm", "pdfinfo": "/x/pdfinfo"}
         for p in (mock.patch.object(ocr, "ROOT", self.tmp), mock.patch.object(ocr, "spust", self.fake),
+                  mock.patch.object(ocr, "spust_prikaz", lambda argv: self.fake(argv).returncode),
                   mock.patch.object(ocr, "najdi", lambda program: self.programy.get(program))):
             p.start()
             self.addCleanup(p.stop)
@@ -684,6 +689,35 @@ class TestText(Zaklad):
         self.assertEqual(self.fake.tesseract_obrazky(), ["s0002"])
 
 
+class TestPreruseni(Zaklad):
+    def test_preruseni_tesseract(self):
+        """Ctrl-C: nic nečeká ve frontě (zavolají se jen strany do přerušení), hláška bez CHYBA, exit 130."""
+        self.nastav({"tessdata": self.uziv, "soubezne": 1})
+        self.fake.prerusit = {"s0003"}
+        rc, _, err = self.spust(self.pdf(10))
+        self.assertEqual(rc, 130)
+        self.assertEqual(self.fake.tesseract_obrazky(), ["s0001", "s0002", "s0003"])
+        self.assertIn("hotovo 2 z 10", err)
+        self.assertNotIn("CHYBA", err)
+        self.assertEqual([f for f in os.listdir(self.vystup("kniha")) if f.endswith(".part")], [])
+        self.fake.prerusit = set()
+        self.fake.volani.clear()
+        self.assertEqual(self.spust(self.pdf(10))[0], 0)
+        self.assertEqual(self.fake.tesseract_obrazky(), ["s%04d" % i for i in range(3, 11)])
+
+    def test_spust_prikaz_ceka(self):
+        for wait, kill in (([KeyboardInterrupt, 0], 0), ([KeyboardInterrupt, KeyboardInterrupt, 0], 1)):
+            proc = mock.Mock()
+            proc.wait.side_effect = wait
+            with mock.patch.object(subprocess, "Popen", return_value=proc), \
+                    contextlib.redirect_stderr(io.StringIO()) as err:
+                with self.assertRaises(KeyboardInterrupt):
+                    PUVODNI_SPUST_PRIKAZ(["x"])
+            self.assertEqual(proc.wait.call_count, len(wait))
+            self.assertEqual(proc.kill.call_count, kill)
+            self.assertIn("čekám", err.getvalue())
+
+
 class TestPrikaz(Zaklad):
     SABLONA = ["fakeocr", "{slozka}", "--lang", "{model}", "--out", "{vystup}"]
 
@@ -781,6 +815,26 @@ class TestPrikaz(Zaklad):
         rc, _, err = self.spust(self.pdf(2), "--vystup", self.vystup("k2"))
         self.assertEqual(rc, 1)
         self.assertIn("cesta", err)
+
+    def test_preruseni_prikaz(self):
+        self.nastav_prikaz(davka=2)
+        davky = []
+
+        def prikaz(argv):
+            davky.append(1)
+            if len(davky) == 2:
+                raise KeyboardInterrupt
+            return self.soubory(argv)
+        self.fake.prikaz = prikaz
+        tmp = os.path.join(self.tmp, "tmp")
+        os.makedirs(tmp)
+        with mock.patch.object(tempfile, "tempdir", tmp):
+            rc, _, err = self.spust(self.pdf(5))
+        self.assertEqual(rc, 130)
+        self.assertIn("hotovo 2 z 5", err)
+        self.assertEqual(sorted(f for f in os.listdir(self.vystup("kniha")) if f.endswith(".txt")),
+                         ["s0001.txt", "s0002.txt"])
+        self.assertEqual(os.listdir(tmp), [])
 
     def test_prikaz_rc_nenula(self):
         self.fake.prikaz = lambda argv: 3
