@@ -20,6 +20,7 @@ Data se točí kolem **čísla popisného** a jeho držitelů a obyvatel v čase
 - `reference/data.md` – formát dat, `reference/web.md` – web, `reference/pribehy.md` – zajímavosti a příběh domu,
   `reference/texty.md` – **jak psát texty na web** (krátce, bez žargonu, pro hosta; platí pro vše, co jde na web),
   `reference/soukromi.md` – soukromí
+- `reference/pomocnici.md` – na jakém modelu pouštět pomocníky (subagenty), nabídka a zkouška u rukopisů
 - `reference/metodika.md` – když běžný postup nestačí: čím spojit zápisy domu a lidí v čase, kdy zápis patří
   k tomuto domu a kdy jde o tutéž osobu, typické chyby, mrtvé body (vznik domu, staré číslo, před 1770, 20. století),
   prameny a lhůty mimo ČR
@@ -164,7 +165,9 @@ trénink modelů (ClaudeBot, GPTBot) se tě netýká. V prohlížeči platí tot
 
 ### Pomocníci (subagenti) – šetrně
 Na velké kolo (projít matriku 1784–1850 a vypsat všechny zápisy z čp. 12, projít sčítání
-1857–1921) můžeš pustit 2–4 pomocníky na levnějším modelu (`model: "sonnet"`). Píšou jen do `pracovni/pom_<úkol>/`,
+1857–1921) můžeš pustit 2–4 pomocníky na modelu podle nastavení projektu
+(`python3 -I tools/nastaveni.py ukaz pomocnici`); `→ ZEPTEJ_SE` u rukopisů = nejdřív nabídka podle
+`reference/pomocnici.md`, nic nezapisuj bez odpovědi. Píšou jen do `pracovni/pom_<úkol>/`,
 **do `data/` nikdy** – do zadání napiš i „nespouštěj příkazy `… svazek` ani jiné, které zapisují do `data/`“. Jejich čtení **vždy ověř sám na snímku** (`tools/overit.py`), než ho zapíšeš jako `doc`.
 V zadání chtěj u každého prošlého snímku, co na něm skutečně přečetli (rok, číslo domu, první jméno).
 Před velkým kolem řekni uživateli, co plánuješ, a nech si to schválit (kredity).
@@ -237,6 +240,7 @@ Obecně a stručně, bez osobních údajů. Nic sám neposílej.
 | `data/prepisy.json`, `data/zvyrazneni.json` | přepisy s překlady, rámečky čteného místa |
 | `data/mapy.json` | staré mapy a letecké snímky (rok, zdroj, skupina pro porovnání, výřez pro prolínání) |
 | `data/research_log.md` | deník všech hledání |
+| `data/nastaveni.json` | volby skillu v projektu (model pomocníků…); jen přes `nastaveni.py` |
 | `data/pametnici.md`, `data/archivni_dotazy.md` | co víme od lidí; co jen v archivu |
 | `data/zajimavosti.md`, `data/pribeh.md`, `data/web.json`, `data/dokumenty.json`, `data/mista.json` | texty a nastavení webu, fotky, body na mapě |
 | `vyrezy/`, `zdroje/` | výřezy zápisů, map a dokumentů (web / plné rozlišení), název = klíč + `.jpg` |
@@ -297,6 +301,7 @@ Vždy **projektovou kopii** `tools/`, nikdy `SKILL_DIR/tools/` (zapisovala by do
 | `zapis.py <soubor> <klíč> <vstup.json> [--sloucit \| --prepsat]` | přidá / změní položku v `zaznamy`, `svazky`, `prepisy`, `mapy`, `web` (pole nastavení webu)… beze změny formátu; náhradu, která by smazala pole, odmítne |
 | `zapis.py denik "<zdroj>" "<rozsah>" "<hledáno>" "<výsledek>" "<citace>"` | řádek deníku `research_log.md` s číslem a datem (pod zámkem, souběžné session) |
 | `kontrola.py` | kontrola dat, soukromí, kdy psát příběh |
+| `nastaveni.py ukaz [sekce]` / `nastav <sekce.klíč> <hodnota\|vychozi>` | volby skillu v projektu (`data/nastaveni.json`); `→ ZEPTEJ_SE` = zeptej se uživatele, ukládej jen s jeho souhlasem |
 | `slusne.py <skript.py> …` / `curl …` / `stav` | společný limit rychlosti k archivům a kontrola podmínek; vlastní skripty a curl jen přes něj (hook `hlidac.py` hlídá) |
 | `verze.py <projekt>` | nová verze skillu na GitHubu, aktualizace projektu (začátek konverzace) |
 | `cache.py stav` | sdílená mezipaměť snímků (`~/.cache/dejiny-domu/snimky`, 5 GB): snímek stažený přes `slusne.py` se příště vezme z disku, i v dalším domě |
