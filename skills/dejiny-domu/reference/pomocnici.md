@@ -43,10 +43,11 @@ Nejasné (tisk s rukopisnými poznámkami, smíšený svazek) = rukopis.
 Co s odpovědí:
 | Uživatel řekne | Co uděláš |
 |---|---|
-| model **a** jednoznačně „ano, ulož / zapamatuj si to“ | `nastaveni.py nastav pomocnici.rukopisy <opus\|sonnet>` a potvrď mu to |
+| model **a** jednoznačně „ano, ulož / zapamatuj si to“ | `nastaveni.py nastav pomocnici.rukopisy <model>` a potvrď mu to |
 | jen model („teď Opus“), nebo „neukládej“ | použij model pro tuto konverzaci, **nic neukládej**; řekni, že se příště zeptáš znovu |
 | „nevím“, „je mi to jedno“ | toto kolo `sonnet`, nic neukládej, nabídni zkoušku |
 | „vyzkoušej to“ | zkouška (níže), pak znovu obě otázky |
+| jiný model (Haiku, Fable, model jiného hostitele) | použij ho, poměr ceny netvrď, nabídni ověření ceníku; ukládej jen po „ulož“ |
 
 Bez výslovného souhlasu s uložením nikdy `nastav` nespouštěj. Volba modelu sama souhlasem s uložením není.
 
@@ -61,13 +62,13 @@ Bez výslovného souhlasu s uložením nikdy `nastav` nespouštěj. Volba modelu
 5. Pak obě otázky z nabídky (model, uložit?).
 
 ## Jak model předat hostiteli
-Hodnoty v nastavení jsou obecné (`opus`, `sonnet`). V Claude Code je předej nástroji Agent jako parametr
-`model: "opus"` nebo `model: "sonnet"` (aliasy podle https://code.claude.com/docs/en/sub-agents, 21. 11. 2026;
-bez parametru pomocník běží na modelu hlavní konverzace).
-**Záložní postup:** hostitel volbu modelu pomocníka nemá (v Codexu se model určuje v definici vlastního
-agenta v `.codex/agents/`) nebo alias odmítne (organizace Opus nepovoluje, chyba
-„issue with the selected model“)? Řekni to uživateli jednou větou, pusť pomocníky na výchozím modelu hostitele
-a u volby `opus` nabídni, že rukopisy přečteš sám v hlavní konverzaci. Nastavení neměň.
+Hodnota v nastavení je název modelu, jak ho zná hostitel (nástroj ji ukládá malými písmeny); předej ji beze změny.
+V Claude Code ukládej a předávej alias (`sonnet`, `opus`, `haiku`, `fable`) jako parametr `model` nástroje Agent –
+plné ID ani `inherit` parametr nebere (https://code.claude.com/docs/en/sub-agents, 21. 11. 2026); bez parametru
+pomocník běží na modelu hlavní konverzace.
+**Záložní postup:** hostitel volbu modelu pomocníka nemá, nebo název modelu odmítne (např. organizace model
+nepovoluje, chyba „issue with the selected model“)? Řekni to uživateli jednou větou, pusť pomocníky na výchozím
+modelu hostitele a u volby `opus` nabídni, že rukopisy přečteš sám v hlavní konverzaci. Nastavení neměň.
 
 ## Změna volby
 Uživatel chce volbu změnit nebo smazat („příště se zase ptej“): s jeho souhlasem `nastav pomocnici.rukopisy <model>`,
