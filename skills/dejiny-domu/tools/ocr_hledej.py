@@ -598,56 +598,58 @@ def mez_vzdalenosti(slovo):
 
 
 def navrh(cil, tvar, pravidla=None):
-    """Pravidla, se kterými by hledání slova cil našlo tvar (texty jako argumenty `pridej`); existující vynechá."""
+    """Pravidla, se kterými by hledání slova cil našlo tvar (texty jako argumenty `pridej`); existující vynechá.
+    Jen záměna, skupina a volba; jiný rozdíl (koncovka, předpona, mezera, víc znaků) návrh nemá. Velikost písmen
+    se nerozlišuje stejně jako při hledání."""
     p = pravidla or {}
     zameny, skupiny, volby = p.get("zameny", {}), p.get("skupiny", {}), p.get("volby", {})
+    cil_cf, tvar_cf = [c.casefold() for c in cil], [c.casefold() for c in tvar]
     n, m = len(cil), len(tvar)
     D = [[0] * (m + 1) for _ in range(n + 1)]
     for i in range(n + 1):
         for j in range(m + 1):
-            D[i][j] = i + j if not i or not j else min(D[i - 1][j - 1] + (cil[i - 1] != tvar[j - 1]),
+            D[i][j] = i + j if not i or not j else min(D[i - 1][j - 1] + (cil_cf[i - 1] != tvar_cf[j - 1]),
                                                        D[i - 1][j] + 1, D[i][j - 1] + 1)
     ops, i, j = [], n, m   # (T, R) po znacích; zpětně: diagonála > vypuštění > vložení
     while i or j:
-        if i and j and D[i][j] == D[i - 1][j - 1] + (cil[i - 1] != tvar[j - 1]):
+        if i and j and D[i][j] == D[i - 1][j - 1] + (cil_cf[i - 1] != tvar_cf[j - 1]):
             ops.append((cil[i - 1], tvar[j - 1])); i -= 1; j -= 1
         elif i and D[i][j] == D[i - 1][j] + 1:
             ops.append((cil[i - 1], "")); i -= 1
         else:
             ops.append(("", tvar[j - 1])); j -= 1
     ops.reverse()
+    stejne = lambda o: o[0].casefold() == o[1].casefold()
     bloky, k = [], 0   # (začátek, konec) úseků neshod v ops
     while k < len(ops):
-        if ops[k][0] == ops[k][1]:
+        if stejne(ops[k]):
             k += 1
             continue
         z = k
-        while k < len(ops) and ops[k][0] != ops[k][1]:
+        while k < len(ops) and not stejne(ops[k]):
             k += 1
         bloky.append((z, k))
     out = []
     for z, k in bloky:
         T = "".join(t for t, _ in ops[z:k])
         R = "".join(r for _, r in ops[z:k])
-        if T and T.casefold() == R.casefold() and len(T) > 1:
-            out.append("velikost")
-        elif not T and any(c in DELENI for c in R):
+        if not T and any(c in DELENI for c in R):
             if not volby.get("deleni_slova"):
                 out.append("volba deleni_slova")
         elif k == len(ops) and (not T or not R):
-            out.append("koncovka")
+            pass               # koncovka: --tvary volne nebo samostatné slovo
         elif z == 0 and len(T) == 1 and not R:
             if not volby.get("chybi_prvni_pismeno"):
                 out.append("volba chybi_prvni_pismeno")
         elif z == 0 and not T:
-            out.append("predpona")
+            pass               # předpona: samostatné slovo
         else:
             if not T:          # vložení patří k předchozímu znaku
                 T, R = ops[z - 1][0], ops[z - 1][1] + R
             elif not R:        # vypuštění k následujícímu
                 T, R = T + ops[k][0], ops[k][1]
             if any(c.isspace() for c in R) or not R:
-                out.append("bez_navrhu")
+                pass
             elif len(T) == 1:
                 if R not in zameny.get(T, []):
                     out.append(f"zamena {T} {R}")
@@ -657,10 +659,6 @@ def navrh(cil, tvar, pravidla=None):
                     R = R[0].lower() + R[1:]
                 if klic.islower() and R not in skupiny.get(klic, []):
                     out.append(f"skupina {klic} {R}")
-                elif not klic.islower():
-                    out.append("bez_navrhu")
-            else:
-                out.append("bez_navrhu")
     return list(dict.fromkeys(out))
 
 
@@ -686,11 +684,11 @@ def _slova(soubor, spojit, mekke=False):
             yield s.group(0), i, radek
 
 
-def kandidati(slova, cesty, pravidla=None, vzdalenost=None, tvary=None):
+def kandidati(slova, cesty, pravidla=None, mez=None, tvary=None):
     """{slovo: [(tvar, počet, vzdálenost, návrhy, (soubor, řádek, text))]}: slova blízká hledanému, která pravidla
     nenajdou. Jeden průchod soubory; počty se drží jen u kandidátů."""
     p = pravidla or {}
-    meze = [mez_vzdalenosti(s) if vzdalenost is None else vzdalenost for s in slova]
+    meze = [mez_vzdalenosti(s) if mez is None else mez for s in slova]
     vzory = [Vzor(s, p, tvary) for s in slova]
     cf = [s.casefold() for s in slova]
     vyloucit = [t.casefold() for t in p.get("vyloucit", {})]
@@ -707,7 +705,7 @@ def kandidati(slova, cesty, pravidla=None, vzdalenost=None, tvary=None):
             if vysl is None:
                 wcf, vysl = w.casefold(), []
                 for x, (s, k) in enumerate(zip(cf, meze)):
-                    d = _vzd(wcf, s, k)
+                    d = vzdalenost(wcf, s, k)
                     if (d <= k and next(vzory[x].najdi(w), None) is None
                             and not any(t in wcf for t in vyloucit)):
                         vysl.append((x, d))
@@ -727,9 +725,6 @@ def kandidati(slova, cesty, pravidla=None, vzdalenost=None, tvary=None):
         rad.sort(key=lambda r: (r[2], -r[1], r[0]))
         out[s] = rad
     return out
-
-
-_vzd = vzdalenost
 
 
 # --- zápis pravidel ---------------------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """Testy ocr_hledej.py: hledání v OCR textech se záměnami písmen podle pravidel projektu. Bez internetu.
 Zápis pravidel (pridej / odeber) přes skutečný nástroj v projektu testuje test_nastroje.py (TestOcrHledej)."""
-import contextlib, io, os, shutil, sys, tempfile, time, unittest
+import contextlib, inspect, io, os, re, shutil, sys, tempfile, time, unittest
 
 KOREN = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILL = os.path.join(KOREN, "skills", "dejiny-domu")
@@ -563,7 +563,7 @@ class TestSoubory(unittest.TestCase):
         self.assertEqual(slova("Fries"), ["Frles"])
         self.assertEqual(slova("Abcdefg"), [])
         self.assertEqual(slova("Zinecker"), ["Zined&er"])
-        self.assertIn("Frlez", slova("Fries", vzdalenost=2))
+        self.assertIn("Frlez", slova("Fries", mez=2))
 
 
 class TestNavrh(unittest.TestCase):
@@ -575,10 +575,10 @@ class TestNavrh(unittest.TestCase):
             ("Zinecker", "Zineker", ["skupina ck k"]),
             ("Zinecker", "Bineder", ["zamena Z B", "skupina ck d"]),
             ("Gansbauden", "Gans-bauden", ["volba deleni_slova"]),
-            ("Gansbauden", "GanSbmlden", ["zamena s S", "skupina au ml"]),
-            ("Zinecker", "Zineckers", ["koncovka"]),
-            ("Zinecker", "ZINECKER", ["velikost"]),
-            ("Zinecker", "InZinecker", ["predpona"]),
+            ("Gansbauden", "GanSbmlden", ["skupina au ml"]),   # velikost se nerozlišuje
+            ("Zinecker", "Zineckers", []),       # koncovka: --tvary volne nebo samostatné slovo
+            ("Zinecker", "ZINECKER", []),
+            ("Zinecker", "InZinecker", []),      # předpona: samostatné slovo
         ]
         for cil, tvar, cekam in pripady:
             with self.subTest(tvar=tvar):
@@ -601,6 +601,17 @@ class TestDokumentace(unittest.TestCase):
         self.assertIn("rovnocennost", ocr)
         self.assertIn("jen po souhlasu", ocr)
         self.assertIn("pridej", ocr[max(0, ocr.index("jen po souhlasu") - 200):ocr.index("jen po souhlasu")])
+
+    def test_63_stitky_navrhu_v_ocr_md(self):
+        """Každý štítek, který navrh umí vytisknout, je vysvětlený v oddílu „Návrhy kandidátů“ reference."""
+        stitky = set(re.findall(r'out\.append\(f?"([a-z_]+(?: [a-z_]+)?)', inspect.getsource(oh.navrh)))
+        self.assertEqual(stitky, {"zamena", "skupina", "volba deleni_slova", "volba chybi_prvni_pismeno"})
+        with open(os.path.join(SKILL, "reference", "ocr.md"), encoding="utf-8") as f:
+            ocr = f.read()
+        oddil = ocr[ocr.index("## Návrhy kandidátů"):]
+        oddil = oddil[:oddil.index("\n## ", 1)]
+        for s in stitky:
+            self.assertIn(f"`{s}", oddil)
 
 
 if __name__ == "__main__":
