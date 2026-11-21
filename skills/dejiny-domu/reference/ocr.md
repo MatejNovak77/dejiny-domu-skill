@@ -13,12 +13,11 @@ a složky. Soubory se čtou po řádcích (i stovky MB), kódování UTF-8 (jina
 ```
 python3 -I tools/ocr_hledej.py hledej Gansbauden Zinecker [--tvary ceske|presne|volne] [-- složka/ soubor.txt]
 python3 -I tools/ocr_hledej.py hledej Zinecker --vypis radky   # řádek na každý nález místo souhrnu
-python3 -I tools/ocr_hledej.py hledej Zinecker --fonetika kolnska [--max 40]   # + podobně znějící jména
 python3 -I tools/ocr_hledej.py kandidati Gansbauden [--vzdalenost N] [--max 40] [-- …]
 python3 -I tools/ocr_hledej.py pridej zamena s f &        # odeber … totéž obráceně
 python3 -I tools/ocr_hledej.py pridej skupina ck d &
 python3 -I tools/ocr_hledej.py pridej vyloucit hald --proc "Gänshalde: b→h a au→al"
-python3 -I tools/ocr_hledej.py pridej volba deleni_slova   # [ano|ne]; volba tvary presne; volba fonetika kolnska
+python3 -I tools/ocr_hledej.py pridej volba deleni_slova   # [ano|ne]; volba tvary presne
 python3 -I tools/ocr_hledej.py odeber rovnocennost prehlasky   # pridej … zapne; vse = všechny (odeber vse = vypnout)
 python3 -I tools/ocr_hledej.py pravidla                    # pravidla + zapnuté rovnocennosti
 ```
@@ -37,7 +36,7 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
  "skupiny":  {"ck": ["&", "d"], "au": ["ml"]},
  "vyloucit": {"hald": "Gänshalde: b→h a au→al"},
  "volby":    {"deleni_slova": true, "chybi_prvni_pismeno": true, "tvary": "ceske",
-              "rovnocennosti": {"nemcina_1901": true}, "fonetika": "kolnska"}}
+              "rovnocennosti": {"nemcina_1901": true}}}
 ```
 - `zameny`: jeden znak → čím ho OCR čte (doslovné texty, ne regex). Velikost písmen se při hledání nerozlišuje
   (Fries najde FRIES i fries). Pravidlo platí pro písmeno, jak stojí v hledaném slově: „s“ pro s, „S“ pro S – velká
@@ -55,7 +54,6 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
   („Friese“). `presne` = jen celé slovo, `volne` = cokoli za slovem (Friesen, Friesland).
 - `volby.rovnocennosti`: `true` (výchozí, klíč chybí) | `false` (žádné; `ſ` = `s` platí vždy) | objekt jen
   s odchylkami od výchozích (`{"prehlasky": false, "nemcina_1901": true}`). Mění se příkazem `pridej|odeber rovnocennost`.
-- `volby.fonetika`: `kolnska` – `hledej` vždy přidá podobně znějící jména (jako `--fonetika kolnska`).
 Před slovem nesmí být písmeno ani `-` (číslice smí: „22Gansbauden“). Za slovem nesmí být kombinující znak (`Mu`
 nenajde začátek rozloženého `Mü`), mimo `volne` ani žádné písmeno (FRIES nenajde FRIESEN). Chybný soubor nástroj odmítne s číslem řádku.
 
@@ -78,7 +76,7 @@ nenajde začátek rozloženého `Mü`), mimo `volne` ani žádné písmeno (FRIE
    Do deníku (`zapis.py denik`) zapiš až tohle N, s poznámkou „s nezapsanými pravidly“, dokud je uživatel neschválí.
    Když uživatel řekne „zatím nepřidávej“, tabulku nálezů ukaž znovu celou (ne odkazem na předchozí zprávu).
 5. Pravidlo přidej `pridej` **jen po souhlasu** uživatele (nebo na jeho výslovný pokyn). Totéž platí pro každý zápis
-   do `data/ocr_zameny.json`: `odeber`, zapnutí sady pravopisu nebo fonetiky.
+   do `data/ocr_zameny.json`: `odeber`, zapnutí sady pravopisu.
 6. `hledej` znovu (bez `--pravidla`) a řekni rozdíl („teď 72 místo 59, nové: …“). Nevhodné pravidlo vrátí `odeber`.
 
 ## Návrhy kandidátů
@@ -102,9 +100,7 @@ Nikdy ne po každém hledání. Stejně (nejvýš jednou za konverzaci, zapsat j
 - **`nemcina_1901`**, když hledáš v německém tisku před 1901 (datum vydání, v obecných slovech `th` a `c`: `Thal`,
   `Thür`, `Concert`, `Centrum`);
 - **vypnutí `cestina_1849`** (`odeber rovnocennost cestina_1849`), jen když jsou české texty mladší než 1849 a sada
-  přidává zjevně falešné nálezy; jinak ji nech zapnutou;
-- **fonetiku** (`--fonetika kolnska`, trvale `pridej volba fonetika kolnska`), když hledáš jméno v německých pramenech
-  a `hledej` dá málo nálezů. Výpis je souhrn tvarů, ne nálezy: každý ověř ve skenu.
+  přidává zjevně falešné nálezy; jinak ji nech zapnutou.
 
 ## Rovnocenné znaky
 Platí bez souboru pravidel. Jsou to čtení **hledaného slova**: prohledávaný text se nemění (ani v paměti) a nález se
@@ -138,12 +134,6 @@ a řekne „už pokryto…“ – platí pak i po vypnutí rovnocennosti.
   [Deutsche Rechtschreibung](https://de.wikipedia.org/wiki/Deutsche_Rechtschreibung)). Jména se psala oběma způsoby
   i potom (Carl/Karl, Meyer/Meier). Na Husích Boudách: Carl 439 → 5 934, Joseph 403 → 17 888, Thal 657 → 1 606 (hlavně
   obecné „Tal“), Meyer 153 → 241 – proto je vypnutá.
-
-**Fonetika** (`--fonetika kolnska`): Kölner Phonetik (Postel 1969, [de.wikipedia](https://de.wikipedia.org/wiki/K%C3%B6lner_Phonetik))
-převede jméno na číslice podle výslovnosti (Meyer = Maier = 67, Schmidt = Schmitt = 862). Vypíše zvlášť, souhrnně,
-slova s velkým prvním písmenem a stejným kódem, která hledání nenajde: `slovo  fonetika  tvar  počet×  soubor:řádek`
-(nejčastější první, `--max`). Je hlučná (Zinecker: Zinnecker a Zienecker, ale i Schuhmacher, Sänger), kód kratší než
-3 číslice nástroj odmítne. Užitečný tvar hledej pak jako samostatné slovo.
 
 **Co rovnocennost není:**
 - Vlnovky (`ã ũ ẽ`) jsou v OCR fraktury obvykle chyby (`Mãdchen` = Mädchen, `Podẽbrad` = Poděbrad) – pravidlo projektu
