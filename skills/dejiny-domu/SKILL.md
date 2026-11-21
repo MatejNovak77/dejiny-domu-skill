@@ -142,7 +142,7 @@ stejné znaky jinak zapsané (ſ, ß/ss, ü/ue, rozložené ě) i jinou velikost
 nalezeného tvaru, všechny řádky dá `--vypis radky`. `ocr_hledej.py kandidati <jméno>` najde blízká
 slova, která pravidla minula, a navrhne pravidlo do `data/ocr_zameny.json`. `hledej` i `kandidati` jen čtou – spusť je
 sám, když přibyly OCR texty, když hledání čekaného jména vrátí méně než 3 nálezy, nebo když najdeš zkomoleninu, kterou
-nástroj minul. Zápis (`pridej`/`odeber` pravidla, sady pravopisu `nemcina_1901`, fonetiky) jen po souhlasu uživatele;
+nástroj minul. Zápis (`pridej`/`odeber` pravidla, sady pravopisu `nemcina_1901`) jen po souhlasu uživatele;
 nabídni ho nejvýš jednou za konverzaci na slovo, nikdy po každém hledání. **Počet zmínek nikdy nesčítej sám**
 (ani z `hledej` + `kandidati`): návrhy z `kandidati` zapiš nástrojem Write do `pracovni/navrh_zamen.json` (pravidla
 projektu + navržená), spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json` a číslo z řádku `# <jméno>: N výskytů`
