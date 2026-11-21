@@ -1269,5 +1269,111 @@ class TestNovyProjekt(Projekt):
             self.assertTrue(os.path.exists(self.path("tools", f)), f)
 
 
+class TestOcrHledej(Projekt):
+    """ocr_hledej.py v projektu: zápis pravidel data/ocr_zameny.json (pridej / odeber) a hledání podle nich."""
+
+    def pravidla(self):
+        return self.path("data", "ocr_zameny.json")
+
+    def bajty(self):
+        with open(self.pravidla(), "rb") as f:
+            return f.read()
+
+    def test_pridej_zalozi_soubor_a_hledej_ho_pouzije(self):
+        p = self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("přidáno", p.stdout)
+        self.assertEqual(self.data("ocr_zameny"), {"zameny": {"s": ["ſ"]}})
+        with open(self.path("pracovni", "ocr.txt"), "w", encoding="utf-8") as f:
+            f.write("Wenzel aus Ganſbauden\n")
+        p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("Gansbauden\tGanſbauden\tpracovni/ocr.txt:1", p.stdout.replace(os.sep, "/"))
+
+    def test_pridej_znovu_nic_nezmeni(self):
+        self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
+        pred = self.bajty()
+        p = self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("už tam je", p.stdout)
+        self.assertEqual(self.bajty(), pred)
+
+    def test_chybne_pravidlo_soubor_nezalozi(self):
+        for args in (("zamena", "ab", "x"), ("skupina", "c", "x"), ("volba", "nesmysl"), ("volba", "tvary", "nic")):
+            with self.subTest(args=args):
+                p = self.nastroj("ocr_hledej.py", "pridej", *args)
+                self.assertNotEqual(p.returncode, 0)
+                self.assertNotIn("Traceback", p.stderr)
+                self.assertFalse(os.path.exists(self.pravidla()))
+
+    def test_odeber_smaze_cteni_i_prazdny_klic(self):
+        self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ", "f")
+        self.nastroj("ocr_hledej.py", "pridej", "skupina", "ck", "&")
+        p = self.nastroj("ocr_hledej.py", "odeber", "zamena", "s", "ſ")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(self.data("ocr_zameny"), {"zameny": {"s": ["f"]}, "skupiny": {"ck": ["&"]}})
+        self.nastroj("ocr_hledej.py", "odeber", "zamena", "s", "f")
+        self.assertEqual(self.data("ocr_zameny"), {"skupiny": {"ck": ["&"]}})
+
+    def test_rozbity_soubor_pridej_neprepise(self):
+        with open(self.pravidla(), "w", encoding="utf-8") as f:
+            f.write('{"zameny": {"s": ["f",]}}')
+        pred = self.bajty()
+        p = self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
+        self.assertNotEqual(p.returncode, 0)
+        self.assertNotIn("Traceback", p.stderr)
+        self.assertEqual(self.bajty(), pred)
+
+    def test_rozbity_soubor_hledej_skonci_hlaskou(self):
+        with open(self.pravidla(), "w", encoding="utf-8") as f:
+            f.write('{"zameny": {"s": "f"}}')
+        p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("data/ocr_zameny.json", p.stderr.replace(os.sep, "/"))
+        self.assertNotIn("Traceback", p.stderr)
+
+    def test_kandidati_nic_nezapise(self):
+        with open(self.path("pracovni", "ocr.txt"), "w", encoding="utf-8") as f:
+            f.write("Gan&bauden\n")
+        p = self.nastroj("ocr_hledej.py", "kandidati", "Gansbauden")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("zamena s &", p.stdout)
+        self.assertIn("nic jsem nezapsal", p.stderr)
+        self.assertFalse(os.path.exists(self.pravidla()))
+
+    def test_novy_projekt_pravidla_neprepise(self):
+        self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
+        pred = self.bajty()
+        p = subprocess.run([sys.executable, "-I", os.path.join(SKILL, "tools", "novy_projekt.py"), self.root],
+                           capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(self.bajty(), pred)
+
+    def test_vyloucit_a_volby(self):
+        for args in (("vyloucit", "hald", "--proc", "Gänshalde: b→h"), ("volba", "deleni_slova"),
+                     ("volba", "tvary", "presne")):
+            p = self.nastroj("ocr_hledej.py", "pridej", *args)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(self.data("ocr_zameny"), {"vyloucit": {"hald": "Gänshalde: b→h"},
+                                                   "volby": {"deleni_slova": True, "tvary": "presne"}})
+        p = self.nastroj("ocr_hledej.py", "pravidla")
+        self.assertIn("Gänshalde", p.stdout)
+
+    def test_soubezne_pridej_cekaji_na_zamek(self):
+        drzi = subprocess.Popen([sys.executable, "-I", "-c", "import sys; sys.path.insert(0, 'tools')\n"
+                                 "import zapis, time\nwith zapis.zamek('ocr_zameny'):\n    print('mam', flush=True)\n"
+                                 "    time.sleep(1)"], cwd=self.root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.assertEqual(drzi.stdout.readline().strip(), "mam")
+        dalsi = [subprocess.Popen([sys.executable, "-I", self.path("tools", "ocr_hledej.py"), "pridej", "zamena", "s", c],
+                                  cwd=self.root, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for c in ("ſ", "f")]
+        time.sleep(0.4)
+        for d in dalsi:
+            self.assertIsNone(d.poll(), "ocr_hledej.py nečekal na zámek")
+        self.assertEqual(drzi.wait(), 0, drzi.stderr.read())
+        for d in dalsi:
+            self.assertEqual(d.wait(), 0, d.stderr.read())
+        self.assertEqual(sorted(self.data("ocr_zameny")["zameny"]["s"]), ["f", "ſ"])
+
+
 if __name__ == "__main__":
     unittest.main()
