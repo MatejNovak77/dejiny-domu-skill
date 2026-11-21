@@ -365,7 +365,7 @@ def _vyjimky_re(texty, zap):
 
 class Vzor:
     """Slovo, jeho rovnocenné zápisy a zkomoleniny podle pravidel jako jeden regex. Text se nemění: rovnocennosti
-    jsou alternativy ve vzoru. Doba běhu není omezená pro umělé vstupy (místní nástroj, vlastní pravidla a texty)."""
+    jsou alternativy ve vzoru. Velikost písmen se nerozlišuje; pravidla platí pro písmeno, jak stojí ve slově. Doba běhu není omezená pro umělé vstupy (místní nástroj, vlastní pravidla a texty)."""
 
     def __init__(self, slovo, pravidla=None, tvary=None):
         if not slovo:
@@ -374,6 +374,8 @@ class Vzor:
         volby = p.get("volby", {})
         zap = self.zapnute = zapnute(p)
         zameny, skupiny = _uprav_pravidla(*_sloucena(p, zap), zap)
+        if slovo.isupper() and len(slovo) > 1:   # FRIES: pravidla jako u Fries (velikost se při hledání nerozlišuje)
+            slovo = slovo[0] + slovo[1:].lower()
         puvodni, slovo = slovo, uprav_slovo(slovo, zap)
         self.slovo = slovo
         self.tvary = tvary or volby.get("tvary", "ceske")
@@ -388,7 +390,7 @@ class Vzor:
             jadro = f"(?:{jadro}|{re.escape(slovo[1:3].lower())}{R[3]})"   # OCR vynechalo první písmeno
         konec = _nebo((len(k), re.escape(k)) for k in KONCOVKY) + "?" if self.tvary == "ceske" else ""
         za = (_tr(MALA)[1:-1] if self.tvary != "volne" else "") + (_znaky_m() if zap else "")
-        self._re = re.compile(f"(?<![{re.escape(PISMENA)}\\-]){jadro}{konec}" + (f"(?![{za}])" if za else ""))
+        self._re = re.compile(f"(?<![{re.escape(PISMENA)}\\-]){jadro}{konec}" + (f"(?![{za}])" if za else ""), re.IGNORECASE)
         # výjimka, kterou vzor výjimek najde v hledaném slově, neplatí (Strasse s výjimkou Straße)
         vyl = [t for t in p.get("vyloucit", {}) if not _vyjimky_re([t], zap).search(puvodni.casefold())]
         self._vyloucit = _vyjimky_re(vyl, zap) if vyl else None
