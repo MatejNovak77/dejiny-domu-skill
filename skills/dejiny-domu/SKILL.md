@@ -142,7 +142,9 @@ stejné znaky jinak zapsané (ſ, ß/ss, ü/ue, rozložené ě) najde samo. `ocr
 slova, která pravidla minula, a navrhne pravidlo do `data/ocr_zameny.json`. `hledej` i `kandidati` jen čtou – spusť je
 sám, když přibyly OCR texty, když hledání čekaného jména vrátí méně než 3 nálezy, nebo když najdeš zkomoleninu, kterou
 nástroj minul. Zápis (`pridej`/`odeber` pravidla, sady pravopisu `nemcina_1901`, fonetiky) jen po souhlasu uživatele;
-nabídni ho nejvýš jednou za konverzaci na slovo, nikdy po každém hledání. Postup: `reference/ocr.md`.
+nabídni ho nejvýš jednou za konverzaci na slovo, nikdy po každém hledání. Počet nálezů ber jen z jednoho výpisu
+`hledej <jméno> --pravidla pracovni/navrh_zamen.json` (pravidla projektu + navržená), ukaž tabulku nálezů a tabulku
+navržených pravidel (`pridej …`) a stejné číslo zapiš do deníku. Postup: `reference/ocr.md`.
 
 ### Webové aplikace bez API – prohlížeč
 Když portál nemá nástroj ani čitelné API (mapové aplikace, prohlížeče snímků, nahlizenidokn, chartae-antiquae),

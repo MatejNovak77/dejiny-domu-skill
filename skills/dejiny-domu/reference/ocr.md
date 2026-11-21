@@ -58,11 +58,19 @@ nenajde začátek rozloženého `Mü`), mimo `volne` ani malé písmeno. Chybný
 1. `hledej` jméno – spusť ho sám, jen čte. Pravopisné varianty („Zinnecker“, „Friß“) hledej jako **samostatná slova**,
    ne pravidlem.
 2. `kandidati` na totéž jméno – taky sám, bez ptaní (jen čte, nic nezapíše).
-3. Uživateli ukaž **tabulku**: tvar, počet, ukázka řádku, navržené pravidlo. Řekni, co by pravidlo navíc chytilo
-   (široké pravidlo, např. `i → in`, chytí i cizí slova).
-4. Pravidlo přidej `pridej` **jen po souhlasu** uživatele (nebo na jeho výslovný pokyn). Totéž platí pro každý zápis
+3. **Počet z jednoho výpisu, ne od oka.** Navržená pravidla zapiš do `pracovni/navrh_zamen.json` (kopie
+   `data/ocr_zameny.json`, pokud existuje, + návrhy z `kandidati`; `--pravidla` soubor projektu **nahrazuje**, proto
+   kopie) a spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json`. `data/` se tím nemění. Řádek
+   `# <jméno>: N výskytů` je počet; nikdy nesčítej nálezy z několika výpisů sám. Když návrh změníš, spusť výpis znovu.
+4. Uživateli ukaž **dvě tabulky** z toho výpisu:
+   - *nálezy*: tvar doslova, `soubor:řádek`, čím se našel (přesně / rovnocennost / navržené pravidlo); pod ní N;
+   - *navržená pravidla*: přesně jako argumenty `pridej …` (z `kandidati`), co každé chytí navíc. Řekni, co by
+     pravidlo chytilo i mimo jméno (široké pravidlo, např. `i → in`, chytí i cizí slova).
+   Do deníku (`zapis.py denik`) zapiš až tohle N, s poznámkou „s nezapsanými pravidly“, dokud je uživatel neschválí.
+   Když uživatel řekne „zatím nepřidávej“, tabulku nálezů ukaž znovu celou (ne odkazem na předchozí zprávu).
+5. Pravidlo přidej `pridej` **jen po souhlasu** uživatele (nebo na jeho výslovný pokyn). Totéž platí pro každý zápis
    do `data/ocr_zameny.json`: `odeber`, zapnutí sady pravopisu nebo fonetiky.
-5. `hledej` znovu a řekni rozdíl („teď 72 místo 59, nové: …“). Nevhodné pravidlo vrátí `odeber`.
+6. `hledej` znovu (bez `--pravidla`) a řekni rozdíl („teď 72 místo 59, nové: …“). Nevhodné pravidlo vrátí `odeber`.
 
 ## Kdy hledání zkomolenin nabídnout
 `hledej` a `kandidati` jen čtou – když je potřebuješ, spusť je. Zápis pravidla sám nabídni (nejvýš jednou za
