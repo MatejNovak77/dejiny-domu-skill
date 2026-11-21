@@ -1290,7 +1290,7 @@ class TestOcrHledej(Projekt):
         self.assertEqual(self.data("ocr_zameny"), {"zameny": {"d": ["b"]}})
         p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
         self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertIn("Gansbauden\tGansbauben\tpracovni/ocr.txt:1", p.stdout.replace(os.sep, "/"))
+        self.assertIn("Gansbauden\tGansbauben\t1×\tpracovni/ocr.txt:1", p.stdout.replace(os.sep, "/"))
 
     def test_rovnocennost_pridej_odeber(self):
         p = self.nastroj("ocr_hledej.py", "odeber", "rovnocennost", "prehlasky")
@@ -1327,7 +1327,7 @@ class TestOcrHledej(Projekt):
         self.assertIn("Gansbauden\tGanſbauden", p.stdout)   # uložené pravidlo platí i po vypnutí
         self.nastroj("ocr_hledej.py", "odeber", "zamena", "s", "ſ")
         p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
-        self.assertNotIn("Ganſbauden", p.stdout)
+        self.assertIn("Ganſbauden", p.stdout)   # ſ = s platí vždy (velikost se nerozlišuje, ſ je malé s)
 
     def test_pridej_znovu_nic_nezmeni(self):
         self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")

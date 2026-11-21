@@ -141,7 +141,8 @@ Pravidla kvality:
 
 ### Hledání v OCR textech
 OCR staré sazby komolí jména („Gansbauden“ → „Sansbauben“). V textech hledej `tools/ocr_hledej.py hledej <jméno>`;
-stejné znaky jinak zapsané (ſ, ß/ss, ü/ue, rozložené ě) najde samo. `ocr_hledej.py kandidati <jméno>` najde blízká
+stejné znaky jinak zapsané (ſ, ß/ss, ü/ue, rozložené ě) i jinou velikost písmen najde samo; vypíše souhrn podle
+nalezeného tvaru, všechny řádky dá `--vypis radky`. `ocr_hledej.py kandidati <jméno>` najde blízká
 slova, která pravidla minula, a navrhne pravidlo do `data/ocr_zameny.json`. `hledej` i `kandidati` jen čtou – spusť je
 sám, když přibyly OCR texty, když hledání čekaného jména vrátí méně než 3 nálezy, nebo když najdeš zkomoleninu, kterou
 nástroj minul. Zápis (`pridej`/`odeber` pravidla, sady pravopisu `nemcina_1901`, fonetiky) jen po souhlasu uživatele;

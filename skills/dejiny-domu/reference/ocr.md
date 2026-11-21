@@ -12,6 +12,7 @@ a složky. Soubory se čtou po řádcích (i stovky MB), kódování UTF-8 (jina
 ## Příkazy
 ```
 python3 -I tools/ocr_hledej.py hledej Gansbauden Zinecker [--tvary ceske|presne|volne] [-- složka/ soubor.txt]
+python3 -I tools/ocr_hledej.py hledej Zinecker --vypis radky   # řádek na každý nález místo souhrnu
 python3 -I tools/ocr_hledej.py hledej Zinecker --fonetika kolnska [--max 40]   # + podobně znějící jména
 python3 -I tools/ocr_hledej.py kandidati Gansbauden [--vzdalenost N] [--max 40] [-- …]
 python3 -I tools/ocr_hledej.py pridej zamena s f &        # odeber … totéž obráceně
@@ -21,8 +22,10 @@ python3 -I tools/ocr_hledej.py pridej volba deleni_slova   # [ano|ne]; volba tva
 python3 -I tools/ocr_hledej.py odeber rovnocennost prehlasky   # pridej … zapne; vse = všechny (odeber vse = vypnout)
 python3 -I tools/ocr_hledej.py pravidla                    # pravidla + zapnuté rovnocennosti
 ```
-`hledej` vypíše slovo, nalezený tvar (doslova, jak stojí v textu), `soubor:řádek` a řádek; počty a zapnuté
-rovnocennosti na stderr. `kandidati` vypíše slova blízká hledanému, která pravidla nenajdou: tvar, počet, vzdálenost,
+`hledej` vypíše souhrn: řádek na každý nalezený tvar (doslova, jak stojí v textu) – slovo, tvar, počet×, první tři
+místa `soubor:řádek` (a kolik dalších), ukázka kolem prvního nálezu; od nejčastějšího tvaru. `--vypis radky` dá řádek
+na každý nález (slovo, tvar, `soubor:řádek`, ukázka). Na stderr pravidla a rovnocennosti, počet prohledaných souborů
+a počet výskytů každého slova; hledané slovo, které je existující cesta, ohlásí (soubory a složky patří za `--`). `kandidati` vypíše slova blízká hledanému, která pravidla nenajdou: tvar, počet, vzdálenost,
 **návrh pravidla** (přesně jako argumenty `pridej`) a první výskyt. Nic nezapíše. Slova do 4 písmen chtějí
 `--vzdalenost N` (jinak by kandidátů bylo moc).
 
@@ -36,8 +39,10 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
  "volby":    {"deleni_slova": true, "chybi_prvni_pismeno": true, "tvary": "ceske",
               "rovnocennosti": {"nemcina_1901": true}, "fonetika": "kolnska"}}
 ```
-- `zameny`: jeden znak → čím ho OCR čte (doslovné texty, ne regex). Velikost se rozlišuje: „s“ platí jen pro s,
-  „S“ pro S. Znak se najde vždy i sám sebou i svými rovnocennostmi (`s` i jako `ſ`, `ü` i jako `ue`).
+- `zameny`: jeden znak → čím ho OCR čte (doslovné texty, ne regex). Velikost písmen se při hledání nerozlišuje
+  (Fries najde FRIES i fries). Pravidlo platí pro písmeno, jak stojí v hledaném slově: „s“ pro s, „S“ pro S – velká
+  písmena fraktury se pletou jinak; čtení se pak najde v libovolné velikosti. Slovo celé verzálkami (FRIES) bere
+  pravidla jako Fries. Znak se najde vždy i sám sebou i svými rovnocennostmi (`s` i jako `ſ`, `ü` i jako `ue`).
 - `skupiny`: dvě malá písmena → čtení celé dvojice. Přidávají se k záměnám po písmenech. U velkého prvního písmene
   („Ch“) se zvětší i první znak čtení.
 - `vyloucit`: text → důvod. Nález, jehož slovo (od začátku nálezu do mezery) text obsahuje, se zahodí; časté falešné
@@ -48,11 +53,11 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
 - `volby.tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými
   ův ova ovo ovu ovy ovic`): Zineckera, Zineckerové, „Friesovy boudy“. **Známý zbytek:** -e/-i/-a pustí i německé tvary
   („Friese“). `presne` = jen celé slovo, `volne` = cokoli za slovem (Friesen, Friesland).
-- `volby.rovnocennosti`: `true` (výchozí, klíč chybí) | `false` (žádné, chování jako před nimi) | objekt jen
+- `volby.rovnocennosti`: `true` (výchozí, klíč chybí) | `false` (žádné; `ſ` = `s` platí vždy) | objekt jen
   s odchylkami od výchozích (`{"prehlasky": false, "nemcina_1901": true}`). Mění se příkazem `pridej|odeber rovnocennost`.
 - `volby.fonetika`: `kolnska` – `hledej` vždy přidá podobně znějící jména (jako `--fonetika kolnska`).
 Před slovem nesmí být písmeno ani `-` (číslice smí: „22Gansbauden“). Za slovem nesmí být kombinující znak (`Mu`
-nenajde začátek rozloženého `Mü`), mimo `volne` ani malé písmeno. Chybný soubor nástroj odmítne s číslem řádku.
+nenajde začátek rozloženého `Mü`), mimo `volne` ani žádné písmeno (FRIES nenajde FRIESEN). Chybný soubor nástroj odmítne s číslem řádku.
 
 ## Postup
 1. `hledej` jméno – spusť ho sám, jen čte. Pravopisné varianty („Zinnecker“, „Friß“) hledej jako **samostatná slova**,
@@ -65,7 +70,9 @@ nenajde začátek rozloženého `Mü`), mimo `volne` ani malé písmeno. Chybný
    `# <jméno>: N výskytů` je počet; nikdy nesčítej nálezy z několika výpisů sám. Když návrh změníš, spusť výpis znovu.
    Dělení slova (`volba deleni_slova`) je pravidlo jako ostatní, ve výchozím stavu vypnuté.
 4. Uživateli ukaž **dvě tabulky** z toho výpisu:
-   - *nálezy*: tvar doslova, `soubor:řádek`, čím se našel (přesně / rovnocennost / navržené pravidlo); pod ní N;
+   - *nálezy*: řádek na tvar ze souhrnu – tvar doslova, počet, místa (první tři `soubor:řádek` a „+M dalších“),
+     čím se našel (přesně / rovnocennost / navržené pravidlo); pod ní N. Všechna místa dá `--vypis radky`, když je
+     uživatel chce;
    - *navržená pravidla*: přesně jako argumenty `pridej …` (z `kandidati`), co každé chytí navíc. Řekni, co by
      pravidlo chytilo i mimo jméno (široké pravidlo, např. `i → in`, chytí i cizí slova).
    Do deníku (`zapis.py denik`) zapiš až tohle N, s poznámkou „s nezapsanými pravidly“, dokud je uživatel neschválí.
@@ -73,6 +80,17 @@ nenajde začátek rozloženého `Mü`), mimo `volne` ani malé písmeno. Chybný
 5. Pravidlo přidej `pridej` **jen po souhlasu** uživatele (nebo na jeho výslovný pokyn). Totéž platí pro každý zápis
    do `data/ocr_zameny.json`: `odeber`, zapnutí sady pravopisu nebo fonetiky.
 6. `hledej` znovu (bez `--pravidla`) a řekni rozdíl („teď 72 místo 59, nové: …“). Nevhodné pravidlo vrátí `odeber`.
+
+## Návrhy kandidátů
+Sloupec návrhu v `kandidati` obsahuje jen pravidla, která jde přidat tak, jak stojí (`pridej …`, po souhlasu):
+- `zamena X Y` – OCR čte znak X jako Y → `pridej zamena X Y`;
+- `skupina xy Z` – OCR čte dvojici xy jako Z → `pridej skupina xy Z`;
+- `volba deleni_slova` – slovo rozdělené znakem dělení → `pridej volba deleni_slova`;
+- `volba chybi_prvni_pismeno` – OCR vynechalo první písmeno → `pridej volba chybi_prvni_pismeno`.
+
+Prázdný sloupec = rozdíl, na který pravidlo není: jiná koncovka (Zineckers) → `--tvary volne` nebo tvar hledej jako
+samostatné slovo; něco před slovem (InZinecker), jiný pravopis, mezera ve slově nebo víc změn najednou → samostatné
+slovo (a ověř ho ve skenu). Rozdíl jen ve velikosti písmen mezi kandidáty není – najde ho už `hledej`.
 
 ## Kdy hledání zkomolenin nabídnout
 `hledej` a `kandidati` jen čtou – když je potřebuješ, spusť je. Zápis pravidla sám nabídni (nejvýš jednou za
@@ -90,11 +108,12 @@ Nikdy ne po každém hledání. Stejně (nejvýš jednou za konverzaci, zapsat j
 
 ## Rovnocenné znaky
 Platí bez souboru pravidel. Jsou to čtení **hledaného slova**: prohledávaný text se nemění (ani v paměti) a nález se
-hlásí doslova (`Fiſcher`, `Muͤller`). Velikost písmen se dál rozlišuje (`MÜLLER` = `MUELLER`, ne `Müller`).
+hlásí doslova (`Fiſcher`, `Muͤller`). Velikost písmen se nerozlišuje (`Müller` najde i `MÜLLER`, `MUELLER`), proto
+`ſ` = `s` platí vždy, i s vypnutým `dlouhe_s`.
 
 | Název | Co platí za stejné | Výchozí |
 |---|---|---|
-| `dlouhe_s` | `ſ` = `s` (Fiſcher) | zapnuto |
+| `dlouhe_s` | `ſ` = `s` (Fiſcher); při hledání platí vždy | zapnuto |
 | `r_rotunda` | `ꝛ` = `r` (Kꝛischlitz) | zapnuto |
 | `ostre_s` | `ß` = `ss` = `ſs` = `sſ` = `ſſ`, `ẞ` = `SS` (Strauß, Strauss) | zapnuto |
 | `prehlasky` | `ä ö ü` = `ae oe ue` = `aͤ oͤ uͤ` = `a`+U+0308 (Müller, Mueller, Muͤller; i velká `MUELLER`) | zapnuto |
@@ -104,7 +123,7 @@ hlásí doslova (`Fiſcher`, `Muͤller`). Velikost písmen se dál rozlišuje (`
 | `nemcina_1901` | sada německého pravopisu před 1901 (níže) | vypnuto |
 
 Vypnout: `odeber rovnocennost <název>`, všechny `odeber rovnocennost vse` (zapíše `"rovnocennosti": false`); vrátit
-výchozí `pridej rovnocennost vse`. Pravidlo, které už rovnocennost pokrývá (záměna s na ſ), nástroj přesto uloží
+výchozí `pridej rovnocennost vse`. Pravidlo, které už rovnocennost pokrývá (záměna ü na ue), nástroj přesto uloží
 a řekne „už pokryto…“ – platí pak i po vypnutí rovnocennosti.
 
 **Sady historického pravopisu** jsou pravidla (rozšiřují nálezy, můžou přidat falešné), sloučí se s pravidly projektu:
