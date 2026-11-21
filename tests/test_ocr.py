@@ -69,6 +69,9 @@ class FalesnySpust:
                 if os.path.basename(a[0]) == "tesseract" and a[-1] != "--list-langs" and a[1:] != ["--version"]]
 
 
+Z = {"s": "jen_s", "ponechat": "ponechat"}   # dřívější dlouhe_s → stare_znaky
+
+
 class Zaklad(unittest.TestCase):
     """Dočasný kořen projektu (ocr.ROOT), systémová a uživatelská složka modelů, falešné programy."""
 
@@ -175,13 +178,36 @@ class TestNastaveni(Zaklad):
         spatne = [{"prikaz": "ocr {slozka} {vystup}"}, {"prikaz": []}, {"prikaz": ["ocr", "{vystup}"]},
                   {"prikaz": ["ocr", "{slozka}"]}, {"prikaz": ["ocr", "{slozka}", "{vystup}", "{neznamy}"]},
                   {"davka": 0}, {"davka": "10"}, {"davka": True}, {"dpi": 50}, {"soubezne": 0}, {"dlouhe_s": "x"},
+                  {"stare_znaky": "x"}, {"stare_znaky": "s"}, {"dlouhe_s": "s", "stare_znaky": "ponechat"},
                   {"prikaz_verze": ""}, {"prikaz_verze": 5}, {"prikaz_verze": "x" * 101}, {"tessdata": 3}, []]
         for d in spatne:
             self.assertTrue(ocr.over_nastaveni(d)[0], d)
-        dobre = {"model": "german_print+ces", "dlouhe_s": "ponechat", "prikaz": ["~/ocr", "{slozka}", "--out={vystup}",
+        dobre = {"model": "german_print+ces", "stare_znaky": "ponechat", "prikaz": ["~/ocr", "{slozka}", "--out={vystup}",
                  "-l", "{model}"], "prikaz_verze": "ocr 2026-11-20", "davka": 10000, "soubezne": 64, "dpi": 72,
                  "tessdata": "~/td"}
         self.assertEqual(ocr.over_nastaveni(dobre), ([], []))
+
+    def test_o2_dlouhe_s_zastarale(self):
+        for d, cekam in (({"dlouhe_s": "s"}, "jen_s"), ({"dlouhe_s": "ponechat"}, "ponechat"), ({}, "zjednodusit"),
+                         ({"stare_znaky": "jen_s"}, "jen_s")):
+            chyby, varovani = ocr.over_nastaveni(d)
+            self.assertEqual(chyby, [], d)
+            self.assertEqual(any("dlouhe_s je zastaralé" in v for v in varovani), "dlouhe_s" in d)
+            self.assertEqual(ocr.platne(d)["stare_znaky"], cekam)
+        chyby, _ = ocr.over_nastaveni({"dlouhe_s": "s", "stare_znaky": "ponechat"})
+        self.assertTrue(any("odporují" in c for c in chyby))
+        self.assertEqual(ocr.over_nastaveni({"dlouhe_s": "s", "stare_znaky": "jen_s"})[0], [])
+        p = os.path.join(self.tmp, "data", "ocr.json")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write('{"model": "ces", "dlouhe_s": "ponechat"}')
+        with contextlib.redirect_stdout(io.StringIO()):
+            ocr.prikaz_nastav(p, "dlouhe_s", "s")
+        self.assertEqual(json.loads(cti_soubor(p)), {"model": "ces", "stare_znaky": "jen_s"})
+        with open(p, "w", encoding="utf-8") as f:
+            f.write('{"dlouhe_s": "ponechat"}')
+        with contextlib.redirect_stdout(io.StringIO()):
+            ocr.prikaz_nastav(p, "stare_znaky", "zjednodusit")
+        self.assertEqual(json.loads(cti_soubor(p)), {"stare_znaky": "zjednodusit"})
 
     def test_nastaveni_nezname_pole_varuje(self):
         chyby, varovani = ocr.over_nastaveni({"model": "ces", "barva": "modra"})
@@ -202,7 +228,8 @@ class TestNastaveni(Zaklad):
         self.assertEqual(d, {"model": "ces", "x_vlastni": 1, "davka": 5, "prikaz": ["ocr", "{slozka}", "{vystup}"]})
         pred = cti_soubor(p, "rb")
         self.assertTrue(pred.endswith(b"\n") and b"\r" not in pred)
-        for k, v in (("davka", "0"), ("dpi", "abc"), ("dlouhe_s", "x"), ("prikaz", '["ocr"]'), ("neznamy", "1")):
+        for k, v in (("davka", "0"), ("dpi", "abc"), ("dlouhe_s", "x"), ("stare_znaky", "s"), ("prikaz", '["ocr"]'),
+                     ("neznamy", "1")):
             with self.assertRaises(ocr.Chyba):
                 ocr.prikaz_nastav(p, k, v)
         self.assertEqual(cti_soubor(p, "rb"), pred)
@@ -447,9 +474,10 @@ class TestDodelavani(Zaklad):
         self.assertEqual(self.spust(p)[0], 0)
         self.assertEqual(self.txt("kniha"), ["s0001.txt", "s0002.txt", "s0003.txt"])
         m = self.manifest("kniha")
-        self.assertEqual((m["zdroj"]["druh"], m["zdroj"]["stran"], m["model"], m["model_overen"], m["dlouhe_s"],
+        self.assertEqual((m["zdroj"]["druh"], m["zdroj"]["stran"], m["model"], m["model_overen"], m["stare_znaky"],
                           m["cesta"], m["render"]["dpi"]),
-                         ("pdf", 3, "german_print", True, "s", {"druh": "tesseract", "verze": "5.5.4"}, 300))
+                         ("pdf", 3, "german_print", True, "zjednodusit", {"druh": "tesseract", "verze": "5.5.4"}, 300))
+        self.assertNotIn("dlouhe_s", m)
         os.remove(self.vystup("kniha", "s0002.txt"))
         open(self.vystup("kniha", "s0002.txt.part"), "w").close()
         open(self.vystup("kniha", "s0003.txt"), "w").close()
@@ -501,12 +529,58 @@ class TestDodelavani(Zaklad):
         self.assertEqual(rc, 1)
         self.assertIn("render.dpi", err)
 
-    def test_jiny_dlouhe_s(self):
+    def test_jine_stare_znaky(self):
         self.assertEqual(self.spust(self.pdf(2))[0], 0)
-        self.nastav({"tessdata": self.uziv, "dlouhe_s": "ponechat"})
+        self.nastav({"tessdata": self.uziv, "stare_znaky": "ponechat"})
         rc, _, err = self.spust(self.pdf(2))
         self.assertEqual(rc, 1)
-        self.assertIn("dlouhe_s", err)
+        self.assertIn("liší se: stare_znaky", err)
+
+    def stary_vystup(self, dlouhe_s, verze):
+        """Hotové 2 ze 3 stran a manifest ve tvaru před stare_znaky (pole dlouhe_s)."""
+        self.nastav({"tessdata": self.uziv, "stare_znaky": Z[dlouhe_s]})
+        self.assertEqual(self.spust(self.pdf(3, verze=verze), "--strany", "1-2")[0], 0)
+        m = self.manifest("kniha")
+        del m["stare_znaky"]
+        m["dlouhe_s"] = dlouhe_s
+        with open(self.vystup("kniha", "ocr_manifest.json"), "w", encoding="utf-8") as f:
+            json.dump(m, f)
+
+    def test_o3_stary_manifest_dodela(self):
+        """O3: starý výstup dlouhe_s se dodělá stejným převodem; výslovně jiná hodnota se odmítne."""
+        verze = "v1 \ua75b \u017f"
+        for dlouhe_s, nastaveni, cekam in (("s", {}, "jen_s"), ("s", {"dlouhe_s": "s"}, "jen_s"),
+                                           ("ponechat", {}, "ponechat")):
+            with self.subTest(dlouhe_s=dlouhe_s, nastaveni=nastaveni):
+                shutil.rmtree(self.vystup("kniha"), ignore_errors=True)
+                self.stary_vystup(dlouhe_s, verze)
+                self.nastav(dict(nastaveni, tessdata=self.uziv))
+                rc, _, err = self.spust(self.pdf(3, verze=verze))
+                self.assertEqual(rc, 0, err)
+                if not nastaveni:
+                    self.assertIn(f"staré znaky: {cekam} podle hotových stran", err)
+                self.assertEqual(self.manifest("kniha")["stare_znaky"], cekam)
+                self.assertNotIn("dlouhe_s", self.manifest("kniha"))
+                text = self.cti("kniha", "s0003.txt")
+                self.assertIn("\ua75b", text)   # ꝛ zůstane (jen_s i ponechat), žádné tiché povýšení
+                self.assertEqual("\u017f" in text, cekam == "ponechat")
+                self.assertEqual(self.spust(self.pdf(3, verze=verze))[0], 0)   # druhé dodělání
+        shutil.rmtree(self.vystup("kniha"), ignore_errors=True)
+        self.stary_vystup("s", verze)
+        self.nastav({"tessdata": self.uziv, "stare_znaky": "zjednodusit"})
+        pred = sorted(os.listdir(self.vystup("kniha")))
+        rc, _, err = self.spust(self.pdf(3, verze=verze))
+        self.assertEqual(rc, 1)
+        self.assertIn("liší se: stare_znaky", err)
+        self.assertEqual(sorted(os.listdir(self.vystup("kniha"))), pred)
+        # nový manifest jen_s + výslovné zjednodusit při druhém dodělání
+        shutil.rmtree(self.vystup("kniha"), ignore_errors=True)
+        self.nastav({"tessdata": self.uziv, "stare_znaky": "jen_s"})
+        self.assertEqual(self.spust(self.pdf(3, verze=verze), "--strany", "1-2")[0], 0)
+        self.nastav({"tessdata": self.uziv, "stare_znaky": "zjednodusit"})
+        rc, _, err = self.spust(self.pdf(3, verze=verze))
+        self.assertEqual(rc, 1)
+        self.assertIn("liší se: stare_znaky", err)
 
     def test_jiny_model(self):
         self.assertEqual(self.spust(self.pdf(2))[0], 0)
@@ -547,10 +621,13 @@ class TestDodelavani(Zaklad):
 
 
 class TestText(Zaklad):
-    def test_dlouhe_s(self):
-        self.assertEqual(ocr.uprav_text("Menſch\n\f", "s"), "Mensch\n")
+    def test_o1_stare_znaky(self):
+        text = "Fi\u017fch \ua75bc. Mu\u0364ller U\u0364ber Mü\u0364ller"
+        self.assertEqual(ocr.uprav_text(text, "zjednodusit"), "Fisch rc. Müller Über Müller")
+        self.assertEqual(ocr.uprav_text(text, "jen_s"), "Fisch \ua75bc. Mu\u0364ller U\u0364ber Mü\u0364ller")
+        self.assertEqual(ocr.uprav_text(text, "ponechat"), text)
         self.assertEqual(ocr.uprav_text("Menſch\n\f", "ponechat"), "Menſch\n")
-        self.assertEqual(ocr.uprav_text("a\r\nb\f", "s"), "a\nb")
+        self.assertEqual(ocr.uprav_text("a\r\nb\f", "zjednodusit"), "a\nb")
         self.assertEqual(self.spust(self.pdf(1))[0], 0)
         self.assertEqual(self.cti("kniha", "s0001.txt"), "Mensch strana 1 z %PDF n=1 v1 german_print\n")
 
@@ -770,7 +847,7 @@ class TestCli(unittest.TestCase):
         self.assertNotIn("Traceback", p.stderr + p.stdout)
 
     def test_nastaveni_prezije_aktualizaci(self):
-        self.assertEqual(self.ocr("nastav", "dlouhe_s", "ponechat").returncode, 0)
+        self.assertEqual(self.ocr("nastav", "stare_znaky", "ponechat").returncode, 0)
         self.assertEqual(self.ocr("nastav", "model", "german_print+ces").returncode, 0)
         with open(self.path("data", "ocr.json"), "rb") as f:
             pred = f.read()
@@ -779,7 +856,7 @@ class TestCli(unittest.TestCase):
                             "--bez-webu"], capture_output=True, check=True)
         with open(self.path("data", "ocr.json"), "rb") as f:
             self.assertEqual(f.read(), pred)
-        self.assertEqual(json.loads(pred), {"dlouhe_s": "ponechat", "model": "german_print+ces"})
+        self.assertEqual(json.loads(pred), {"stare_znaky": "ponechat", "model": "german_print+ces"})
 
     def test_cli_I_pouziva_slusne(self):
         p = self.ocr("stav")

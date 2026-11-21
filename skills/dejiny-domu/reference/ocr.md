@@ -81,7 +81,7 @@ Postup:
 1. Nabídni OCR Tesseractem. `python3 -I tools/ocr.py stav` (bez sítě) řekne, co chybí, a vypíše návod pro systém.
    Instalaci spouštěj jen se souhlasem; `sudo` a winget spouští uživatel sám.
 2. **Fraktura** (německý tisk 18.–20. stol., lomené písmo): nabídni `ocr.py stahni german_print` (3,5 MB, UB Mannheim)
-   a **volbu dlouhého s** (níže). Volbu zapiš `ocr.py nastav …`; v projektu se už neptej.
+   a **volbu starých znaků** (níže). Volbu zapiš `ocr.py nastav …`; v projektu se už neptej.
 3. Čeština ve fraktuře (švabach, tisky před ~1850): model `german_print+ces`. Čeština antikvou: `ces`.
 4. `ocr.py <vstup>`; texty jsou `lit`, dokud nález neověříš ve skenu.
 
@@ -123,21 +123,25 @@ připnutý, nesedí-li, nic se nenainstaluje). `ocr.py modely` vypíše známé 
 2. Jinak `--tessdata-dir <uživatelská>`; části, které jsou jen v systémové složce, se tam před během zkopírují.
 3. Co není ani v jedné, je exit 2 s návodem. `ocr.py stav` vypíše, kterou složku běh použije.
 
-## Dlouhé s (ſ)
-Fraktura má dlouhé s (`Fiſchzuchtanſtalt`). U fraktury se zeptej jednou za projekt:
-- **převést na s** (výchozí, `ocr.py nastav dlouhe_s s`): hledá se běžnými slovy;
-- **ponechat ſ** (věrný přepis, `ocr.py nastav dlouhe_s ponechat`): pak se souhlasem
-  `ocr_hledej.py pridej zamena s ſ`, aby hledání „s“ našlo i „ſ“.
-Volba platí pro nové texty; složka s hotovými stranami jiné volby se nedodělá (manifest, níže).
+## Staré znaky (ſ, ꝛ, aͤ)
+Fraktura má dlouhé s (`Fiſchzuchtanſtalt`), r rotundu (`ꝛc.`) a přehlásky se znaménkem e nad písmenem (`Muͤller`).
+U fraktury se zeptej jednou za projekt:
+- **zjednodušit** (výchozí, `ocr.py nastav stare_znaky zjednodusit`): do textu se zapíše `ſ → s`, `ꝛ → r`,
+  `aͤ oͤ uͤ → ä ö ü` (i velká); text se čte a cituje běžnými slovy;
+- **ponechat** (věrný přepis, `ocr.py nastav stare_znaky ponechat`).
+Hledání (`ocr_hledej.py`) najde `ſ`, `ꝛ` i `aͤ` samo (výchozí rovnocennosti), takže ani při „ponechat“ se žádné
+pravidlo nepřidává. `jen_s` (jen `ſ → s`) mají výstupy z doby, kdy volba byla `dlouhe_s`; zastaralé `dlouhe_s` v
+nastavení nástroj převede (`s` → `jen_s`) a varuje. Volba platí pro nové texty; složka s hotovými stranami se dodělá
+stejně, jak vznikla (není-li volba nastavená, převezme ji z manifestu), výslovně jiná volba se odmítne (manifest, níže).
 
 ## Nastavení `data/ocr.json`
 Všechna pole jsou volitelná; aktualizace skillu soubor nepřepíše. Zapisuj ho `ocr.py nastav <klíč> <hodnota>`
 (`vychozi` pole smaže), prohlédni `ocr.py nastaveni`.
 ```json
-{"model": "german_print", "dlouhe_s": "s", "davka": 100, "soubezne": 4, "dpi": 300, "tessdata": "~/.local/share/tessdata",
+{"model": "german_print", "stare_znaky": "zjednodusit", "davka": 100, "soubezne": 4, "dpi": 300, "tessdata": "~/.local/share/tessdata",
  "prikaz": ["/cesta/k/programu", "{slozka}", "--lang", "{model}", "--out", "{vystup}"], "prikaz_verze": "program 2026-11"}
 ```
-- `model` (přebije ho `--model`), `dlouhe_s` `s`|`ponechat`, `dpi` 72–1200 (převod PDF), `soubezne` 1–64 (procesů
+- `model` (přebije ho `--model`), `stare_znaky` `zjednodusit`|`ponechat`|`jen_s`, `dpi` 72–1200 (převod PDF), `soubezne` 1–64 (procesů
   Tesseractu najednou, výchozí polovina jader, nejvýš 4), `davka` 1–10000 (strany na jedno volání vlastního příkazu),
   `tessdata` (uživatelská složka modelů; `~` se rozbalí, relativní cesta platí od kořene projektu).
 - Chybný soubor nástroj odmítne s řádkem nebo polem (exit 1); neznámá pole jen vypíše jako varování.
@@ -160,9 +164,10 @@ ověř pár stran podle skenu, nebo nastav `davka 1`.
   `a-001.txt`). Jinam `--vystup SLOŽKA`, jen část PDF `--strany 1-40`.
 - Vícestránkový TIFF se odmítne; rozdělí ho `magick vstup.tif pracovni/<jméno>/s-%03d.tif` a vstupem je pak složka.
 - `ocr_manifest.json` (zapíše se před první stranou) drží sha256 vstupu (u složky každého obrázku), model a sha256
-  použitých souborů modelu, verzi Tesseractu nebo šablonu příkazu, převod PDF (dpi, verze pdftoppm) a dlouhé s.
+  použitých souborů modelu, verzi Tesseractu nebo šablonu příkazu, převod PDF (dpi, verze pdftoppm) a staré znaky
+  (`stare_znaky`; starší manifest má `dlouhe_s`, `s` se bere jako `jen_s`).
 - Opakované spuštění dodělá jen chybějící strany (hotová = existující `.txt`, i prázdný). Liší-li se cokoli z manifestu
-  (jiné bajty PDF, jiný model, dpi, dlouhé s, změněný obrázek hotové strany), skončí exit 1 se jmény polí a nic
+  (jiné bajty PDF, jiný model, dpi, staré znaky, změněný obrázek hotové strany), skončí exit 1 se jmény polí a nic
   nezmění; pak `--vystup` s novou složkou, nebo starou složku smaž. Nové obrázky ve složce se jen připíšou.
 - Do jedné složky zapisuje vždy jen jeden běh (`.ocr.lock`); druhý hned skončí „jiný běh OCR“.
 - Exit: 0 hotovo, 1 selhání nebo nesoulad (vadné strany se při dalším běhu dodělají), 2 něco chybí (Tesseract,

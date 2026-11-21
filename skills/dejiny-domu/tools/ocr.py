@@ -1,5 +1,5 @@
 """OCR vlastních skenů Tesseractem: z PDF, obrázku nebo složky obrázků text po stranách do pracovni/ocr/<dokument>/.
-Postup, volba modelu, dlouhé s a vlastní příkaz: reference/ocr.md.
+Postup, volba modelu, staré znaky (ſ, ꝛ, aͤ) a vlastní příkaz: reference/ocr.md.
 
 Použití (z kořene projektu):
   ocr.py <vstup>… [--model M] [--vystup SLOŽKA] [--strany A-B]
@@ -11,7 +11,8 @@ Použití (z kořene projektu):
   ocr.py modely                    známé modely a kde jsou nainstalované
   ocr.py nastaveni                 platné nastavení (data/ocr.json a výchozí hodnoty)
   ocr.py nastav <klíč> <hodnota|vychozi>
-      klíče: model, dlouhe_s (s|ponechat), prikaz (JSON seznam), prikaz_verze, davka, soubezne, dpi, tessdata
+      klíče: model, stare_znaky (zjednodusit|ponechat|jen_s), prikaz (JSON seznam), prikaz_verze, davka,
+      soubezne, dpi, tessdata; zastaralé dlouhe_s (s|ponechat) se zapíše jako stare_znaky
   ocr.py stahni <model>…           stáhne známý model (jen po souhlasu uživatele; jen přes slusne.py)
 Exit: 0 vše hotovo, 1 selhání nebo nesoulad, 2 něco není nainstalované.
 Samotné OCR nic nestahuje.
@@ -61,7 +62,11 @@ ZNAME = {   # model: (url, sha256, MB, popis)
     "pol": (f"{BEST}/pol.traineddata", "e80cc4cefbdface06e9223f43f089556b9dcf104020fbc0a200f6863c57d4405", 12.0,
             "polština"),
 }
-POLE = ("model", "dlouhe_s", "prikaz", "prikaz_verze", "davka", "soubezne", "dpi", "tessdata")
+POLE = ("model", "stare_znaky", "dlouhe_s", "prikaz", "prikaz_verze", "davka", "soubezne", "dpi", "tessdata")
+# stare_znaky: zjednodusit = ſ → s, ꝛ → r, aͤ oͤ uͤ → ä ö ü (výchozí); ponechat = věrný přepis; jen_s = jen ſ → s
+# (dřívější dlouhe_s: s; staré výstupy se dodělávají stejně). Zastaralé dlouhe_s se převádí: s → jen_s.
+STARE_ZNAKY = ("zjednodusit", "ponechat", "jen_s")
+Z_DLOUHE_S = {"s": "jen_s", "ponechat": "ponechat"}
 ROZSAHY = {"davka": (1, 10000), "soubezne": (1, 64), "dpi": (72, 1200)}
 
 
@@ -304,8 +309,17 @@ def over_nastaveni(d):
             rozloz_model(d["model"])
         except Chyba as e:
             chyby.append(f"model: {e}")
-    if "dlouhe_s" in d and d["dlouhe_s"] not in ("s", "ponechat"):
-        chyby.append('dlouhe_s: musí být "s" nebo "ponechat"')
+    if "stare_znaky" in d and d["stare_znaky"] not in STARE_ZNAKY:
+        chyby.append(f"stare_znaky: musí být {' | '.join(STARE_ZNAKY)}")
+    if "dlouhe_s" in d:
+        if d["dlouhe_s"] not in Z_DLOUHE_S:
+            chyby.append('dlouhe_s: musí být "s" nebo "ponechat"')
+        else:
+            varovani.append("dlouhe_s je zastaralé, použij stare_znaky (ocr.py nastav stare_znaky "
+                            f"{Z_DLOUHE_S[d['dlouhe_s']]})")
+            if "stare_znaky" in d and d["stare_znaky"] != Z_DLOUHE_S[d["dlouhe_s"]]:
+                chyby.append(f"dlouhe_s {d['dlouhe_s']} a stare_znaky {d['stare_znaky']} si odporují – nech jen "
+                             "stare_znaky")
     if "prikaz" in d:
         p = d["prikaz"]
         if not isinstance(p, list) or not p or not all(isinstance(x, str) and x for x in p):
@@ -343,10 +357,18 @@ def uloz_nastaveni(d, cesta=None):
 
 def platne(nast, model=None):
     """Výsledné hodnoty: --model, pak soubor, pak výchozí."""
-    return {"model": model or nast.get("model") or "german_print", "dlouhe_s": nast.get("dlouhe_s", "s"),
+    return {"model": model or nast.get("model") or "german_print", "stare_znaky": stare_znaky(nast) or "zjednodusit",
             "prikaz": nast.get("prikaz"), "prikaz_verze": nast.get("prikaz_verze"),
             "davka": nast.get("davka", 100), "soubezne": nast.get("soubezne", vychozi_soubezne()),
             "dpi": nast.get("dpi", 300), "tessdata": nast.get("tessdata")}
+
+
+def stare_znaky(d):
+    """Výslovně nastavené staré znaky v nastavení nebo manifestu (stare_znaky, jinak převedené dlouhe_s), jinak None."""
+    v, s = d.get("stare_znaky"), d.get("dlouhe_s")
+    if isinstance(v, str) and v:
+        return v
+    return Z_DLOUHE_S.get(s) if isinstance(s, str) else None
 
 
 def varuj_model(model):
@@ -503,7 +525,7 @@ def rozsah_stran(text, n):
 
 # --- manifest -------------------------------------------------------------------------------------------------
 
-def manifest(druh, vstup, seznam, model, model_overen, modely_sha, cesta, render, dlouhe_s):
+def manifest(druh, vstup, seznam, model, model_overen, modely_sha, cesta, render, znaky):
     jmeno = os.path.basename(os.path.normpath(vstup))
     if druh == "slozka":
         zdroj, obrazky = {"druh": "slozka", "jmeno": jmeno}, {s["jmeno"]: sha256_souboru(s["obrazek"]) for s in seznam}
@@ -512,7 +534,7 @@ def manifest(druh, vstup, seznam, model, model_overen, modely_sha, cesta, render
     else:
         zdroj, obrazky = {"druh": "obrazek", "jmeno": jmeno, "sha256": sha256_souboru(vstup)}, None
     return {"verze": 1, "zdroj": zdroj, "obrazky": obrazky, "model": model, "model_overen": model_overen,
-            "modely_sha256": modely_sha, "cesta": cesta, "render": render, "dlouhe_s": dlouhe_s,
+            "modely_sha256": modely_sha, "cesta": cesta, "render": render, "stare_znaky": znaky,
             "vystup_prikazu": None}
 
 
@@ -530,9 +552,11 @@ def porovnej_manifest(stary, novy, hotove):
     vystup_prikazu se neporovnává (zjistí se až z výstupu). Vlastní příkaz bez prikaz_verze nedodělává."""
     rozdil = []
     for k in sorted(set(stary) | set(novy)):
-        if k in ("obrazky", "vystup_prikazu"):
+        if k in ("obrazky", "vystup_prikazu", "dlouhe_s", "stare_znaky"):
             continue
         rozdil += _rozdily(stary.get(k), novy.get(k), k)
+    if stare_znaky(stary) != stare_znaky(novy):   # odvozená hodnota: starý manifest dlouhe_s s = jen_s
+        rozdil.append("stare_znaky")
     so, no = stary.get("obrazky"), novy.get("obrazky")
     if (so is None) != (no is None):
         rozdil.append("obrazky")
@@ -580,9 +604,20 @@ def zamek_slozky(slozka):
 
 # --- převod ---------------------------------------------------------------------------------------------------
 
-def uprav_text(text, dlouhe_s):
+_NAD_E = "\u0364"   # kombinující malé e nad písmenem (aͤ = ä)
+_PREHLASKY = {"a": "ä", "o": "ö", "u": "ü", "A": "Ä", "O": "Ö", "U": "Ü"}
+_NAD_E_RE = re.compile(f"([aouAOU{''.join(_PREHLASKY.values())}]){_NAD_E}")
+
+
+def uprav_text(text, znaky):
+    """Konce řádků a stránek; staré znaky podle volby (zjednodusit: ſ → s, ꝛ → r, aͤ → ä, üͤ → ü; jen_s: ſ → s)."""
     text = text.replace("\r\n", "\n").replace("\f", "")
-    return text.replace("ſ", "s") if dlouhe_s == "s" else text
+    if znaky in ("zjednodusit", "jen_s"):
+        text = text.replace("\u017f", "s")
+    if znaky == "zjednodusit":
+        text = text.replace("\ua75b", "r")
+        text = _NAD_E_RE.sub(lambda m: _PREHLASKY.get(m.group(1), m.group(1)), text)
+    return text
 
 
 def zapis_stranu(slozka, jmeno, text):
@@ -685,8 +720,6 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None):
             cesta, model_overen = {"druh": "tesseract", "verze": verze}, True
         render = ({"dpi": p["dpi"], "format": "jpeg-gray-q92", "pdftoppm": verze_poppleru(pdftoppm)}
                   if druh == "pdf" else None)
-        novy = manifest(druh, vstup, seznam, model, model_overen, modely_sha, cesta, render, p["dlouhe_s"])
-
         mpath = os.path.join(vystup, MANIFEST)
         txt = {f[:-4] for f in os.listdir(vystup) if f.endswith(".txt")}
         stary = None
@@ -703,6 +736,11 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None):
                 stary = None
         if txt and stary is None:
             raise Chyba(f"{vystup}: jsou tu strany bez {MANIFEST} – nelze zaručit původ. Smaž složku, nebo zvol --vystup.")
+        if stary is not None and txt and stare_znaky(nast) is None and stare_znaky(stary):
+            # nenastavené výslovně: dodělat stejně jako hotové strany (žádné tiché povýšení starého výstupu)
+            p["stare_znaky"] = stare_znaky(stary)
+            print(f"staré znaky: {p['stare_znaky']} podle hotových stran", file=sys.stderr)
+        novy = manifest(druh, vstup, seznam, model, model_overen, modely_sha, cesta, render, p["stare_znaky"])
         if stary is not None and txt:
             rozdil = porovnej_manifest(stary, novy, txt)
             if rozdil:
@@ -730,7 +768,7 @@ def _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup)
             obr = s["obrazek"] if druh != "pdf" else vykresli(pdftoppm, vstup, s["cislo"], p["dpi"],
                                                                os.path.join(t, s["jmeno"]))
             text = tesseract_strana(tess, obr, model, tdir)
-        zapis_stranu(vystup, s["jmeno"], uprav_text(text, p["dlouhe_s"]))
+        zapis_stranu(vystup, s["jmeno"], uprav_text(text, p["stare_znaky"]))
 
     chyby, n = 0, 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=p["soubezne"]) as ex:
@@ -773,7 +811,7 @@ def _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup, man, 
                     man["vystup_prikazu"] = "spojeny"
                     zapis_json(mpath, man)
             for s in davka:
-                zapis_stranu(vystup, s["jmeno"], uprav_text(texty[s["jmeno"]], p["dlouhe_s"]))
+                zapis_stranu(vystup, s["jmeno"], uprav_text(texty[s["jmeno"]], p["stare_znaky"]))
         except Chyba as e:
             print(f"CHYBA dávky {davka[0]['jmeno']}–{davka[-1]['jmeno']}: {e}", file=sys.stderr)
             return 1
@@ -829,7 +867,7 @@ def prikaz_stav(nast, model_arg=None):
             print(f"složka modelů pro běh: {tdir or sdir} ({'--tessdata-dir' if tdir else 'systémová'})")
     if p["prikaz"]:
         print(f"vlastní příkaz: {json.dumps(p['prikaz'], ensure_ascii=False)} (verze: {p['prikaz_verze'] or 'nenastavena'})")
-    print(f"dlouhé s: {p['dlouhe_s']}")
+    print(f"staré znaky: {p['stare_znaky']}")
     return 2 if chybi else 0
 
 
@@ -863,6 +901,12 @@ def prikaz_nastav(nast_cesta, klic, hodnota):
             raise Chyba(f"{nast_cesta}: nejde přečíst ({e}); oprav nebo smaž soubor.")
         if not isinstance(d, dict):
             raise Chyba(f"{nast_cesta}: kořen musí být objekt.")
+    if klic == "dlouhe_s":   # zastaralé pole: zapíše se převedené jako stare_znaky
+        if hodnota != "vychozi" and hodnota not in Z_DLOUHE_S:
+            raise Chyba('dlouhe_s: musí být "s" nebo "ponechat" – nic se nezapsalo.')
+        klic, hodnota = "stare_znaky", Z_DLOUHE_S.get(hodnota, hodnota)
+    if klic == "stare_znaky":
+        d.pop("dlouhe_s", None)
     if hodnota == "vychozi":
         d.pop(klic, None)
     elif klic == "prikaz":
