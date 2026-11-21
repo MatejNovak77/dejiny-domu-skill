@@ -53,7 +53,7 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
 - `volby.tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými
   ův ova ovo ovu ovy ovic`): Zineckera, Zineckerové, „Friesovy boudy“. **Známý zbytek:** -e/-i/-a pustí i německé tvary
   („Friese“). `presne` = jen celé slovo, `volne` = cokoli za slovem (Friesen, Friesland).
-- `volby.rovnocennosti`: `true` (výchozí, klíč chybí) | `false` (žádné) | objekt jen
+- `volby.rovnocennosti`: `true` (výchozí, klíč chybí) | `false` (žádné; `ſ` = `s` platí vždy) | objekt jen
   s odchylkami od výchozích (`{"prehlasky": false, "nemcina_1901": true}`). Mění se příkazem `pridej|odeber rovnocennost`.
 - `volby.fonetika`: `kolnska` – `hledej` vždy přidá podobně znějící jména (jako `--fonetika kolnska`).
 Před slovem nesmí být písmeno ani `-` (číslice smí: „22Gansbauden“). Za slovem nesmí být kombinující znak (`Mu`
@@ -113,7 +113,7 @@ hlásí doslova (`Fiſcher`, `Muͤller`). Velikost písmen se nerozlišuje (`Mü
 
 | Název | Co platí za stejné | Výchozí |
 |---|---|---|
-| `dlouhe_s` | `ſ` = `s` (Fiſcher) | zapnuto |
+| `dlouhe_s` | `ſ` = `s` (Fiſcher); při hledání platí vždy | zapnuto |
 | `r_rotunda` | `ꝛ` = `r` (Kꝛischlitz) | zapnuto |
 | `ostre_s` | `ß` = `ss` = `ſs` = `sſ` = `ſſ`, `ẞ` = `SS` (Strauß, Strauss) | zapnuto |
 | `prehlasky` | `ä ö ü` = `ae oe ue` = `aͤ oͤ uͤ` = `a`+U+0308 (Müller, Mueller, Muͤller; i velká `MUELLER`) | zapnuto |
