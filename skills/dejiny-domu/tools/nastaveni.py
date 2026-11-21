@@ -11,6 +11,7 @@ Příklad: nastaveni.py nastav pomocnici.rukopisy opus
 Sekce si deklaruje každý nástroj sám literálem na nejvyšší úrovni souboru:
   NASTAVENI_SEKCE = {"<sekce>": {"<klíč>": {"vychozi": …, "hodnoty": [...] | "cele": [min, max] | "text": True,
                                             "popis": "…"}}}
+„text“ = neprázdný text bez mezer na okrajích; s „"mala": True“ se ukládá malými písmeny.
 „vychozi“: None = nenastaveno, zeptej se uživatele. nastaveni.py je najde v tools/*.py bez importu (ast).
 Z Pythonu: import nastaveni; nastaveni.sekce("pomocnici") → {klíč: hodnota}; výjimka nastaveni.Chyba.
 Neznámé sekce a klíče (z novější verze skillu) jen varují a zápis je zachová.
@@ -30,11 +31,13 @@ VYCHOZI = "vychozi"
 
 NASTAVENI_SEKCE = {
     "pomocnici": {   # pomocníky (subagenty) pouští Claude podle SKILL.md, žádný nástroj; viz reference/pomocnici.md
-        "rukopisy": {"vychozi": None, "hodnoty": ["opus", "sonnet"],
+        "rukopisy": {"vychozi": None, "text": True, "mala": True,
                      "popis": "model pomocníků, kteří čtou snímky ručně psaného textu (matriky, gruntovní "
-                              "a pozemkové knihy, sčítací operáty, kurent)"},
-        "ostatni": {"vychozi": "sonnet", "hodnoty": ["opus", "sonnet"],
-                    "popis": "model pomocníků pro ostatní práci (tištěné zdroje, OCR texty, procházení portálů)"},
+                              "a pozemkové knihy, sčítací operáty, kurent); název modelu, jak ho zná hostitel "
+                              "(v Claude Code alias sonnet, opus, haiku nebo fable)"},
+        "ostatni": {"vychozi": "sonnet", "text": True, "mala": True,
+                    "popis": "model pomocníků pro ostatní práci (tištěné zdroje, OCR texty, procházení portálů); "
+                             "název modelu jako u rukopisů"},
     },
 }
 
@@ -111,7 +114,7 @@ def _platna(popis, v):
         return isinstance(v, str) and v in popis["hodnoty"]
     if "cele" in popis:
         return type(v) is int and popis["cele"][0] <= v <= popis["cele"][1]
-    return isinstance(v, str)
+    return isinstance(v, str) and v.strip() != ""
 
 
 def _povoleno(popis):
@@ -119,7 +122,7 @@ def _povoleno(popis):
         return ", ".join(popis["hodnoty"])
     if "cele" in popis:
         return f"celé číslo {popis['cele'][0]}–{popis['cele'][1]}"
-    return "libovolný text"
+    return "neprázdný text" + (" (ukládá se malými písmeny)" if popis.get("mala") else "")
 
 
 def _nacti():
@@ -195,8 +198,8 @@ def _prevod(klic, popis, text):
             v = None
         if v is not None and _platna(popis, v):
             return v
-    else:
-        return text
+    elif text.strip():
+        return text.strip().lower() if popis.get("mala") else text.strip()
     raise Chyba(f"{klic}: neplatná hodnota „{text}“ (povoleno: {_povoleno(popis)}, nebo {VYCHOZI}) – "
                 "nic jsem nezměnil.")
 

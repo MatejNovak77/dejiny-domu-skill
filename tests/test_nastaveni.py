@@ -64,14 +64,27 @@ class TestNastaveni(Projekt):
         self.assertEqual(self.bajty(), PRESNE.encode())
 
     def test_neplatna_hodnota_nic_nezmeni(self):
-        p = self.nast("nastav", "pomocnici.rukopisy", "gpt")
+        p = self.nast("nastav", "pomocnici.rukopisy", "")
         self.assertEqual(p.returncode, 1)
-        self.assertIn("opus, sonnet", p.stderr)
+        self.assertIn("neprázdný text", p.stderr)
         self.assertFalse(os.path.exists(self.soubor()))
         self.nast("nastav", "pomocnici.rukopisy", "opus")
-        p = self.nast("nastav", "pomocnici.ostatni", "haiku")
+        p = self.nast("nastav", "pomocnici.ostatni", "   ")
         self.assertEqual(p.returncode, 1)
         self.assertEqual(self.bajty(), PRESNE.encode())
+
+    def test_libovolny_model_hostitele(self):
+        self.assertEqual(self.nast("nastav", "pomocnici.rukopisy", "fable").returncode, 0)
+        self.assertEqual(self.nast("nastav", "pomocnici.ostatni", " Haiku ").returncode, 0)
+        self.assertEqual(json.loads(self.bajty())["pomocnici"], {"rukopisy": "fable", "ostatni": "haiku"})
+        p = self.nast("ukaz", "pomocnici")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("pomocnici.rukopisy = fable", p.stdout)
+        self.assertIn("alias sonnet, opus, haiku nebo fable", p.stdout)
+        self.uloz('{"pomocnici": {"rukopisy": ""}}')
+        p = self.nast("ukaz", "pomocnici")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("CHYBA", p.stderr)
 
     def test_neznamy_klic_a_sekce_odmitne(self):
         for klic in ("pomocnici.rukopis", "ocrr.model", "pomocnici"):
