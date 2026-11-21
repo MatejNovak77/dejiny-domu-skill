@@ -60,8 +60,10 @@ nenajde začátek rozloženého `Mü`), mimo `volne` ani malé písmeno. Chybný
 2. `kandidati` na totéž jméno – taky sám, bez ptaní (jen čte, nic nezapíše).
 3. **Počet z jednoho výpisu, ne od oka.** Navržená pravidla zapiš do `pracovni/navrh_zamen.json` (kopie
    `data/ocr_zameny.json`, pokud existuje, + návrhy z `kandidati`; `--pravidla` soubor projektu **nahrazuje**, proto
-   kopie) a spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json`. `data/` se tím nemění. Řádek
+   kopie). Soubor vytvoř nástrojem pro zápis souborů (Write), ne `cat >` ani heredocem v Bashi (ty můžou být
+   zamítnuté). Pak spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json`; `data/` se tím nemění. Řádek
    `# <jméno>: N výskytů` je počet; nikdy nesčítej nálezy z několika výpisů sám. Když návrh změníš, spusť výpis znovu.
+   Dělení slova (`volba deleni_slova`) je pravidlo jako ostatní, ve výchozím stavu vypnuté.
 4. Uživateli ukaž **dvě tabulky** z toho výpisu:
    - *nálezy*: tvar doslova, `soubor:řádek`, čím se našel (přesně / rovnocennost / navržené pravidlo); pod ní N;
    - *navržená pravidla*: přesně jako argumenty `pridej …` (z `kandidati`), co každé chytí navíc. Řekni, co by
