@@ -5,11 +5,10 @@ tvary písmen (e + U+030C = ě), měkké dělení U+00AD a česká sada pravopis
 v data/ocr_zameny.json (bez souboru = celé slovo s rovnocennostmi a českými koncovkami). Postup: reference/ocr.md.
 
 Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všech *.txt v pracovni/):
-  ocr_hledej.py hledej <slovo>… [--tvary ceske|presne|volne] [--vypis souhrn|radky] [--fonetika kolnska [--max 40]]
+  ocr_hledej.py hledej <slovo>… [--tvary ceske|presne|volne] [--vypis souhrn|radky]
                 [--pravidla <json>] [-- <soubor|složka>…]
       → souhrn podle nalezeného tvaru: slovo, tvar, počet×, první tři místa (+ kolik dalších), ukázka (tabulátory);
-        --vypis radky: řádek na nález (slovo, tvar, soubor:řádek, ukázka); počty a počet souborů na stderr;
-        s fonetikou navíc podobně znějící slova (slovo, „fonetika“, tvar, počet×, první výskyt) – nejsou to nálezy
+        --vypis radky: řádek na nález (slovo, tvar, soubor:řádek, ukázka); počty a počet souborů na stderr
   ocr_hledej.py kandidati <slovo>… [--vzdalenost N] [--max 40] [--tvary …] [--pravidla <json>] [-- …]
       → slova blízká hledanému, která pravidla nenajdou, s počtem, ukázkou a návrhem pravidla; nic nezapíše
   ocr_hledej.py pridej|odeber zamena <znak> <čtení>…
@@ -17,7 +16,6 @@ Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všec
   ocr_hledej.py pridej|odeber vyloucit <text> [--proc "důvod"]
   ocr_hledej.py pridej|odeber volba deleni_slova|chybi_prvni_pismeno [ano|ne]
   ocr_hledej.py pridej|odeber volba tvary ceske|presne|volne
-  ocr_hledej.py pridej|odeber volba fonetika kolnska
   ocr_hledej.py pridej|odeber rovnocennost <název>|vse
   ocr_hledej.py pravidla
 Pravidlo, rovnocennost i volbu měň jen se souhlasem uživatele. Pravopisné varianty jmen (Zinecker / Zinnecker)
@@ -42,8 +40,7 @@ KONCOVKY = ("a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův 
 TVARY = ("ceske", "presne", "volne")
 SEKCE = ("poznamka", "zameny", "skupiny", "vyloucit", "volby")
 VOLBY_BOOL = ("deleni_slova", "chybi_prvni_pismeno")
-FONETIKY = ("kolnska",)
-MEMO = 200_000        # slov v paměti kandidátů a fonetiky
+MEMO = 200_000        # slov v paměti kandidátů
 SLOVO_RE = re.compile(r"[^\s.,;:!?\"'„“”‚‘’»«()\[\]{}<>/|*]+")
 MEZERA_RE = re.compile(r"\s")
 
@@ -132,10 +129,6 @@ def chyby_pravidel(p):
             elif k == "tvary":
                 if not (isinstance(v, str) and v in TVARY):
                     chyby.append(f"volby tvary: musí být {' | '.join(TVARY)} (je {json.dumps(v, ensure_ascii=False)})")
-            elif k == "fonetika":
-                if not (isinstance(v, str) and v in FONETIKY):
-                    chyby.append(f"volby fonetika: musí být {' | '.join(FONETIKY)} "
-                                 f"(je {json.dumps(v, ensure_ascii=False)})")
             elif k == "rovnocennosti":
                 if isinstance(v, dict):
                     for n, b in v.items():
@@ -149,7 +142,7 @@ def chyby_pravidel(p):
                                  f"(je {json.dumps(v, ensure_ascii=False)})")
             else:
                 chyby.append(f"neznámá volba „{k}“ (povolené: "
-                             f"{', '.join(VOLBY_BOOL + ('tvary', 'fonetika', 'rovnocennosti'))})")
+                             f"{', '.join(VOLBY_BOOL + ('tvary', 'rovnocennosti'))})")
     return chyby
 
 
@@ -494,86 +487,6 @@ def souhrn(nalezy, mist=3):
     return out
 
 
-# --- fonetika ---------------------------------------------------------------------------------------------------
-
-_KOLN_PREVOD = {"ä": "a", "ö": "o", "ü": "u", OSTRE: "s", DLOUHE_S: "s", OSTRE_VELKE: "s"}
-
-
-def kolnsky_kod(slovo):
-    """Kölner Phonetik (Postel 1969, podle de.wikipedia „Kölner Phonetik“): písmena → číslice podle sousedů,
-    sloučit sousední shodné, odstranit 0 mimo začátek. Ä Ö Ü jako samohlásky, ß ſ jako S; jiné znaky se vynechají."""
-    w = unicodedata.normalize("NFC", slovo).lower()
-    w = "".join(_KOLN_PREVOD.get(c, c) for c in w).upper()
-    w = "".join(c for c in w if "A" <= c <= "Z")
-    kody = []
-    for i, c in enumerate(w):
-        pred = w[i - 1] if i else ""
-        dal = w[i + 1] if i + 1 < len(w) else ""
-        if c in "AEIJOUY":
-            k = "0"
-        elif c == "H":
-            k = ""
-        elif c == "B":
-            k = "1"
-        elif c == "P":
-            k = "3" if dal == "H" else "1"
-        elif c in "DT":
-            k = "8" if dal and dal in "CSZ" else "2"
-        elif c in "FVW":
-            k = "3"
-        elif c in "GKQ":
-            k = "4"
-        elif c == "C":
-            if i == 0:
-                k = "4" if dal and dal in "AHKLOQRUX" else "8"
-            else:
-                k = "4" if dal and dal in "AHKOQUX" and pred not in ("S", "Z") else "8"
-        elif c == "X":
-            k = "8" if pred and pred in "CKQ" else "48"
-        elif c == "L":
-            k = "5"
-        elif c in "MN":
-            k = "6"
-        elif c == "R":
-            k = "7"
-        else:   # S Z
-            k = "8"
-        kody.append(k)
-    out = []
-    for d in "".join(kody):   # H nemá kód, takže sousední shodné kódy kolem něj se sloučí
-        if not out or out[-1] != d:
-            out.append(d)
-    return "".join(out[:1]) + "".join(out[1:]).replace("0", "")
-
-
-def fonetika(slova, cesty, pravidla=None, tvary=None):
-    """{slovo: {tvar: [počet, (soubor, řádek, text)]}}: slova s velkým prvním písmenem, která mají stejný kölnský kód
-    jako hledané slovo a hledání je nenajde. Jeden průchod soubory pro všechna slova; nejsou to nálezy."""
-    vzory = [Vzor(s, pravidla, tvary) for s in slova]
-    kody = {}
-    for x, s in enumerate(slova):
-        kody.setdefault(kolnsky_kod(s), []).append(x)
-    out, memo = [dict() for _ in slova], {}
-    for f in soubory(cesty):
-        for i, radek in enumerate(radky(f), 1):
-            for w in SLOVO_RE.findall(radek):
-                if not w[0].isupper():
-                    continue
-                shody = memo.get(w)
-                if shody is None:
-                    shody = tuple(x for x in kody.get(kolnsky_kod(w), ()) if next(vzory[x].najdi(w), None) is None)
-                    if len(memo) >= MEMO:
-                        memo.clear()
-                    memo[w] = shody
-                for x in shody:
-                    z = out[x].get(w)
-                    if z is None:
-                        out[x][w] = [1, (f, i, radek.strip())]
-                    else:
-                        z[0] += 1
-    return dict(zip(slova, out))
-
-
 # --- kandidáti --------------------------------------------------------------------------------------------------
 
 def vzdalenost(a, b, k):
@@ -853,8 +766,7 @@ def _zmena(akce, druh, args, proc):
         return z
     if druh == "volba":
         if not args or len(args) > 2:
-            sys.exit(f"{akce} volba deleni_slova|chybi_prvni_pismeno [ano|ne] | {akce} volba tvary ceske|presne|volne"
-                     f" | {akce} volba fonetika kolnska")
+            sys.exit(f"{akce} volba deleni_slova|chybi_prvni_pismeno [ano|ne] | {akce} volba tvary ceske|presne|volne")
         nazev = args[0]
         if not pridat:
             def z(p):
@@ -866,7 +778,7 @@ def _zmena(akce, druh, args, proc):
                     del p["volby"]
                 return True, f"odebráno: volba {nazev}"
             return z
-        if nazev in ("tvary", "fonetika"):
+        if nazev == "tvary":
             hodnota = args[1] if len(args) == 2 else None
         elif len(args) == 1 or args[1] in ("ano", "ne"):
             hodnota = len(args) == 1 or args[1] == "ano"
@@ -938,8 +850,7 @@ def main(argv):
         sys.exit(__doc__)
     prikaz, argv = argv[0], argv[1:]
     if prikaz in ("hledej", "kandidati"):
-        povolene = ["--tvary", "--pravidla", "--max"] + (["--vzdalenost"] if prikaz == "kandidati"
-                                                        else ["--fonetika", "--vypis"])
+        povolene = ["--tvary", "--pravidla"] + (["--vzdalenost", "--max"] if prikaz == "kandidati" else ["--vypis"])
         slova, volby, cesty = _volby(argv, povolene)
         if not slova:
             sys.exit(__doc__)
@@ -963,15 +874,6 @@ def main(argv):
         n = len(soubory(cesty))
         print(f"# prohledáno: {n} soubor{'' if n == 1 else 'y' if 2 <= n <= 4 else 'ů'}", file=sys.stderr)
         if prikaz == "hledej":
-            fon = volby.get("fonetika", p.get("volby", {}).get("fonetika"))
-            if fon is not None and fon not in FONETIKY:
-                sys.exit(f"--fonetika: {' | '.join(FONETIKY)}")
-            if fon:
-                kratke = [f"{s} ({kolnsky_kod(s) or 'prázdný'})" for s in slova if len(kolnsky_kod(s)) < 3]
-                if kratke:
-                    sys.exit(f"fonetika: krátký kód u {', '.join(kratke)} – méně než 3 číslice by našly stovky "
-                             "nesouvisejících slov; hledej bez --fonetika")
-            podobne = fonetika(slova, cesty, p, tvary) if fon else {}
             for s in slova:
                 nalezy = hledej(s, cesty, p, tvary)
                 if vypis == "radky":
@@ -981,14 +883,6 @@ def main(argv):
                     for radek in souhrn(nalezy):
                         print(f"{s}\t{radek}")
                 print(f"# {s}: {len(nalezy)} výskytů", file=sys.stderr)
-                if fon:
-                    tvary_f = podobne[s]
-                    rad = sorted(tvary_f.items(), key=lambda x: (-x[1][0], x[0]))
-                    for w, (n, (f, i, _)) in rad[:nejvic]:
-                        print(f"{s}\tfonetika\t{w}\t{n}×\t{_cesta(f)}:{i}")
-                    print(f"# {s}: fonetika {fon} (kód {kolnsky_kod(s)}): {len(rad)} podobně znějících tvarů, "
-                          f"{sum(n for n, _ in tvary_f.values())} výskytů – nejsou to nálezy, ověř je ve skenu",
-                          file=sys.stderr)
             return
         if k is not None and not 0 <= k <= 3:
             sys.exit("--vzdalenost: 0 až 3")
