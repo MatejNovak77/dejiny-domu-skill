@@ -264,6 +264,15 @@ class TestDetekce(Zaklad):
         self.assertIn("server UB Mannheim", radky["german_print"])
         self.assertIn("Apache-2.0", radky["ces"])
 
+    def test_reference_velikosti_modelu(self):
+        with open(os.path.join(SKILL, "reference", "ocr.md"), encoding="utf-8") as f:
+            radky = f.read().splitlines()
+        for m, (url, _, mb, _) in ocr.ZNAME.items():
+            radek = [r for r in radky if r.startswith(f"| `{m}`")]
+            self.assertEqual(len(radek), 1, m)
+            self.assertIn(f"| {mb:.1f} MB |".replace(".", ","), radek[0])
+            self.assertIn("neuvedená" if "uni-mannheim" in url else "Apache-2.0", radek[0])
+
     def test_stav_stare_znaky_nastaveno(self):
         rc, out, _ = self.spust("stav")
         self.assertIn("staré znaky: zjednodusit (výchozí, nenastaveno – u fraktury se zeptej uživatele)", out)

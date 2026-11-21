@@ -151,14 +151,18 @@ Musí platit všechno:
 
 Postup:
 1. Nabídni OCR Tesseractem. `python3 -I tools/ocr.py stav` (bez sítě) řekne, co chybí, a vypíše návod pro systém.
-   Instalaci spouštěj jen se souhlasem; `sudo` a winget spouští uživatel sám.
-2. **Fraktura** (německý tisk 18.–20. stol., lomené písmo): nabídni `ocr.py stahni german_print` (3,5 MB, UB Mannheim)
-   a **volbu starých znaků** (níže). Volbu zapiš `ocr.py nastav …`; v projektu se už neptej.
+   `brew` (macOS) a `winget` (Windows) spusť sám, ale jen po souhlasu. **`sudo`/`su`/`doas` nikdy, ani se souhlasem**
+   (hook projektu je zamítne): na Linuxu dej uživateli příkaz z `ocr.py stav`, ať ho spustí sám (v Claude Code
+   `! sudo apt install …`, jinak v terminálu), a počkej.
+2. **Fraktura** (německý tisk 18.–20. stol., lomené písmo): nabídni `ocr.py stahni german_print` (3,5 MB, server
+   UB Mannheim – ne GitHub, licence neuvedená; jen po souhlasu) a **zeptej se na staré znaky** (níže), pokud
+   `ocr.py stav` u nich neukáže „nastaveno“. Volbu zapiš `ocr.py nastav …`; v projektu se už neptej. Velikost, server
+   a licenci ber z tabulky „Volba modelu“ nebo z `ocr.py modely`, ne z paměti.
 3. Čeština ve fraktuře (švabach, tisky před ~1850): model `german_print+ces`. Čeština antikvou: `ces`.
 4. `ocr.py <vstup>`; texty jsou `lit`, dokud nález neověříš ve skenu.
 
 Komplikace: Windows – Tesseract ani Poppler nejsou v PATH, `ocr.py` je najde v obvyklých složkách (restart není nutný).
-Linux bez `sudo` – vypiš uživateli příkaz pro správce. Selže stažení modelu – hláška obsahuje adresu a cílovou složku
+Uživatel na Linuxu bez práv `sudo` – příkaz dá správci. Selže stažení modelu – hláška obsahuje adresu a cílovou složku
 pro ruční stažení.
 
 ## Instalace
@@ -175,13 +179,18 @@ Potřeba je Tesseract ≥ 4. Systémové modely jsou ve složce, kterou vypíše
 ve které `*.traineddata` přímo leží.
 
 ## Volba modelu
-| Model | Na co | Zdroj |
-|---|---|---|
-| `german_print` (výchozí) | německý tisk, fraktura i stará antikva | UB Mannheim |
-| `frak2021` | německá fraktura 16.–20. stol. | UB Mannheim |
-| `german_print+ces` | čeština ve fraktuře / švabachu | |
-| `ces`, `deu`, `lat`, `pol`, `eng` | antikva v daném jazyce | tessdata_best (připnutý commit) |
-| `deu_latf` | fraktura (Google) – **nepoužívat**, výrazně horší | tessdata_best |
+| Model | Na co | Velikost | Zdroj | Licence |
+|---|---|---|---|---|
+| `german_print` (výchozí) | německý tisk, fraktura i stará antikva | 3,5 MB | server UB Mannheim (ne GitHub) | neuvedená |
+| `frak2021` | německá fraktura 16.–20. stol. | 5,1 MB | server UB Mannheim (ne GitHub) | neuvedená |
+| `ces` | čeština, antikva | 10,9 MB | tessdata_best na GitHubu (připnutý commit) | Apache-2.0 |
+| `deu` | němčina, antikva | 8,6 MB | tessdata_best na GitHubu | Apache-2.0 |
+| `lat` | latina | 9,7 MB | tessdata_best na GitHubu | Apache-2.0 |
+| `pol` | polština | 12,0 MB | tessdata_best na GitHubu | Apache-2.0 |
+| `eng` | angličtina | 15,4 MB | tessdata_best na GitHubu | Apache-2.0 |
+| `deu_latf` | fraktura (Google) – **nepoužívat**, výrazně horší | 12,9 MB | tessdata_best na GitHubu | Apache-2.0 |
+
+Čeština ve fraktuře / švabachu: `german_print+ces` (oba modely).
 
 Měření (Tesseract 5.5.4, 19. 11. 2026): jednotlivé řádky (GT4HistOCR, 19. stol.) frak2021 0,39 % CER ≈ german_print
 0,41 % ≫ deu_latf 4,6 %; celé strany (Kant 1781) german_print 7,0 % < frak2021 7,4 % ≪ deu_latf 11,2 %. Kurrent
