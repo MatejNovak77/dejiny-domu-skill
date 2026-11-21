@@ -74,6 +74,17 @@ nenajde začátek rozloženého `Mü`), mimo `volne` ani malé písmeno. Chybný
    do `data/ocr_zameny.json`: `odeber`, zapnutí sady pravopisu nebo fonetiky.
 6. `hledej` znovu (bez `--pravidla`) a řekni rozdíl („teď 72 místo 59, nové: …“). Nevhodné pravidlo vrátí `odeber`.
 
+## Návrhy kandidátů
+Sloupec návrhu v `kandidati` obsahuje jen pravidla, která jde přidat tak, jak stojí (`pridej …`, po souhlasu):
+- `zamena X Y` – OCR čte znak X jako Y → `pridej zamena X Y`;
+- `skupina xy Z` – OCR čte dvojici xy jako Z → `pridej skupina xy Z`;
+- `volba deleni_slova` – slovo rozdělené znakem dělení → `pridej volba deleni_slova`;
+- `volba chybi_prvni_pismeno` – OCR vynechalo první písmeno → `pridej volba chybi_prvni_pismeno`.
+
+Prázdný sloupec = rozdíl, na který pravidlo není: jiná koncovka (Zineckers) → `--tvary volne` nebo tvar hledej jako
+samostatné slovo; něco před slovem (InZinecker), jiný pravopis, mezera ve slově nebo víc změn najednou → samostatné
+slovo (a ověř ho ve skenu). Rozdíl jen ve velikosti písmen mezi kandidáty není – najde ho už `hledej`.
+
 ## Kdy hledání zkomolenin nabídnout
 `hledej` a `kandidati` jen čtou – když je potřebuješ, spusť je. Zápis pravidla sám nabídni (nejvýš jednou za
 konverzaci na jedno slovo; po odmítnutí znovu až s novými texty), když:
