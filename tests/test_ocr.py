@@ -569,6 +569,11 @@ class TestDodelavani(Zaklad):
         self.assertEqual(self.manifest("kniha")["model"], "frak2021")
         self.assertTrue(os.path.exists(self.vystup("kniha", "poznamka.txt")))
         self.assertTrue(os.path.exists(self.vystup("kniha", "poznamka.md")))
+        # kratší PDF pod stejným jménem: --znovu smaže i strany, které nový zdroj nemá (podle manifestu)
+        self.assertEqual(self.spust(self.pdf(2), "--model", "frak2021")[0], 1)
+        self.assertEqual(self.spust(self.pdf(2), "--model", "frak2021", "--znovu")[0], 0)
+        self.assertEqual(sorted(f for f in os.listdir(self.vystup("kniha")) if f.endswith(".txt")),
+                         ["poznamka.txt", "s0001.txt", "s0002.txt"])
         cizi = self.vystup("cizi")   # .txt bez manifestu: složka nemusí být naše → nic nesmazat
         os.makedirs(cizi)
         open(os.path.join(cizi, "s0001.txt"), "w").close()
@@ -697,6 +702,9 @@ class TestPreruseni(Zaklad):
             self.assertEqual(proc.wait.call_count, len(wait))
             self.assertEqual(proc.kill.call_count, kill)
             self.assertIn("čekám", err.getvalue())
+        with self.assertRaises(ocr.Chyba) as c:   # překlep v cestě: hláška místo tracebacku
+            PUVODNI_SPUST_PRIKAZ([os.path.join(self.tmp, "neexistuje", "ocr")])
+        self.assertIn("nejde spustit", str(c.exception))
 
 
 class TestPrikaz(Zaklad):

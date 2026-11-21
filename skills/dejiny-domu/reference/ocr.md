@@ -275,9 +275,11 @@ do `{vystup}` **jeden** `.txt` (jméno libovolné), za **každou** stranou znak 
 - **Nehlídá** obsah souborů: vyměníš-li sken nebo PDF pod stejným jménem (a počtem stran) nebo soubor modelu pod
   stejným názvem, spusť s `--znovu`, jinak se nové strany přimíchají ke starým.
 - Opakované spuštění dodělá jen chybějící strany (hotová = existující `.txt`, i prázdný). Nesoulad s manifestem:
-  exit 1, výpis `pole: staré → nové`, nic se nezmění. Pak `--znovu` (smaže texty stran a manifest v té složce, jiné
-  soubory nechá, a udělá dokument celý znovu), nebo `--vystup` s novou složkou. `--znovu` ve složce se stranami bez
-  manifestu nic nesmaže (složka nemusí být nástroje). Nové obrázky ve složce se jen připíšou.
+  exit 1, výpis `pole: staré → nové`, nic se nezmění. Pak `--znovu` (smaže texty stran – u PDF i strany delšího
+  dřívějšího PDF – a manifest, jiné soubory nechá, a udělá dokument celý znovu), nebo `--vystup` s novou složkou.
+  `--znovu` ve složce se stranami bez manifestu nic nesmaže (složka nemusí být nástroje). Nové obrázky ve složce se
+  jen připíšou; text odebraného nebo přejmenovaného obrázku ve složce zůstane – smaž ho ručně.
+- Špatná cesta ve vlastním příkazu (`prikaz`) je chyba dávky s hláškou, ne pád.
 - Do jedné složky zapisuje vždy jen jeden běh (`.ocr.lock`); druhý hned skončí „jiný běh OCR“. Tesseract a modely
   se kontrolují dřív, než výstupní složka vznikne.
 - Ctrl-C: běh skončí hned po právě rozpracovaných stranách, vypíše, kolik je hotovo, a další spuštění dodělá zbytek.

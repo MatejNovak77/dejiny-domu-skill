@@ -87,7 +87,10 @@ def spust(argv, **kw):
 def spust_prikaz(argv):
     """Vlastní příkaz uživatele. Po Ctrl-C počká, až příkaz sám skončí (terminál mu přerušení poslal taky; další
     Ctrl-C ho ukončí hned), a teprve pak přerušení pustí dál – jinak by osiřelý proces četl smazanou dávku."""
-    proc = subprocess.Popen(argv, cwd=ROOT)
+    try:
+        proc = subprocess.Popen(argv, cwd=ROOT)
+    except OSError as e:   # překlep v cestě, program mimo PATH (např. ~/.local/bin)
+        raise Chyba(f"vlastní příkaz {argv[0]} nejde spustit ({e.strerror or e}); oprav prikaz (ocr.py nastav prikaz …).")
     try:
         return proc.wait()
     except KeyboardInterrupt:
@@ -624,13 +627,7 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None, znovu=False):
     with zamek_slozky(vystup):
         mpath = os.path.join(vystup, MANIFEST)
         txt = {f[:-4] for f in os.listdir(vystup) if f.endswith(".txt")}
-        if znovu and (os.path.exists(mpath) or not txt):   # jen naše složka; maže jen strany zdroje, ne cizí soubory
-            for s in seznam:
-                for f in (s["jmeno"] + ".txt", s["jmeno"] + ".txt.part", MANIFEST):
-                    with contextlib.suppress(FileNotFoundError):
-                        os.remove(os.path.join(vystup, f))
-            txt = set()
-        stary = None
+        stary, necitelny = None, None
         if os.path.exists(mpath):
             try:
                 with open(mpath, encoding="utf-8") as f:
@@ -638,10 +635,19 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None, znovu=False):
                 if not isinstance(stary, dict):
                     raise ValueError("není objekt")
             except (OSError, ValueError) as e:
-                if txt:
-                    raise Chyba(f"{mpath}: nečitelný manifest ({e}) a ve složce jsou strany – nelze zaručit původ. "
-                                "Spusť s --znovu, nebo zvol --vystup.")
-                stary = None
+                stary, necitelny = None, e
+        if znovu and os.path.exists(mpath):   # jen naše složka; maže jen strany zdroje, ne cizí soubory
+            jmena = {s["jmeno"] for s in seznam}
+            z = (stary or {}).get("zdroj") or {}
+            if z.get("druh") == "pdf" and isinstance(z.get("stran"), int):   # dřívější PDF mohlo mít víc stran
+                jmena |= {"s%0*d" % (max(4, len(str(z["stran"]))), i) for i in range(1, z["stran"] + 1)}
+            for f in [j + ".txt" for j in jmena] + [j + ".txt.part" for j in jmena] + [MANIFEST]:
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(vystup, f))
+            txt, stary, necitelny = set(), None, None
+        if necitelny and txt:
+            raise Chyba(f"{mpath}: nečitelný manifest ({necitelny}) a ve složce jsou strany – nelze zaručit původ. "
+                        "Spusť s --znovu, nebo zvol --vystup.")
         if txt and stary is None:
             raise Chyba(f"{vystup}: jsou tu strany bez {MANIFEST} – nelze zaručit původ. Smaž složku, nebo zvol --vystup.")
         sz = stary.get("stare_znaky") if stary and txt else None
