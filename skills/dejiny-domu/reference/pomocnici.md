@@ -32,7 +32,8 @@ Nejasné (tisk s rukopisnými poznámkami, smíšený svazek) = rukopis.
   **145/146** zápisů křtů správně (1 chyba v datu). Číslo pro Sonnet neuváděj, žádné změřené není.
 - **Cena:** podle ceníku Anthropicu (https://platform.claude.com/docs/en/about-claude/pricing, ověřeno 21. 11. 2026)
   stojí Claude Opus 5.5 4 $ za milion tokenů vstupu a 20 $ výstupu, Claude Sonnet 5.5 2 $ a 10 $: Opus je
-  **zhruba dvakrát dražší**. S předplatným (Pro, Max) se neplatí za tokeny, ale Opus podle
+  **zhruba dvakrát dražší**. Cenu uživateli říkej **vždy se zdrojem a datem** („podle ceníku Anthropicu
+  k 21. 11. 2026“), samotné „dvakrát dražší“ nestačí. S předplatným (Pro, Max) se neplatí za tokeny, ale Opus podle
   https://claude.com/pricing čerpá limit jinak než Sonnet („How fast you reach a limit depends on the model you use“);
   o kolik, oficiální stránky neuvádějí. Ceník se mění: když od data výše uplynulo víc než pár měsíců, řekni to.
 - **Zkouška:** můžeš to vyzkoušet na malé dávce (níže), ať se uživatel rozhodne podle vlastních pramenů.
