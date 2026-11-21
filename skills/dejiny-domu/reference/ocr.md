@@ -51,11 +51,14 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
 - `volby.chybi_prvni_pismeno`: OCR vynechalo první písmeno (jen slova delší než 6, další dvě písmena musí sedět).
 - `volby.tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými
   ův ova ovo ovu ovy ovic`): Zineckera, Zineckerové, „Friesovy boudy“. **Známý zbytek:** -e/-i/-a pustí i německé tvary
-  („Friese“). `presne` = jen celé slovo, `volne` = cokoli za slovem (Friesen, Friesland).
+  („Friese“). `presne` = jen celé slovo (i slepené s dalším, viz níže), `volne` = cokoli za slovem (Friesen, Friesland).
 - `volby.rovnocennosti`: `true` (výchozí, klíč chybí) | `false` (žádné; `ſ` = `s` platí vždy) | objekt jen
   s odchylkami od výchozích (`{"prehlasky": false, "nemcina_1901": true}`). Mění se příkazem `pridej|odeber rovnocennost`.
 Před slovem nesmí být písmeno ani `-` (číslice smí: „22Gansbauden“). Za slovem nesmí být kombinující znak (`Mu`
-nenajde začátek rozloženého `Mü`), mimo `volne` ani žádné písmeno (FRIES nenajde FRIESEN). Chybný soubor nástroj odmítne s číslem řádku.
+nenajde začátek rozloženého `Mü`), mimo `volne` ani malé písmeno (Fischer nenajde Fischerei). Velké písmeno smí,
+když nález končí malým: OCR slepí jméno s dalším slovem (`FischerDavid`, `ZineckerS Fuchsbergbaude`). Slovo celé
+verzálkami slepené s dalším (`FISCHERDAVID`) se nenajde, protože by se našla i jiná slova (FRIES v FRIESEN) – na jedno
+hledání `--tvary volne`. Chybný soubor nástroj odmítne s číslem řádku.
 
 ## Postup
 1. `hledej` jméno – spusť ho sám, jen čte. Pravopisné varianty („Zinnecker“, „Friß“) hledej jako **samostatná slova**,
