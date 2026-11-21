@@ -5,10 +5,11 @@ tvary písmen (e + U+030C = ě), měkké dělení U+00AD a česká sada pravopis
 v data/ocr_zameny.json (bez souboru = celé slovo s rovnocennostmi a českými koncovkami). Postup: reference/ocr.md.
 
 Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všech *.txt v pracovni/):
-  ocr_hledej.py hledej <slovo>… [--tvary ceske|presne|volne] [--fonetika kolnska [--max 40]] [--pravidla <json>]
-                [-- <soubor|složka>…]
-      → slovo, nalezený tvar, soubor:řádek, řádek (tabulátory); počty na stderr; s fonetikou navíc souhrn
-        podobně znějících slov (slovo, „fonetika“, tvar, počet×, první výskyt) – nejsou to nálezy
+  ocr_hledej.py hledej <slovo>… [--tvary ceske|presne|volne] [--vypis souhrn|radky] [--fonetika kolnska [--max 40]]
+                [--pravidla <json>] [-- <soubor|složka>…]
+      → souhrn podle nalezeného tvaru: slovo, tvar, počet×, první tři místa (+ kolik dalších), ukázka (tabulátory);
+        --vypis radky: řádek na nález (slovo, tvar, soubor:řádek, ukázka); počty a počet souborů na stderr;
+        s fonetikou navíc podobně znějící slova (slovo, „fonetika“, tvar, počet×, první výskyt) – nejsou to nálezy
   ocr_hledej.py kandidati <slovo>… [--vzdalenost N] [--max 40] [--tvary …] [--pravidla <json>] [-- …]
       → slova blízká hledanému, která pravidla nenajdou, s počtem, ukázkou a návrhem pravidla; nic nezapíše
   ocr_hledej.py pridej|odeber zamena <znak> <čtení>…
@@ -449,7 +450,8 @@ def _deleny(radek, znaky=DELENI):
 
 
 def hledej(slovo, cesty, pravidla=None, tvary=None):
-    """[(nalezený tvar, soubor, číslo řádku, řádek), …]; dělení přes konec řádku se hlásí na prvním řádku (tvar s ⏎)."""
+    """[(nalezený tvar, soubor, číslo řádku, řádek bez okrajových mezer, sloupec nálezu v něm), …]; dělení přes konec
+    řádku se hlásí na prvním řádku (tvar s ⏎)."""
     vzor = Vzor(slovo, pravidla, tvary)
     znaky = vzor.znaky_deleni
     nalezy = []
@@ -459,9 +461,31 @@ def hledej(slovo, cesty, pravidla=None, tvary=None):
                 text, limit = radek + "\n" + dalsi, len(radek)
             else:
                 text, limit = radek, None
+            odsazeni = len(radek) - len(radek.lstrip())
             for p, e in vzor.najdi(text, limit):
-                nalezy.append((re.sub(r"\n\s*", "⏎", text[p:e]), f, i, radek.strip()))
+                nalezy.append((re.sub(r"\n\s*", "⏎", text[p:e]), f, i, radek.strip(), p - odsazeni))
     return nalezy
+
+
+def ukazka(text, sloupec, tvar):
+    """Výřez řádku kolem nálezu: od 40 znaků před ním, aspoň 110 znaků a vždy celá část tvaru před ⏎."""
+    od = max(0, sloupec - 40)
+    do = max(od + 110, sloupec + len(tvar.split("⏎")[0]))
+    return ("…" if od else "") + text[od:do] + ("…" if do < len(text) else "")
+
+
+def souhrn(nalezy, mist=3):
+    """Řádek na nalezený tvar, od nejčastějšího: tvar, počet×, prvních pár míst, ukázka prvního (tabulátory)."""
+    podle = {}
+    for n in nalezy:
+        podle.setdefault(n[0], []).append(n)
+    out = []
+    for tvar, ns in sorted(podle.items(), key=lambda x: (-len(x[1]), x[0])):
+        mista = "; ".join(f"{_cesta(f)}:{i}" for _, f, i, _, _ in ns[:mist])
+        if len(ns) > mist:
+            mista += f"; +{len(ns) - mist} dalších"
+        out.append(f"{tvar}\t{len(ns)}×\t{mista}\t{ukazka(*ns[0][3:], tvar)}")
+    return out
 
 
 # --- fonetika ---------------------------------------------------------------------------------------------------
@@ -913,7 +937,8 @@ def main(argv):
         sys.exit(__doc__)
     prikaz, argv = argv[0], argv[1:]
     if prikaz in ("hledej", "kandidati"):
-        povolene = ["--tvary", "--pravidla", "--max"] + (["--vzdalenost"] if prikaz == "kandidati" else ["--fonetika"])
+        povolene = ["--tvary", "--pravidla", "--max"] + (["--vzdalenost"] if prikaz == "kandidati"
+                                                        else ["--fonetika", "--vypis"])
         slova, volby, cesty = _volby(argv, povolene)
         if not slova:
             sys.exit(__doc__)
@@ -925,8 +950,17 @@ def main(argv):
             nejvic = int(volby.get("max", 40))
         except ValueError:
             sys.exit("--vzdalenost a --max jsou celá čísla")
+        vypis = volby.get("vypis", "souhrn")
+        if vypis not in ("souhrn", "radky"):
+            sys.exit("--vypis: souhrn | radky")
+        for s in slova:
+            if os.path.exists(s):
+                print(f"# pozor: „{s}“ je existující cesta – hledám ji jako slovo; soubory a složky patří za --",
+                      file=sys.stderr)
         p = _pravidla_cli(volby)
         cesty = _cesty_cli(cesty)
+        n = len(soubory(cesty))
+        print(f"# prohledáno: {n} soubor{'' if n == 1 else 'y' if 2 <= n <= 4 else 'ů'}", file=sys.stderr)
         if prikaz == "hledej":
             fon = volby.get("fonetika", p.get("volby", {}).get("fonetika"))
             if fon is not None and fon not in FONETIKY:
@@ -939,8 +973,12 @@ def main(argv):
             podobne = fonetika(slova, cesty, p, tvary) if fon else {}
             for s in slova:
                 nalezy = hledej(s, cesty, p, tvary)
-                for tvar, f, i, radek in nalezy:
-                    print(f"{s}\t{tvar}\t{_cesta(f)}:{i}\t{radek[:110]}")
+                if vypis == "radky":
+                    for tvar, f, i, text, sloupec in nalezy:
+                        print(f"{s}\t{tvar}\t{_cesta(f)}:{i}\t{ukazka(text, sloupec, tvar)}")
+                else:
+                    for radek in souhrn(nalezy):
+                        print(f"{s}\t{radek}")
                 print(f"# {s}: {len(nalezy)} výskytů", file=sys.stderr)
                 if fon:
                     tvary_f = podobne[s]

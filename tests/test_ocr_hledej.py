@@ -344,7 +344,7 @@ class TestSoubory(unittest.TestCase):
         return cesta
 
     def nalezy(self, slovo, cesty=None, pravidla=None, tv=None):
-        return [(t, os.path.basename(f), i) for t, f, i, _ in oh.hledej(slovo, cesty or [self.d], pravidla, tv)]
+        return [(t, os.path.basename(f), i) for t, f, i, *_ in oh.hledej(slovo, cesty or [self.d], pravidla, tv)]
 
     def test_14_deleni_pres_radek(self):
         for text in ("Gans-\nbauden\n", "Gans-\n   bauden\n"):
@@ -399,7 +399,7 @@ class TestSoubory(unittest.TestCase):
         radek = "Wenzel Fi\u017fcher\u00a0Mu\u0364ller und Mu\u0308ller"
         f = self.soubor("a.txt", radek + "\n")
         for slovo in ("Fischer", "Müller"):
-            for tvar, _, _, r in oh.hledej(slovo, [f]):
+            for tvar, _, _, r, _ in oh.hledej(slovo, [f]):
                 self.assertEqual(r.encode("utf-8"), radek.encode("utf-8"))
                 self.assertIn(tvar, radek)
 
@@ -425,6 +425,53 @@ class TestSoubory(unittest.TestCase):
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             oh.main(["hledej", "Zinecker", "--", f])
         self.assertNotIn("fonetika", out.getvalue())
+
+    def cli(self, *argv):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            try:
+                oh.main(list(argv))
+            except SystemExit as e:
+                err.write(str(e.code))
+        return out.getvalue(), err.getvalue()
+
+    def test_59_ukazka_okno(self):
+        text = "x" * 200 + "Gansbauden" + "y" * 90
+        u = oh.ukazka(text, 200, "Gansbauden")
+        self.assertIn("Gansbauden", u)
+        self.assertTrue(u.startswith("…"))
+        self.assertEqual(oh.ukazka("Herr Gansbauden", 5, "Gansbauden"), "Herr Gansbauden")
+        dlouhy = "G" + "a" * 150
+        self.assertIn(dlouhy, oh.ukazka("z" * 50 + dlouhy, 50, dlouhy + "⏎bauden"))
+        f = self.soubor("a.txt", "z" * 120 + " Gans-\nbauden dále\n")
+        ((tvar, _, _, text, sloupec),) = oh.hledej("Gansbauden", [f], DELENI)
+        self.assertEqual(tvar, "Gans-⏎bauden")
+        self.assertIn("Gans-", oh.ukazka(text, sloupec, tvar))
+
+    def test_60_souhrn_podle_tvaru(self):
+        self.soubor("a.txt", "Gansbauden\nx Gansbauden\nGansbauden y\nGanſbauden\n")
+        self.soubor("b.txt", "Gansbauden\n\nGansbauden\n")
+        out, err = self.cli("hledej", "Gansbauden", "--", self.d)
+        radky = out.splitlines()
+        self.assertEqual(len(radky), 2)
+        self.assertEqual(radky[0].split("\t")[:3], ["Gansbauden", "Gansbauden", "5×"])
+        self.assertIn("a.txt:1; ", radky[0])
+        self.assertIn("; +2 dalších\t", radky[0])
+        self.assertEqual(radky[1].split("\t")[:3], ["Gansbauden", "Ganſbauden", "1×"])
+        out2, err2 = self.cli("hledej", "Gansbauden", "--vypis", "radky", "--", self.d)
+        self.assertEqual(len(out2.splitlines()), 6)
+        self.assertEqual(err, err2)
+        self.assertIn("# Gansbauden: 6 výskytů", err)
+        self.assertIn("--vypis: souhrn | radky", str(self.cli("hledej", "X", "--vypis", "vse", "--", self.d)))
+
+    def test_61_soubory_a_cesta(self):
+        prazdna = os.path.join(self.d, "prazdna")
+        os.makedirs(prazdna)
+        self.assertIn("# prohledáno: 0 souborů", self.cli("hledej", "Fries", "--", prazdna)[1])
+        self.soubor("a.txt", "Fries\n")
+        self.assertIn("# prohledáno: 1 soubor\n", self.cli("kandidati", "Fries", "--", self.d)[1])
+        _, err = self.cli("hledej", "Fries", self.d)
+        self.assertIn(f"# pozor: „{self.d}“ je existující cesta", err)
 
     def test_16_chybejici_pravidla(self):
         self.assertEqual(oh.nacti_pravidla(os.path.join(self.d, "nic.json")), {})
