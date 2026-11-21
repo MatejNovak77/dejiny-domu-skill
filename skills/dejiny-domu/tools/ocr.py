@@ -255,14 +255,6 @@ def kde_modely(casti, system, uziv):
     return uziv, cesty, chybi, kopie
 
 
-def sha256_souboru(cesta):
-    h = hashlib.sha256()
-    with open(cesta, "rb") as f:
-        for kus in iter(lambda: f.read(1 << 20), b""):
-            h.update(kus)
-    return h.hexdigest()
-
-
 def rada_modelu(model, uziv):
     if model in ZNAME:
         return (f"stáhni: python3 -I tools/ocr.py stahni {model} ({str(ZNAME[model][2]).replace('.', ',')} MB, "
@@ -271,7 +263,7 @@ def rada_modelu(model, uziv):
 
 
 def priprav_modely(tess, model, nastaveni, kopirovat=True):
-    """Najde (a pro běh zkopíruje) části modelu. Vrací (tessdata_dir|None, {část: sha256}). Chybí → Chyba(kód 2)."""
+    """Najde (a pro běh zkopíruje) části modelu. Vrací tessdata_dir|None. Chybí → Chyba(kód 2)."""
     casti = rozloz_model(model)
     sdir, sjaz = jazyky(tess)
     sdir = systemova_slozka(sdir)
@@ -286,13 +278,11 @@ def priprav_modely(tess, model, nastaveni, kopirovat=True):
             shutil.copyfile(os.path.join(sdir, c + ".traineddata"), cil + ".part")
             os.replace(cil + ".part", cil)
             print(f"{c}: zkopírován ze systémové složky do {uziv}")
-    hashe = {}
     for c, p in cesty.items():
         if p is None or not os.path.isfile(p):
             raise Chyba(f"Model {c}: Tesseract ho hlásí, ale soubor se nenašel (složka modelů neznámá) – "
                         f"dej {c}.traineddata do {uziv}.", 2)
-        hashe[c] = sha256_souboru(p)
-    return tdir, hashe
+    return tdir
 
 
 # --- nastavení ------------------------------------------------------------------------------------------------
@@ -551,49 +541,21 @@ def rozsah_stran(text, n):
 
 # --- manifest -------------------------------------------------------------------------------------------------
 
-def manifest(druh, vstup, seznam, model, model_overen, modely_sha, cesta, render, znaky):
-    jmeno = os.path.basename(os.path.normpath(vstup))
-    if druh == "slozka":
-        zdroj, obrazky = {"druh": "slozka", "jmeno": jmeno}, {s["jmeno"]: sha256_souboru(s["obrazek"]) for s in seznam}
-    elif druh == "pdf":
-        zdroj, obrazky = {"druh": "pdf", "jmeno": jmeno, "sha256": sha256_souboru(vstup), "stran": len(seznam)}, None
-    else:
-        zdroj, obrazky = {"druh": "obrazek", "jmeno": jmeno, "sha256": sha256_souboru(vstup)}, None
-    return {"verze": 1, "zdroj": zdroj, "obrazky": obrazky, "model": model, "model_overen": model_overen,
-            "modely_sha256": modely_sha, "cesta": cesta, "render": render, "stare_znaky": znaky,
-            "vystup_prikazu": None}
+POROVNAVANE = ("verze", "zdroj", "model", "stare_znaky", "dpi")   # programy se jen zaznamenají
 
 
-def _rozdily(a, b, cesta=""):
-    if isinstance(a, dict) and isinstance(b, dict):
-        out = []
-        for k in sorted(set(a) | set(b)):
-            out += _rozdily(a.get(k), b.get(k), f"{cesta}.{k}" if cesta else k)
-        return out
-    return [] if a == b else [cesta]
+def manifest(druh, vstup, seznam, model, znaky, dpi, programy):
+    zdroj = {"druh": druh, "jmeno": os.path.basename(os.path.normpath(vstup))}
+    if druh == "pdf":
+        zdroj["stran"] = len(seznam)
+    return {"verze": 2, "zdroj": zdroj, "model": model, "stare_znaky": znaky, "dpi": dpi if druh == "pdf" else None,
+            "programy": programy}
 
 
-def porovnej_manifest(stary, novy, hotove):
-    """→ seznam rozdílných polí (prázdný = lze dodělat). obrazky: musí sedět hash každé hotové strany;
-    vystup_prikazu se neporovnává (zjistí se až z výstupu). Vlastní příkaz bez prikaz_verze nedodělává."""
-    rozdil = []
-    for k in sorted(set(stary) | set(novy)):
-        if k in ("obrazky", "vystup_prikazu", "dlouhe_s", "stare_znaky"):
-            continue
-        rozdil += _rozdily(stary.get(k), novy.get(k), k)
-    if stare_znaky(stary) != stare_znaky(novy):   # odvozená hodnota: starý manifest dlouhe_s s = jen_s
-        rozdil.append("stare_znaky")
-    so, no = stary.get("obrazky"), novy.get("obrazky")
-    if (so is None) != (no is None):
-        rozdil.append("obrazky")
-    elif so is not None:
-        for s in sorted(hotove):
-            if so.get(s) is None or so.get(s) != no.get(s):
-                rozdil.append(f"obrazky.{s}")
-    c = novy.get("cesta") or {}
-    if hotove and c.get("druh") == "prikaz" and c.get("verze") is None and not any(r.startswith("cesta") for r in rozdil):
-        rozdil.append("prikaz_verze")
-    return rozdil
+def porovnej_manifest(stary, novy):
+    """→ rozdíly jako 'klíč: staré → nové' (prázdné = lze dodělat). Verze programů dodělání neblokují."""
+    j = lambda v: json.dumps(v, ensure_ascii=False)
+    return [f"{k}: {j(stary.get(k))} → {j(novy.get(k))}" for k in POROVNAVANE if stary.get(k) != novy.get(k)]
 
 
 def zapis_json(cesta, d):
@@ -713,7 +675,7 @@ def _tesseract():
     return tess, v
 
 
-def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None):
+def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None, znovu=False):
     """OCR jednoho vstupu. → počet chyb stran (0 = vše hotovo)."""
     p = platne(nast, model_arg)
     druh, seznam, pdftoppm = strany(vstup)
@@ -735,20 +697,25 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None):
         else:
             print("Varování: vlastní příkaz nemá {model} – model je „neověřený“ (skill ho nezná).",
                   file=sys.stderr)
-        cesta = {"druh": "prikaz", "prikaz": sablona, "verze": p["prikaz_verze"]}
-        model_overen, modely_sha, tess, tdir = False, None, None, None
+        programy, tess, tdir = {"prikaz": sablona}, None, None
     else:
         model = p["model"]
         rozloz_model(model)
         varuj_model(model)
         tess, verze = _tesseract()
-        tdir, modely_sha = priprav_modely(tess, model, nast)
-        cesta, model_overen = {"druh": "tesseract", "verze": verze}, True
-    render = ({"dpi": p["dpi"], "format": "jpeg-gray-q92", "pdftoppm": verze_poppleru(pdftoppm)}
-              if druh == "pdf" else None)
+        tdir = priprav_modely(tess, model, nast)
+        programy = {"tesseract": verze}
+    if druh == "pdf":
+        programy["pdftoppm"] = verze_poppleru(pdftoppm)
     with zamek_slozky(vystup):
         mpath = os.path.join(vystup, MANIFEST)
         txt = {f[:-4] for f in os.listdir(vystup) if f.endswith(".txt")}
+        if znovu and (os.path.exists(mpath) or not txt):   # jen naše složka; maže jen strany zdroje, ne cizí soubory
+            for s in seznam:
+                for f in (s["jmeno"] + ".txt", s["jmeno"] + ".txt.part", MANIFEST):
+                    with contextlib.suppress(FileNotFoundError):
+                        os.remove(os.path.join(vystup, f))
+            txt = set()
         stary = None
         if os.path.exists(mpath):
             try:
@@ -759,22 +726,21 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None):
             except (OSError, ValueError) as e:
                 if txt:
                     raise Chyba(f"{mpath}: nečitelný manifest ({e}) a ve složce jsou strany – nelze zaručit původ. "
-                                "Smaž složku, nebo zvol --vystup.")
+                                "Spusť s --znovu, nebo zvol --vystup.")
                 stary = None
         if txt and stary is None:
             raise Chyba(f"{vystup}: jsou tu strany bez {MANIFEST} – nelze zaručit původ. Smaž složku, nebo zvol --vystup.")
-        if stary is not None and txt and stare_znaky(nast) is None and stare_znaky(stary):
+        sz = stary.get("stare_znaky") if stary and txt else None
+        if stare_znaky(nast) is None and sz in STARE_ZNAKY and sz != p["stare_znaky"]:
             # nenastavené výslovně: dodělat stejně jako hotové strany (žádné tiché povýšení starého výstupu)
-            p["stare_znaky"] = stare_znaky(stary)
-            print(f"staré znaky: {p['stare_znaky']} podle hotových stran", file=sys.stderr)
-        novy = manifest(druh, vstup, seznam, model, model_overen, modely_sha, cesta, render, p["stare_znaky"])
+            p["stare_znaky"] = sz
+            print(f"staré znaky: {sz} podle hotových stran", file=sys.stderr)
+        novy = manifest(druh, vstup, seznam, model, p["stare_znaky"], p["dpi"], programy)
         if stary is not None and txt:
-            rozdil = porovnej_manifest(stary, novy, txt)
+            rozdil = porovnej_manifest(stary, novy)
             if rozdil:
-                rada = (" Nastav prikaz_verze (ocr.py nastav prikaz_verze \"…\"; změň ho při každé změně programu "
-                        "nebo modelu), nebo zvol" if "prikaz_verze" in rozdil else " Zvol")
-                raise Chyba(f"{vystup}: hotové strany vznikly jinak – liší se: {', '.join(rozdil)}.{rada} "
-                            "--vystup s novou složkou, nebo složku smaž a spusť znovu.")
+                raise Chyba(f"{vystup}: hotové strany vznikly jinak – {'; '.join(rozdil)}. Spusť s --znovu (smaže "
+                            "hotové strany a udělá dokument celý znovu), nebo zvol --vystup s novou složkou.")
             if stary.get("vystup_prikazu"):
                 novy["vystup_prikazu"] = stary["vystup_prikazu"]
         zapis_json(mpath, novy)
@@ -971,11 +937,14 @@ def prikaz_nastav(nast_cesta, klic, hodnota):
 NAPOVEDA = __doc__
 
 
-def _volby(argv, povolene):
+def _volby(argv, povolene, prepinace=()):
     poz, volby, i = [], {}, 0
     while i < len(argv):
         a = argv[i]
-        if a.startswith("--"):
+        if a in prepinace:
+            volby[a[2:]] = True
+            i += 1
+        elif a.startswith("--"):
             if a not in povolene or i + 1 >= len(argv):
                 raise Chyba(f"Neznámá volba nebo chybí hodnota: {a}\n{NAPOVEDA}")
             volby[a[2:]] = argv[i + 1]
@@ -1014,7 +983,7 @@ def main(argv):
                 for c in rozloz_model(m):
                     stahni(c, cil)
             return 0
-        vstupy, volby = _volby(argv, ("--model", "--vystup", "--strany"))
+        vstupy, volby = _volby(argv, ("--model", "--vystup", "--strany"), ("--znovu",))
         if volby.get("vystup") and len(vstupy) != 1:
             raise Chyba("--vystup jde jen s jedním vstupem.")
         if volby.get("model"):
@@ -1022,7 +991,8 @@ def main(argv):
         chyby, nehotove = 0, []
         for v in vstupy:   # vadný vstup nezastaví ostatní; nenainstalované (2) a Ctrl-C (130) ano
             try:
-                chyby += zpracuj(v, nast, volby.get("model"), volby.get("vystup"), volby.get("strany"))
+                chyby += zpracuj(v, nast, volby.get("model"), volby.get("vystup"), volby.get("strany"),
+                                 volby.get("znovu", False))
             except Chyba as e:
                 if e.kod != 1:
                     raise

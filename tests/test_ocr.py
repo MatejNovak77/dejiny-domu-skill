@@ -29,6 +29,7 @@ class FalesnySpust:
         self.selhat = set()      # jména obrázků (bez přípony), na kterých tesseract selže
         self.prerusit = set()    # jména obrázků, na kterých přijde Ctrl-C (KeyboardInterrupt)
         self.prikaz = None       # funkce(argv) -> návratový kód
+        self.verze = {"tesseract": "5.5.4", "pdftoppm": "26.11.0"}
 
     def __call__(self, argv, **kw):
         self.volani.append(list(argv))
@@ -38,7 +39,7 @@ class FalesnySpust:
             return ok(rc=self.prikaz(argv))
         if p == "tesseract":
             if argv[1:] == ["--version"]:
-                return ok(b"tesseract 5.5.4\n leptonica-1.87.0\n")
+                return ok(f"tesseract {self.verze['tesseract']}\n leptonica-1.87.0\n".encode())
             if argv[-1] == "--list-langs":
                 d = argv[2] if argv[1] == "--tessdata-dir" else self.sysdir
                 langs = sorted(f[:-12] for f in os.listdir(d) if f.endswith(".traineddata"))
@@ -55,7 +56,7 @@ class FalesnySpust:
             return ok(f"Menſch {obsah} {argv[-1]}\r\n\f".encode())
         if p == "pdftoppm":
             if argv[1:] == ["-v"]:
-                return ok(err=b"pdftoppm version 26.11.0\n")
+                return ok(err=f"pdftoppm version {self.verze['pdftoppm']}\n".encode())
             cislo = argv[argv.index("-f") + 1]
             with open(argv[-2], encoding="utf-8") as f:
                 pdf = f.read().strip()
@@ -343,15 +344,13 @@ class TestSlozkyModelu(Zaklad):
         self.nastav({"tessdata": prazdna})
         self.assertEqual(self.spust(self.pdf(1))[0], 0)
         self.assertNotIn("--tessdata-dir", self.tess_argv()[0])
-        self.assertEqual(self.manifest("kniha")["modely_sha256"]["german_print"],
-                         hashlib.sha256(b"systemovy").hexdigest())
         self.assertEqual(os.listdir(prazdna), [])
 
     def test_model_jen_v_uzivatelske(self):
         self.assertEqual(self.spust(self.pdf(1))[0], 0)
         a = self.tess_argv()[0]
         self.assertEqual(a[a.index("--tessdata-dir") + 1], self.uziv)
-        self.assertTrue(self.manifest("kniha")["model_overen"])
+        self.assertEqual(self.manifest("kniha")["model"], "german_print")
 
     def test_model_rozdeleny_zkopiruje(self):
         self.model(self.sysdir, "ces", "cesky")
@@ -534,11 +533,9 @@ class TestDodelavani(Zaklad):
         p = self.pdf(3)
         self.assertEqual(self.spust(p)[0], 0)
         self.assertEqual(self.txt("kniha"), ["s0001.txt", "s0002.txt", "s0003.txt"])
-        m = self.manifest("kniha")
-        self.assertEqual((m["zdroj"]["druh"], m["zdroj"]["stran"], m["model"], m["model_overen"], m["stare_znaky"],
-                          m["cesta"], m["render"]["dpi"]),
-                         ("pdf", 3, "german_print", True, "zjednodusit", {"druh": "tesseract", "verze": "5.5.4"}, 300))
-        self.assertNotIn("dlouhe_s", m)
+        self.assertEqual(self.manifest("kniha"), {
+            "verze": 2, "zdroj": {"druh": "pdf", "jmeno": "kniha.pdf", "stran": 3}, "model": "german_print",
+            "stare_znaky": "zjednodusit", "dpi": 300, "programy": {"tesseract": "5.5.4", "pdftoppm": "26.11.0"}})
         os.remove(self.vystup("kniha", "s0002.txt"))
         open(self.vystup("kniha", "s0002.txt.part"), "w").close()
         open(self.vystup("kniha", "s0003.txt"), "w").close()
@@ -550,23 +547,6 @@ class TestDodelavani(Zaklad):
         self.assertEqual(self.cti("kniha", "s0003.txt"), "")
         self.assertFalse(os.path.exists(self.vystup("kniha", "s0002.txt.part")))
 
-    def test_zmeneny_vstup_stejne_jmeno_a_stran(self):
-        self.assertEqual(self.spust(self.pdf(3))[0], 0)
-        self.fake.volani.clear()
-        rc, _, err = self.spust(self.pdf(3, verze="v2"))
-        self.assertEqual(rc, 1)
-        self.assertIn("zdroj.sha256", err)
-        self.assertEqual(self.fake.tesseract_obrazky(), [])
-
-    def test_zmeneny_obrazek_hotove_strany(self):
-        d = self.obrazky("a-001.jpg", "a-002.jpg")
-        self.assertEqual(self.spust(d)[0], 0)
-        with open(os.path.join(d, "a-001.jpg"), "w") as f:
-            f.write("jiný sken")
-        rc, _, err = self.spust(d)
-        self.assertEqual(rc, 1)
-        self.assertIn("obrazky.a-001", err)
-
     def test_novy_obrazek_ve_slozce(self):
         d = self.obrazky("a-001.jpg", "a-002.jpg")
         self.assertEqual(self.spust(d)[0], 0)
@@ -574,74 +554,94 @@ class TestDodelavani(Zaklad):
         self.fake.volani.clear()
         self.assertEqual(self.spust(d)[0], 0)
         self.assertEqual(self.fake.tesseract_obrazky(), ["a-003"])
-        self.assertEqual(sorted(self.manifest("skeny")["obrazky"]), ["a-001", "a-002", "a-003"])
+        m = self.manifest("skeny")
+        self.assertEqual((m["zdroj"], m["dpi"]), ({"druh": "slozka", "jmeno": "skeny"}, None))
 
     def test_zmenene_bajty_modelu(self):
         self.assertEqual(self.spust(self.pdf(2))[0], 0)
-        self.model(self.uziv, "german_print", "jiná verze modelu")
+        self.model(self.uziv, "german_print", "jiná verze modelu")   # vědomě nehlídané (jen název modelu)
+        os.remove(self.vystup("kniha", "s0002.txt"))
+        self.fake.volani.clear()
+        self.assertEqual(self.spust(self.pdf(2))[0], 0)
+        self.assertEqual(self.fake.tesseract_obrazky(), ["s0002"])
+
+    def test_jine_verze_programu_dodela(self):
+        self.fake.verze = {"tesseract": "5.5.3", "pdftoppm": "26.02.0"}
+        self.assertEqual(self.spust(self.pdf(3), "--strany", "1-2")[0], 0)
+        self.fake.verze = {"tesseract": "5.5.4", "pdftoppm": "26.03.0"}
+        self.fake.volani.clear()
+        self.assertEqual(self.spust(self.pdf(3))[0], 0)
+        self.assertEqual(self.fake.tesseract_obrazky(), ["s0003"])
+        self.assertEqual(self.manifest("kniha")["programy"], {"tesseract": "5.5.4", "pdftoppm": "26.03.0"})
+
+    def test_jiny_zdroj(self):
+        self.assertEqual(self.spust(self.pdf(3))[0], 0)
+        for argv in ((self.pdf(4),), (self.pdf(3, jmeno="jina.pdf"), "--vystup", self.vystup("kniha")),
+                     (os.path.join(self.obrazky("kniha.jpg"), "kniha.jpg"), "--vystup", self.vystup("kniha"))):
+            rc, _, err = self.spust(*argv)
+            self.assertEqual(rc, 1, argv)
+            self.assertIn("zdroj: {", err)
+
+    def test_stary_manifest(self):
+        os.makedirs(self.vystup("kniha"))
+        open(self.vystup("kniha", "s0001.txt"), "w").close()
+        with open(self.vystup("kniha", "ocr_manifest.json"), "w") as f:
+            json.dump({"verze": 1, "zdroj": {"druh": "pdf", "jmeno": "kniha.pdf", "stran": 2}, "model": "german_print",
+                       "stare_znaky": "zjednodusit"}, f)
         rc, _, err = self.spust(self.pdf(2))
         self.assertEqual(rc, 1)
-        self.assertIn("modely_sha256.german_print", err)
+        self.assertIn("verze: 1 → 2", err)
+        self.assertIn("--znovu", err)
+
+    def test_znovu(self):
+        self.assertEqual(self.spust(self.pdf(3))[0], 0)
+        for f in ("poznamka.txt", "poznamka.md"):   # vlastní soubory uživatele ve složce stran
+            open(self.vystup("kniha", f), "w").close()
+        self.model(self.uziv, "frak2021")
+        self.assertEqual(self.spust(self.pdf(3), "--model", "frak2021")[0], 1)
+        self.fake.volani.clear()
+        rc, _, err = self.spust(self.pdf(3), "--model", "frak2021", "--znovu")
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(sorted(self.fake.tesseract_obrazky()), ["s0001", "s0002", "s0003"])
+        self.assertEqual(self.manifest("kniha")["model"], "frak2021")
+        self.assertTrue(os.path.exists(self.vystup("kniha", "poznamka.txt")))
+        self.assertTrue(os.path.exists(self.vystup("kniha", "poznamka.md")))
+        cizi = self.vystup("cizi")   # .txt bez manifestu: složka nemusí být naše → nic nesmazat
+        os.makedirs(cizi)
+        open(os.path.join(cizi, "s0001.txt"), "w").close()
+        rc, _, err = self.spust(self.pdf(3), "--vystup", cizi, "--znovu")
+        self.assertEqual(rc, 1)
+        self.assertIn("bez ocr_manifest.json", err)
+        self.assertTrue(os.path.exists(os.path.join(cizi, "s0001.txt")))
 
     def test_jine_dpi(self):
         self.assertEqual(self.spust(self.pdf(2))[0], 0)
         self.nastav({"tessdata": self.uziv, "dpi": 200})
         rc, _, err = self.spust(self.pdf(2))
         self.assertEqual(rc, 1)
-        self.assertIn("render.dpi", err)
+        self.assertIn("dpi: 300 → 200", err)
 
     def test_jine_stare_znaky(self):
         self.assertEqual(self.spust(self.pdf(2))[0], 0)
         self.nastav({"tessdata": self.uziv, "stare_znaky": "ponechat"})
         rc, _, err = self.spust(self.pdf(2))
         self.assertEqual(rc, 1)
-        self.assertIn("liší se: stare_znaky", err)
+        self.assertIn('stare_znaky: "zjednodusit" → "ponechat"', err)
 
-    def stary_vystup(self, dlouhe_s, verze):
-        """Hotové 2 ze 3 stran a manifest ve tvaru před stare_znaky (pole dlouhe_s)."""
-        self.nastav({"tessdata": self.uziv, "stare_znaky": Z[dlouhe_s]})
+    def test_stare_znaky_z_manifestu(self):
+        """Nenastavené staré znaky se dodělají podle hotových stran; s výchozí hodnotou bez hlášky."""
+        verze = "v1 \u017f"
+        self.nastav({"tessdata": self.uziv, "stare_znaky": "ponechat"})
         self.assertEqual(self.spust(self.pdf(3, verze=verze), "--strany", "1-2")[0], 0)
-        m = self.manifest("kniha")
-        del m["stare_znaky"]
-        m["dlouhe_s"] = dlouhe_s
-        with open(self.vystup("kniha", "ocr_manifest.json"), "w", encoding="utf-8") as f:
-            json.dump(m, f)
-
-    def test_o3_stary_manifest_dodela(self):
-        """O3: starý výstup dlouhe_s se dodělá stejným převodem; výslovně jiná hodnota se odmítne."""
-        verze = "v1 \ua75b \u017f"
-        for dlouhe_s, nastaveni, cekam in (("s", {}, "jen_s"), ("s", {"dlouhe_s": "s"}, "jen_s"),
-                                           ("ponechat", {}, "ponechat")):
-            with self.subTest(dlouhe_s=dlouhe_s, nastaveni=nastaveni):
-                shutil.rmtree(self.vystup("kniha"), ignore_errors=True)
-                self.stary_vystup(dlouhe_s, verze)
-                self.nastav(dict(nastaveni, tessdata=self.uziv))
-                rc, _, err = self.spust(self.pdf(3, verze=verze))
-                self.assertEqual(rc, 0, err)
-                if not nastaveni:
-                    self.assertIn(f"staré znaky: {cekam} podle hotových stran", err)
-                self.assertEqual(self.manifest("kniha")["stare_znaky"], cekam)
-                self.assertNotIn("dlouhe_s", self.manifest("kniha"))
-                text = self.cti("kniha", "s0003.txt")
-                self.assertIn("\ua75b", text)   # ꝛ zůstane (jen_s i ponechat), žádné tiché povýšení
-                self.assertEqual("\u017f" in text, cekam == "ponechat")
-                self.assertEqual(self.spust(self.pdf(3, verze=verze))[0], 0)   # druhé dodělání
-        shutil.rmtree(self.vystup("kniha"), ignore_errors=True)
-        self.stary_vystup("s", verze)
-        self.nastav({"tessdata": self.uziv, "stare_znaky": "zjednodusit"})
-        pred = sorted(os.listdir(self.vystup("kniha")))
+        self.nastav({"tessdata": self.uziv})
         rc, _, err = self.spust(self.pdf(3, verze=verze))
-        self.assertEqual(rc, 1)
-        self.assertIn("liší se: stare_znaky", err)
-        self.assertEqual(sorted(os.listdir(self.vystup("kniha"))), pred)
-        # nový manifest jen_s + výslovné zjednodusit při druhém dodělání
-        shutil.rmtree(self.vystup("kniha"), ignore_errors=True)
-        self.nastav({"tessdata": self.uziv, "stare_znaky": "jen_s"})
-        self.assertEqual(self.spust(self.pdf(3, verze=verze), "--strany", "1-2")[0], 0)
-        self.nastav({"tessdata": self.uziv, "stare_znaky": "zjednodusit"})
-        rc, _, err = self.spust(self.pdf(3, verze=verze))
-        self.assertEqual(rc, 1)
-        self.assertIn("liší se: stare_znaky", err)
+        self.assertEqual(rc, 0, err)
+        self.assertIn("staré znaky: ponechat podle hotových stran", err)
+        self.assertIn("\u017f", self.cti("kniha", "s0003.txt"))
+        self.assertEqual(self.spust(self.pdf(3), "--strany", "1-2", "--vystup", self.vystup("k2"))[0], 0)
+        rc, _, err = self.spust(self.pdf(3), "--vystup", self.vystup("k2"))
+        self.assertEqual(rc, 0)
+        self.assertNotIn("podle hotových stran", err)
 
     def test_jiny_model(self):
         self.assertEqual(self.spust(self.pdf(2))[0], 0)
@@ -649,7 +649,8 @@ class TestDodelavani(Zaklad):
         pred = {f: os.path.getmtime(self.vystup("kniha", f)) for f in os.listdir(self.vystup("kniha"))}
         rc, _, err = self.spust(self.pdf(2), "--model", "frak2021")
         self.assertEqual(rc, 1)
-        self.assertIn("model,", err)
+        self.assertIn('model: "german_print" → "frak2021"', err)
+        self.assertIn("--znovu", err)
         self.assertEqual(pred, {f: os.path.getmtime(self.vystup("kniha", f)) for f in os.listdir(self.vystup("kniha"))})
 
     def test_strany_bez_manifestu(self):
@@ -777,8 +778,7 @@ class TestPrikaz(Zaklad):
         for i in (1, 2, 3):
             self.assertEqual(self.cti("kniha", f"s000{i}.txt"), f"P strana {i} z %PDF n=3 v1\n")
         m = self.manifest("kniha")
-        self.assertEqual((m["model"], m["model_overen"], m["modely_sha256"], m["vystup_prikazu"], m["cesta"]["druh"]),
-                         ("german_print", False, None, None, "prikaz"))
+        self.assertEqual((m["model"], m["programy"]), ("german_print", {"prikaz": self.SABLONA, "pdftoppm": "26.11.0"}))
         self.assertEqual(self.fake.tesseract_obrazky(), [])
         v = os.path.join(self.tmp, "v")
         for soubory, chyba in ((["a", "b"], "chybí c"), (["a", "b", "c", "x"], "cizí x"), (["a", "b", "x"], "x")):
@@ -816,22 +816,7 @@ class TestPrikaz(Zaklad):
         rc, _, err = self.spust(self.pdf(1))
         self.assertEqual(rc, 0)
         self.assertIn("neověřený", err)
-        m = self.manifest("kniha")
-        self.assertEqual((m["model"], m["model_overen"]), ("neověřený", False))
-
-    def test_prikaz_a_vestaveny_nemichat(self):
-        self.assertEqual(self.spust(self.pdf(2))[0], 0)
-        self.nastav_prikaz(prikaz_verze="ocr 1")
-        rc, _, err = self.spust(self.pdf(2))
-        self.assertEqual(rc, 1)
-        self.assertIn("cesta", err)
-        self.assertIn("model_overen", err)
-        self.assertEqual(self.davky, [])
-        self.assertEqual(self.spust(self.pdf(2), "--vystup", self.vystup("k2"))[0], 0)
-        self.nastav({"tessdata": self.uziv})
-        rc, _, err = self.spust(self.pdf(2), "--vystup", self.vystup("k2"))
-        self.assertEqual(rc, 1)
-        self.assertIn("cesta", err)
+        self.assertEqual(self.manifest("kniha")["model"], "neověřený")
 
     def test_preruseni_prikaz(self):
         self.nastav_prikaz(davka=2)
@@ -875,34 +860,27 @@ class TestPrikaz(Zaklad):
                          ["s0001.txt", "s0002.txt"])
         self.fake.prikaz = self.soubory
         self.davky.clear()
-        self.nastav_prikaz(davka=2, prikaz_verze="v1")   # dodělat napříč běhy jde jen s prikaz_verze
-        rc, _, err = self.spust(self.pdf(5))
-        self.assertEqual(rc, 1)
-        self.assertIn("cesta.verze", err)
-        shutil.rmtree(self.vystup("kniha"))
         self.assertEqual(self.spust(self.pdf(5))[0], 0)
-        self.assertEqual(self.davky, [["s0001", "s0002"], ["s0003", "s0004"], ["s0005"]])
+        self.assertEqual(self.davky, [["s0003", "s0004"], ["s0005"]])
 
-    def test_prikaz_bez_verze_nedodela(self):
+    def test_prikaz_dodela(self):
+        """Dodělání bez prikaz_verze, stejně jako vestavěná cesta; i ve složce hotové vestavěným Tesseractem."""
         self.nastav_prikaz()
         self.assertEqual(self.spust(self.pdf(3))[0], 0)
         os.remove(self.vystup("kniha", "s0002.txt"))
         self.davky.clear()
-        rc, _, err = self.spust(self.pdf(3))
-        self.assertEqual(rc, 1)
-        self.assertIn("prikaz_verze", err)
-        self.assertEqual(self.davky, [])
-        self.nastav_prikaz(prikaz_verze="ocr 2026-11-20")
-        self.assertEqual(self.spust(self.pdf(3), "--vystup", self.vystup("k2"))[0], 0)
-        os.remove(self.vystup("k2", "s0002.txt"))
+        self.assertEqual(self.spust(self.pdf(3))[0], 0)
+        self.assertEqual(self.davky, [["s0002"]])
+        self.nastav({"tessdata": self.uziv})
+        self.assertEqual(self.spust(self.pdf(3), "--strany", "1-2", "--vystup", self.vystup("k2"))[0], 0)
+        self.nastav_prikaz()
         self.davky.clear()
         self.assertEqual(self.spust(self.pdf(3), "--vystup", self.vystup("k2"))[0], 0)
-        self.assertEqual(self.davky, [["s0002"]])
-        self.nastav_prikaz(prikaz_verze="ocr 2026-12-01")
+        self.assertEqual(self.davky, [["s0003"]])
         os.remove(self.vystup("k2", "s0003.txt"))
-        rc, _, err = self.spust(self.pdf(3), "--vystup", self.vystup("k2"))
+        rc, _, err = self.spust(self.pdf(3), "--vystup", self.vystup("k2"), "--model", "frak2021")
         self.assertEqual(rc, 1)
-        self.assertIn("cesta.verze", err)
+        self.assertIn('model: "german_print" → "frak2021"', err)
 
 
 FAKE_OCR = """import os, sys
