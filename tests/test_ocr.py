@@ -243,6 +243,36 @@ class TestDetekce(Zaklad):
         self.assertIn("oschwartz10612.Poppler", ocr.navod("poppler", "win32"))
         self.assertIn("sudo apt install tesseract-ocr", ocr.navod("tesseract", "linux"))
         self.assertIn("poppler-utils", ocr.navod("poppler", "linux"))
+        for co in ("tesseract", "poppler"):   # Linux: sudo jen jako příkaz pro uživatele, brew/winget po souhlasu
+            self.assertIn("spustí ho sám", ocr.navod(co, "linux"))
+            self.assertIn("! sudo", ocr.navod(co, "linux"))
+            for plat in ("darwin", "win32"):
+                self.assertIn("po souhlasu smí Claude spustit", ocr.navod(co, plat))
+                self.assertNotIn("sudo", ocr.navod(co, plat))
+
+    def test_rada_modelu_puvod(self):
+        gp = ocr.rada_modelu("german_print", "/u")
+        self.assertIn("3,5 MB", gp)
+        self.assertIn("UB Mannheim (ne GitHub)", gp)
+        self.assertIn("licence neuvedená", gp)
+        for m in ("deu", "ces", "lat"):
+            self.assertIn("tessdata_best na GitHubu, Apache-2.0", ocr.rada_modelu(m, "/u"))
+        self.assertIn("licence neuvedená", ocr.rada_modelu("frak2021", "/u"))
+        rc, out, _ = self.spust("modely")
+        self.assertEqual(rc, 0)
+        radky = {r.split()[0]: r for r in out.splitlines() if r.split() and r.split()[0] in ocr.ZNAME}
+        self.assertIn("server UB Mannheim", radky["german_print"])
+        self.assertIn("Apache-2.0", radky["ces"])
+
+    def test_stav_stare_znaky_nastaveno(self):
+        rc, out, _ = self.spust("stav")
+        self.assertIn("staré znaky: zjednodusit (výchozí, nenastaveno – u fraktury se zeptej uživatele)", out)
+        self.nastav({"tessdata": self.uziv, "stare_znaky": "ponechat"})
+        rc, out, _ = self.spust("stav")
+        self.assertIn("staré znaky: ponechat (nastaveno v data/ocr.json)", out)
+        self.nastav({"tessdata": self.uziv, "dlouhe_s": "s"})   # zastaralé pole se počítá jako nastavené
+        rc, out, _ = self.spust("stav")
+        self.assertIn("staré znaky: jen_s (nastaveno v data/ocr.json)", out)
 
     def test_chybi_tesseract_exit2(self):
         del self.programy["tesseract"]

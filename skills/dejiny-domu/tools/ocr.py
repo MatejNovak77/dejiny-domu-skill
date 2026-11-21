@@ -38,6 +38,8 @@ MANIFEST = "ocr_manifest.json"
 ZAMEK = ".ocr.lock"
 NEOVERENY = "neověřený"
 MIN_MODEL = 100_000   # menší stažený soubor není model (chybová stránka)
+PRO_UZIVATELE = "příkaz pro uživatele (spustí ho sám, v Claude Code `! sudo apt install …`; Claude sudo nespouští)"
+PO_SOUHLASU = "(po souhlasu smí Claude spustit)"
 
 UBMA = "https://ub-backup.bib.uni-mannheim.de/~stweil/tesstrain"
 BEST = "https://github.com/tesseract-ocr/tessdata_best/raw/e12c65a915945e4c28e237a9b52bc4a8f39a0cec"   # připnutý commit
@@ -120,19 +122,27 @@ def najdi(program, platform=None, env=None, which=shutil.which, existuje=os.path
 
 
 def navod(co, platform=None):
-    """Návod na instalaci Tesseractu nebo Poppleru pro daný systém (instalaci spouští uživatel nebo se souhlasem)."""
+    """Návod na instalaci Tesseractu nebo Poppleru pro daný systém. brew/winget smí Claude spustit po souhlasu,
+    sudo nikdy (hook hlidac.py ho zamítne) – na Linuxu je to příkaz pro uživatele."""
     platform = sys.platform if platform is None else platform
     if platform == "darwin":
-        return {"tesseract": "macOS: brew install tesseract   (Homebrew: https://brew.sh)",
-                "poppler": "macOS: brew install poppler"}[co]
+        return {"tesseract": f"macOS {PO_SOUHLASU}: brew install tesseract   (Homebrew: https://brew.sh)",
+                "poppler": f"macOS {PO_SOUHLASU}: brew install poppler"}[co]
     if platform == "win32":
-        return {"tesseract": "Windows: winget install --id UB-Mannheim.TesseractOCR -e   (dá 5.4.0; novější instalátor "
+        return {"tesseract": f"Windows {PO_SOUHLASU}: winget install --id UB-Mannheim.TesseractOCR -e   (dá 5.4.0; novější instalátor "
                              "na https://github.com/UB-Mannheim/tesseract/wiki). PATH se nenastaví, ocr.py ho najde "
                              "v Program Files i bez restartu.",
-                "poppler": "Windows: winget install --id oschwartz10612.Poppler -e   (přenosný balíček; ocr.py ho "
+                "poppler": f"Windows {PO_SOUHLASU}: winget install --id oschwartz10612.Poppler -e   (přenosný balíček; ocr.py ho "
                            "najde ve WinGet\\Packages i bez restartu)"}[co]
-    return {"tesseract": "Linux: sudo apt install tesseract-ocr   (Fedora: sudo dnf install tesseract)",
-            "poppler": "Linux: sudo apt install poppler-utils   (Fedora: sudo dnf install poppler-utils)"}[co]
+    return {"tesseract": f"Linux, {PRO_UZIVATELE}: sudo apt install tesseract-ocr   (Fedora: sudo dnf install tesseract)",
+            "poppler": f"Linux, {PRO_UZIVATELE}: sudo apt install poppler-utils   (Fedora: sudo dnf install poppler-utils)"}[co]
+
+
+def puvod(model):
+    """Odkud model je a pod jakou licencí (odvozeno z adresy v ZNAME)."""
+    if "uni-mannheim" in ZNAME[model][0]:
+        return "server UB Mannheim (ne GitHub), licence neuvedená"
+    return "tessdata_best na GitHubu, Apache-2.0"
 
 
 def _vystup(r):
@@ -240,7 +250,7 @@ def sha256_souboru(cesta):
 def rada_modelu(model, uziv):
     if model in ZNAME:
         return (f"stáhni: python3 -I tools/ocr.py stahni {model} ({str(ZNAME[model][2]).replace('.', ',')} MB, "
-                f"{'UB Mannheim' if 'uni-mannheim' in ZNAME[model][0] else 'tessdata_best'}; jen po souhlasu)")
+                f"{puvod(model)}; jen po souhlasu)")
     return f"skill tento model nezná; soubor {model}.traineddata dej ručně do {uziv}"
 
 
@@ -842,7 +852,7 @@ def prikaz_stav(nast, model_arg=None):
     if not all(pop.values()):
         chybi = True
     if not tess and not all(pop.values()) and sys.platform.startswith("linux"):
-        print("Linux, obojí najednou: sudo apt install tesseract-ocr poppler-utils")
+        print(f"Linux, obojí najednou, {PRO_UZIVATELE}: sudo apt install tesseract-ocr poppler-utils")
     model = p["model"]
     casti = rozloz_model(model)
     uziv = uzivatelska_slozka(nast)
@@ -867,7 +877,8 @@ def prikaz_stav(nast, model_arg=None):
             print(f"složka modelů pro běh: {tdir or sdir} ({'--tessdata-dir' if tdir else 'systémová'})")
     if p["prikaz"]:
         print(f"vlastní příkaz: {json.dumps(p['prikaz'], ensure_ascii=False)} (verze: {p['prikaz_verze'] or 'nenastavena'})")
-    print(f"staré znaky: {p['stare_znaky']}")
+    print(f"staré znaky: {p['stare_znaky']} " + ("(nastaveno v data/ocr.json)" if stare_znaky(nast) else
+                                                  "(výchozí, nenastaveno – u fraktury se zeptej uživatele)"))
     return 2 if chybi else 0
 
 
@@ -883,7 +894,7 @@ def prikaz_modely(nast):
     for m, (_, _, mb, popis) in ZNAME.items():
         kde = [k for k, ano in (("systém", m in sjaz), ("uživatel", os.path.isfile(os.path.join(uziv, m + ".traineddata"))))
                if ano]
-        print(f"{m:14} {mb:5.1f} MB  {'+'.join(kde) or '–':16} {popis}")
+        print(f"{m:14} {mb:5.1f} MB  {'+'.join(kde) or '–':16} {popis}; {puvod(m)}")
     for m in sorted(jine - set(ZNAME)):
         print(f"{m:14}           nainstalovaný (skill ho nezná)")
     return 0
