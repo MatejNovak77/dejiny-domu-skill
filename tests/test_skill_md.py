@@ -35,7 +35,7 @@ class TestSkillMd(unittest.TestCase):
                    "nastav pomocnici.rukopisy"):
             self.assertIn(co, ref)
         self.assertRegex(ref, r"\d{1,2}\. \d{1,2}\. 20\d\d")
-        for co in ("zhruba dvakrát", "aktuální ceník"):
+        for co in ("zhruba dvakrát", "Ověření ceníku – vždy nabídni"):
             self.assertIn(co, ref)
         for co in ("codex/agents", "vždy se zdrojem a datem"):
             self.assertNotIn(co, ref)

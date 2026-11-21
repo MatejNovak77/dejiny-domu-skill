@@ -32,11 +32,11 @@ Nejasné (tisk s rukopisnými poznámkami, smíšený svazek) = rukopis.
   **145/146** zápisů křtů správně (1 chyba v datu). Číslo pro Sonnet neuváděj, žádné změřené není.
 - **Cena:** Opus je **zhruba dvakrát dražší** než Sonnet (ceník Anthropicu
   https://platform.claude.com/docs/en/about-claude/pricing, poměr ověřen 21. 11. 2026 pro Claude Opus 5.5
-  a Sonnet 5.5). Přesné částky neuváděj. Nabídni, že aktuální ceník ověříš: když uživatel chce, přečti oficiální
-  ceník a řekni, co platí teď; bez přístupu na web to řekni. U jiného modelu než Sonnet a Opus žádný poměr netvrď,
-  jen nabídni ověření ceníku. S předplatným (Pro, Max) se neplatí za tokeny, ale Opus podle
-  https://claude.com/pricing čerpá limit jinak než Sonnet („How fast you reach a limit depends on the model you use“);
+  a Sonnet 5.5). Přesné částky neuváděj. U jiného modelu než Sonnet a Opus žádný poměr netvrď. S předplatným
+  (Pro, Max) se neplatí za tokeny, ale Opus podle https://claude.com/pricing čerpá limit jinak než Sonnet („How fast you reach a limit depends on the model you use“);
   o kolik, oficiální stránky neuvádějí. Ceník se mění: když od data ověření uplynulo víc než pár měsíců, řekni to.
+- **Ověření ceníku – vždy nabídni** („Aktuální ceník vám můžu ověřit.“): když uživatel chce, přečti oficiální
+  ceník a řekni, co platí teď; bez přístupu na web to řekni.
 - **Zkouška:** můžeš to vyzkoušet na malé dávce (níže), ať se uživatel rozhodne podle vlastních pramenů.
 - Zeptej se na **dvě věci zvlášť**: (1) který model teď, (2) „Mám volbu uložit do nastavení projektu, ať se příště
   neptám?“
