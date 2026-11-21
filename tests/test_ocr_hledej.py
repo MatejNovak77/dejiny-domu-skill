@@ -25,9 +25,9 @@ class Zaklad(unittest.TestCase):
 
 class TestVzor(Zaklad):
     def test_01_presne_bez_pravidel(self):
-        for text in ("Gansbauden", "22Gansbauden", "(Gansbauden)", "GansbaudenNr"):
+        for text in ("Gansbauden", "22Gansbauden", "(Gansbauden)", "gansbauden"):   # velikost se nerozlišuje
             self.najde("Gansbauden", text, tv="presne")
-        for text in ("Gansbaudener", "XGansbauden", "ČGansbauden", "-Gansbauden", "Gans-bauden", "gansbauden"):
+        for text in ("Gansbaudener", "GansbaudenNr", "XGansbauden", "ČGansbauden", "-Gansbauden", "Gans-bauden"):
             self.nenajde("Gansbauden", text, tv="presne")
 
     def test_02_bez_escapovani(self):
@@ -70,7 +70,7 @@ class TestVzor(Zaklad):
         p = {"skupiny": {"ch": ["d"]}}
         self.najde("Christoph", "Christoph", p)
         self.najde("Christoph", "Dristoph", p)
-        self.nenajde("Christoph", "dristoph", p)
+        self.najde("Christoph", "dristoph", p)   # velikost se nerozlišuje
         self.najde("Bach", "Bad", p)
 
     def test_09_deleni_v_radku(self):
@@ -132,6 +132,32 @@ class TestVzor(Zaklad):
         self.assertEqual(spany("ab", "ab1ab", {"zameny": {"b": ["b1a"]}, "vyloucit": {"b1ab": ""}}), [(3, 5)])
 
 
+    def test_62_velikost_pismen(self):
+        """Velikost se nerozlišuje; pravidla platí pro písmeno, jak stojí ve slově; slovo verzálkami jako Fries."""
+        for text in ("FRIES", "fries", "FRIES,"):
+            self.najde("Fries", text)
+        for tv in ("ceske", "presne"):
+            self.nenajde("Fries", "FRIESEN", tv=tv)
+            self.nenajde("Fries", "FRIESLAND", tv=tv)
+        self.najde("Fries", "FRIESEN", tv="volne")
+        self.najde("Zinecker", "ZINECKEROVÁ")
+        self.nenajde("Zinecker", "ZINECKEROVÁ", tv="presne")
+        ostre = {"zameny": {"s": ["ß"]}}
+        self.najde("Fries", "FRIESS", ostre)
+        self.nenajde("Fries", "FRIESS")
+        for text in ("FRIESS", "Frieß"):
+            self.najde("FRIES", text, ostre)
+        self.najde("Gansbauden", "sansbauden", {"zameny": {"G": ["S"]}})
+        self.najde("Gansbauden", "SANSBAUDEN", {"zameny": {"G": ["S"]}})
+        self.nenajde("Gansbauden", "Sansbauden", {"zameny": {"g": ["s"]}})
+        d = tempfile.mkdtemp(prefix="ocr_hledej_")
+        try:
+            with open(os.path.join(d, "a.txt"), "w", encoding="utf-8") as f:
+                f.write("ZINECKER zinecker Zineker\n")
+            self.assertEqual([k[0] for k in oh.kandidati(["Zinecker"], [d])["Zinecker"]], ["Zineker"])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
 VYP = {"volby": {"rovnocennosti": False}}
 
 
@@ -170,8 +196,8 @@ class TestRovnocennosti(Zaklad):
         self.najde("Über", "Ueber")
         self.najde("Ueber", "Über")
         self.nenajde("Müller", "Muller")
-        self.nenajde("Müller", "MÜLLER")
-        self.nenajde("MÜLLER", "Müller")
+        self.najde("Müller", "MÜLLER")   # velikost se nerozlišuje
+        self.najde("MÜLLER", "Müller")
         for znak in ("\u0308", "\u1ab0", "\u20d7"):   # konec nesmí doprostřed znaku (kategorie M, ne jen U+0300–036F)
             for tv in oh.TVARY:
                 with self.subTest(znak=hex(ord(znak)), tv=tv):
@@ -199,19 +225,21 @@ class TestRovnocennosti(Zaklad):
         self.nenajde("Gansbauden", "Gans-" + "\u00a0" * 251 + "bauden", DELENI)
 
     def test_46_vypnuti(self):
-        for slovo, text in (("Fischer", "Fiſcher"), ("Strauß", "Strauss"), ("Müller", "Mueller"),
+        self.najde("Fischer", "Fiſcher", VYP)   # ſ = s platí vždy: ſ je malé s i pro re.IGNORECASE
+        for slovo, text in (("Strauß", "Strauss"), ("Müller", "Mueller"),
                             ("Müller", "Mu\u0308ller"), ("Poděbrad", "Pode\u030cbrad"), ("Krischlitz", "Kꝛischlitz"),
                             ("Gansbauden", "Gans\u00adbauden"), ("Václav", "Wáclaw"), ("Mu", "Mu\u0308")):
             with self.subTest(text=text):
                 (self.nenajde if slovo == "Mu" else self.najde)(slovo, text)
                 (self.najde if slovo == "Mu" else self.nenajde)(slovo, text, VYP)
-        # najdi s false shodné s 009162b (výsledky změřené starým nástrojem na týchž vzorcích)
+        # najdi s false shodné s 009162b (výsledky změřené starým nástrojem na týchž vzorcích); navíc jen to, co najde
+        # nerozlišování velikosti: Ganſbauden, MÜLLER, Strauſs, STRAUẞ
         pripady = [
             ("Gansbauden", "Ganſbauden Gans-bauden Gansbauben Gan&bauden Gans\u00adbauden",
-             {"zameny": {"d": ["b"], "s": ["&"]}, "volby": {"deleni_slova": True}}, [(11, 22), (23, 33), (34, 44)]),
+             {"zameny": {"d": ["b"], "s": ["&"]}, "volby": {"deleni_slova": True}}, [(0, 10), (11, 22), (23, 33), (34, 44)]),
             ("Müller", "Müller Mueller Mu\u0308ller Mu\u0364ller Müllerova Mülleri MÜLLER", {"vyloucit": {"llerova": ""}},
-             [(0, 6), (41, 48)]),
-            ("Strauß", "Strauß Strauss Strauſs STRAUẞ", {"zameny": {"ß": ["ss"]}}, [(0, 6), (7, 14)]),
+             [(0, 6), (41, 48), (49, 55)]),
+            ("Strauß", "Strauß Strauss Strauſs STRAUẞ", {"zameny": {"ß": ["ss"]}}, [(0, 6), (7, 14), (15, 22), (23, 29)]),
             ("Zinecker", "Zineckera Zine&er Zinecker\u0301 Ziuecker Zinec-ker",
              {"zameny": {"n": ["u"]}, "skupiny": {"ck": ["&"]},
               "volby": {"deleni_slova": True, "chybi_prvni_pismeno": True}},
