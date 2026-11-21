@@ -22,7 +22,7 @@ Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všec
 Pravidlo, rovnocennost i volbu měň jen se souhlasem uživatele. Pravopisné varianty jmen (Zinecker / Zinnecker)
 hledej jako samostatná slova.
 """
-import glob, json, os, re, sys, unicodedata
+import functools, glob, json, os, re, sys, unicodedata
 
 for _s in (sys.stdout, sys.stderr):   # UTF-8 výstup i na Windows bez -X utf8
     if hasattr(_s, "reconfigure"):
@@ -42,12 +42,11 @@ TVARY = ("ceske", "presne", "volne")
 SEKCE = ("poznamka", "zameny", "skupiny", "vyloucit", "volby")
 VOLBY_BOOL = ("deleni_slova", "chybi_prvni_pismeno")
 FONETIKY = ("kolnska",)
-CACHE = 100_000       # položek lazy DFA (přechod množiny stavů znakem)
 MEMO = 200_000        # slov v paměti kandidátů a fonetiky
 SLOVO_RE = re.compile(r"[^\s.,;:!?\"'„“”‚‘’»«()\[\]{}<>/|*]+")
 MEZERA_RE = re.compile(r"\s")
 
-# Rovnocennosti: stejný znak jinak zapsaný. Platí jen na straně hledaného slova (čtení v automatu), text se nemění.
+# Rovnocennosti: stejný znak jinak zapsaný. Platí jen na straně hledaného slova (čtení ve vzoru), text se nemění.
 DLOUHE_S, R_ROTUNDA, NAD_E, MEKKE = "\u017f", "\ua75b", "\u0364", "\u00ad"   # ſ, ꝛ, kombinující malé e, U+00AD
 OSTRE, OSTRE_VELKE = "\u00df", "\u1e9e"                                      # ß, ẞ
 PREHLASKY = {"ä": "a", "ö": "o", "ü": "u", "Ä": "A", "Ö": "O", "Ü": "U"}
@@ -213,7 +212,7 @@ def nacti_pravidla(cesta=PRAVIDLA):
     return {} if p is None else p
 
 
-# --- automat (NFA) ----------------------------------------------------------------------------------------------
+# --- vzor (regex) -----------------------------------------------------------------------------------------------
 
 def _sloucena(p, zap):
     """Záměny a skupiny projektu sloučené se zapnutými sadami pravopisu (kopie, vstup se nemění)."""
@@ -229,7 +228,7 @@ def _sloucena(p, zap):
 
 def _uprav_pravidla(zameny, skupiny, zap):
     """Klíče a čtení po úpravě slova; čtení shodné s klíčem odpadne (pokryje ho rovnocennost). Klíč skupiny se
-    rozepíše na základní písmena (äß → aess), aby seděl na pozice automatu."""
+    rozepíše na základní písmena (äß → aess), aby seděl na pozice slova."""
     z = {}
     for k, v in zameny.items():
         k = uprav_slovo(k, zap)
@@ -271,59 +270,19 @@ def _zaklad(c, zap):
 
 
 def _prime(c, zap):
-    """Přímá čtení celého znaku (seznamy množin): sám, rozložený tvar (NFD), ä + ͤ, ß ↔ ẞ."""
-    out = [[{c}]]
-    if "rozlozene" in zap:
-        d = unicodedata.normalize("NFD", c)
-        if d != c:
-            out.append([{x} for x in d])
+    """Přímá čtení celého znaku: sám, rozložený tvar (NFD), ä + ͤ, ß ↔ ẞ."""
+    out, d = [c], unicodedata.normalize("NFD", c)
+    if "rozlozene" in zap and d != c:
+        out.append(d)
     if c in PREHLASKY and "prehlasky" in zap:
-        out.append([{c}, {NAD_E}])
+        out.append(c + NAD_E)
     if "ostre_s" in zap and c in (OSTRE, OSTRE_VELKE):
-        out.append([{OSTRE_VELKE if c == OSTRE else OSTRE}])
+        out.append(OSTRE_VELKE if c == OSTRE else OSTRE)
     return out
 
 
-def _stav(pr):
-    pr.append({})
-    return len(pr) - 1
-
-
-def _hrana(pr, z, znaky, do):
-    for c in sorted(znaky):
-        pr[z].setdefault(c, []).append(do)
-
-
-def _retez(pr, z, stitky, do):   # z --stitky--> do, štítek = množina znaků jedné pozice
-    for L in stitky[:-1]:
-        s = _stav(pr)
-        _hrana(pr, z, L, s)
-        z = s
-    _hrana(pr, z, stitky[-1], do)
-
-
-def _cteni_hrany(pr, z, text, do, zap):
-    """Čtení pravidla jako řetěz; každý znak i se svými rovnocennostmi (podautomat lineární v délce čtení).
-    Vrátí horní mez délky v znacích textu."""
-    delka = 0
-    for j, c in enumerate(text):
-        cil = do if j == len(text) - 1 else _stav(pr)
-        nejd = 1
-        h = _pulky(c, zap)
-        if h:
-            _retez(pr, z, h, cil)
-            nejd = 2
-        for st in _prime(c, zap):
-            _retez(pr, z, st, cil)
-            nejd = max(nejd, len(st))
-        _hrana(pr, z, _alt(c, zap) - {c}, cil)
-        delka += nejd
-        z = cil
-    return delka
-
-
 def _pozice(slovo, zap):
-    """Pozice automatu (množiny znaků), index první pozice každého znaku slova a základní písmena pozic."""
+    """Pozice slova (množiny znaků), index první pozice každého znaku slova a základní písmena pozic."""
     P, zac, zaklad = [], [], []
     for c in slovo:
         zac.append(len(P))
@@ -338,99 +297,74 @@ def _pozice(slovo, zap):
     return P, zac, "".join(zaklad)
 
 
-def _hrany(pr, slovo, P, zac, zaklad, jadro, J, zameny, skupiny, zap):
-    """Hrany písmen, přímých čtení, záměn a skupin; vrátí nejdelší čtení (ve znacích textu) na každé pozici."""
-    nejd = [1] * len(P)
-    for i, L in enumerate(P):
-        _hrana(pr, jadro[i], L, J[i + 1])
-        for c in sorted(L):   # záměny na pozici (i půlky přehlásky: u → n najde Mneller)
-            for r in zameny.get(c, ()):
-                nejd[i] = max(nejd[i], _cteni_hrany(pr, jadro[i], r, J[i + 1], zap))
-    for j, c in enumerate(slovo):
-        i = zac[j]
-        h = _pulky(c, zap)
-        konec = i + (2 if h else 1)
-        for st in _prime(c, zap):
-            if h or st != [{c}]:
-                _retez(pr, jadro[i], st, J[konec])
-                nejd[i] = max(nejd[i], len(st))
-        if h:   # záměny celého znaku (ü → u) na přímou hranu
-            for r in zameny.get(c, ()):
-                nejd[i] = max(nejd[i], _cteni_hrany(pr, jadro[i], r, J[konec], zap))
-    for k, v in skupiny.items():
-        if not k.isalpha():
-            continue
-        for i in range(len(P) - len(k) + 1):
-            if zaklad[i:i + len(k)] == k:
-                velke = any(x.isupper() for x in P[i]) and not any(x.islower() for x in P[i])
-                for r in dict.fromkeys(v):
-                    if velke:
-                        r = r[0].upper() + r[1:]   # „Ch“ → „D“
-                    nejd[i] = max(nejd[i], _cteni_hrany(pr, jadro[i], r, J[i + len(k)], zap))
-    return nejd
+def _tr(znaky):
+    return "[" + "".join(map(re.escape, sorted(znaky))) + "]"
 
 
-def _uzavery(pr, eps):
+def _nebo(alts):
+    """Alternativy (délka, regex): delší dřív, aby vyhrál nejdelší nález."""
+    a = list(dict.fromkeys(r for _, r in sorted(alts, key=lambda x: -x[0])))
+    return a[0] if len(a) == 1 else "(?:" + "|".join(a) + ")"
+
+
+def _cteni_re(text, zap):
+    """Čtení pravidla jako (nejvyšší délka v textu, regex); každý znak i se svými rovnocennostmi."""
     out = []
-    for s in range(len(pr)):
-        u, zasobnik = {s}, [s]
-        while zasobnik:
-            for t in eps.get(zasobnik.pop(), ()):
-                if t not in u:
-                    u.add(t)
-                    zasobnik.append(t)
-        out.append(frozenset(u))
-    return out
+    for c in text:
+        h = _pulky(c, zap)
+        alts = [(2, _tr(h[0]) + _tr(h[1]))] if h else []
+        alts += [(len(x), re.escape(x)) for x in _prime(c, zap)] + [(1, _tr(_alt(c, zap)))]
+        out.append((max(n for n, _ in alts), _nebo(alts)))
+    return sum(n for n, _ in out), "".join(r for _, r in out)
 
 
-class Vyjimky:
-    """Texty vyloucit jako jeden obrácený automat nad casefold znaků textu (plný Unicode casefold i víceznakový,
-    ß = SS, nezávisle na rovnocennostech) se zapnutými rovnocennostmi a sadami, bez záměn projektu. Běží zprava
-    doleva bez kotvy, takže první přijetí je nejzazší začátek výjimky; text se nekopíruje."""
+def _slovo_re(slovo, zameny, skupiny, zap, deleni):
+    """Regex slova bez okrajů: písmena, záměny, přímá čtení celého znaku a skupiny jako hrany mezi pozicemi;
+    R[i] = zbytek slova od pozice i (s volitelným znakem dělení a ≤ 250 bílými znaky před ní)."""
+    P, zac, zaklad = _pozice(slovo, zap)
+    n, hrany = len(P), [{} for _ in P]   # hrany[i][cíl] = [(délka, regex)]
+    for i, L in enumerate(P):
+        hrany[i][i + 1] = [(1, _tr(L))] + [_cteni_re(r, zap) for c in sorted(L) for r in zameny.get(c, ())]
+    for j, c in enumerate(slovo):
+        i, h = zac[j], _pulky(c, zap)
+        cil = hrany[i].setdefault(i + (2 if h else 1), [])
+        cil += [(len(x), re.escape(x)) for x in _prime(c, zap) if h or x != c]
+        cil += [_cteni_re(r, zap) for r in zameny.get(c, ())] if h else []
+    for k, v in skupiny.items():
+        for i in range(n - len(k) + 1):
+            if k.isalpha() and zaklad[i:i + len(k)] == k:
+                velke = any(x.isupper() for x in P[i]) and not any(x.islower() for x in P[i])
+                hrany[i].setdefault(i + len(k), []).extend(
+                    _cteni_re(r[0].upper() + r[1:] if velke else r, zap) for r in dict.fromkeys(v))   # „Ch“ → „D“
+    H = f"(?:{_tr(deleni)}\\s{{0,{MEZER_PO_DELENI}}})?" if deleni else ""
+    R = [(0, "")] * (n + 1)   # (nejvyšší délka bez dělení, regex)
+    for i in range(n - 1, -1, -1):
+        alts = [(max(d for d, _ in a) + R[c][0], _nebo(a) + R[c][1]) for c, a in hrany[i].items()]
+        R[i] = (max(d for d, _ in alts), (H if i else "") + _nebo(alts))
+    return [r for _, r in R], zaklad
 
-    def __init__(self, texty, zap):
-        zap = frozenset(zap) - {"ostre_s"}   # ß i ẞ jsou po casefold ss, stažení ss → ß by je minulo
-        zameny, skupiny = _sloucena({}, zap)
-        zameny = {k: [r.casefold() for r in v] for k, v in zameny.items() if k == k.casefold()}
-        skupiny = {k: [r.casefold() for r in v] for k, v in skupiny.items()}
-        zameny, skupiny = _uprav_pravidla(zameny, skupiny, zap)
-        pr = []
-        zacatek, konec = _stav(pr), _stav(pr)
-        for t in texty:
-            x = uprav_slovo(t.casefold(), zap)
-            P, zac, zaklad = _pozice(x, zap)
-            J = [zacatek] + [_stav(pr) for _ in range(len(P) - 1)] + [konec]
-            _hrany(pr, x, P, zac, zaklad, J, J, zameny, skupiny, zap)
-        self._pr = [{} for _ in pr]   # obrácené hrany
-        for s, d in enumerate(pr):
-            for ch, cile in d.items():
-                for t in cile:
-                    self._pr[t].setdefault(ch, []).append(s)
-        self._zac, self._prijmout, self._cache = frozenset({konec}), zacatek, {}
 
-    def nejzazsi(self, text, a, b):
-        """Index nejzazšího znaku text[a:b], ve kterém začíná některá výjimka (i uprostřed jeho casefold), nebo -1."""
-        S = self._zac
-        for q in range(b - 1, a - 1, -1):
-            for ch in reversed(text[q].casefold()):
-                klic = (S, ch)
-                T = self._cache.get(klic)
-                if T is None:
-                    T = frozenset(t for s in S for t in self._pr[s].get(ch, ()))
-                    if len(self._cache) >= CACHE:
-                        self._cache.clear()
-                    self._cache[klic] = T
-                if self._prijmout in T:
-                    return q
-                S = T | self._zac
-        return -1
+@functools.cache
+def _znaky_m():
+    """Třída všech kombinujících znaků (kategorie M*)."""
+    return "".join(re.escape(chr(i)) for i in range(0x110000) if unicodedata.category(chr(i))[0] == "M")
+
+
+def _vyjimky_re(texty, zap):
+    """Texty vyloucit jako jeden regex nad casefold textu (plný Unicode casefold, ß = SS, nezávisle na
+    rovnocennostech) se zapnutými rovnocennostmi a sadami, bez záměn projektu."""
+    zap = frozenset(zap) - {"ostre_s"}   # ß i ẞ jsou po casefold ss, stažení ss → ß by je minulo
+    zameny, skupiny = _sloucena({}, zap)
+    zameny = {k: [r.casefold() for r in v] for k, v in zameny.items() if k == k.casefold()}
+    skupiny = {k: [r.casefold() for r in v] for k, v in skupiny.items()}
+    zameny, skupiny = _uprav_pravidla(zameny, skupiny, zap)
+    return re.compile("|".join(_slovo_re(uprav_slovo(t.casefold(), zap), zameny, skupiny, zap, "")[0][0]
+                               for t in texty))
 
 
 class Vzor:
-    """Slovo, jeho rovnocenné zápisy a zkomoleniny podle pravidel jako NFA; simulace množinami stavů (bez
-    backtrackingu). Text se nemění: rovnocennosti jsou pozice s více znaky a přímá čtení ve slově.
-
-    Doba hledání v řádku délky m je nejvýš O(m · maxlen) kroků; přechody množin stavů jsou v omezené cache."""
+    """Slovo, jeho rovnocenné zápisy a zkomoleniny podle pravidel jako jeden regex. Text se nemění: rovnocennosti
+    jsou alternativy ve vzoru. Doba běhu není omezená pro umělé vstupy (místní nástroj, vlastní pravidla a texty)."""
 
     def __init__(self, slovo, pravidla=None, tvary=None):
         if not slovo:
@@ -446,116 +380,35 @@ class Vzor:
             raise ValueError(f"tvary: {self.tvary} (povolené: {', '.join(TVARY)})")
         self.znaky_deleni = (DELENI if volby.get("deleni_slova", False) else "") + \
             (MEKKE if "mekke_deleni" in zap else "")
-        self._konec_znaku = bool(zap)   # za nálezem nesmí být kombinující znak (Mu nenajde začátek Mu + U+0308)
-        P, zac, zaklad = _pozice(slovo, zap)
-        n = len(P)
-        pr = self._prechody = []   # stav → {znak: [stav, …]}
-        self._mezera = {}          # stav → stav po bílém znaku
-        self._eps = {}             # stav → [stav, …]
-        J = [_stav(pr) for _ in range(n + 1)]   # vstup do hranice pozic i (sem vede přechod přes pozici)
-        jadro = list(J)                          # odsud se čte pozice i; po dělení se vrací sem (jen 1 znak dělení)
-        if self.znaky_deleni:
-            for i in range(1, n):
-                jadro[i] = _stav(pr)
-                self._eps.setdefault(J[i], []).append(jadro[i])
-                D = [_stav(pr) for _ in range(MEZER_PO_DELENI + 1)]   # D[k] = po znaku dělení a k bílých znacích
-                for c in self.znaky_deleni:
-                    pr[J[i]].setdefault(c, []).append(D[0])
-                for k in range(MEZER_PO_DELENI):
-                    self._mezera[D[k]] = D[k + 1]
-                for d in D:
-                    self._eps.setdefault(d, []).append(jadro[i])
-        nejd = _hrany(pr, slovo, P, zac, zaklad, jadro, J, zameny, skupiny, zap)
+        R, zaklad = _slovo_re(slovo, zameny, skupiny, zap, self.znaky_deleni)
+        jadro = R[0]
         if (volby.get("chybi_prvni_pismeno") and len(slovo) > 6 and not any(_pulky(c, zap) for c in slovo[:3])
                 and not any(zaklad[i:i + len(k)] == k for i in range(3) for k in skupiny)):
-            _retez(pr, J[0], [{c} for c in slovo[1:3].lower()], J[3])   # OCR vynechalo první písmeno
-        self._prijmout = {J[n]}
-        if self.tvary == "ceske":
-            acc = _stav(pr)
-            for k in KONCOVKY:
-                _retez(pr, J[n], [{c} for c in k], acc)
-            self._prijmout.add(acc)
-        self.maxlen = sum(nejd) + (n - 1) * (1 + MEZER_PO_DELENI) + 5
-        self._uzaver = _uzavery(pr, self._eps)
-        self._start = self._uzaver[J[0]]
-        prvni = sorted({c for s in self._start for c in pr[s]})
-        self._pred = re.compile(f"(?<![{re.escape(PISMENA)}\\-])(?=[{''.join(map(re.escape, prvni))}])")
-        self._cache, self._prijima = {}, {}
-        # výjimka, kterou automat výjimek najde v hledaném slově, neplatí (Strasse s výjimkou Straße)
-        vyl = [t for t in p.get("vyloucit", {}) if Vyjimky([t], zap).nejzazsi(puvodni, 0, len(puvodni)) < 0]
-        self._vyloucit = Vyjimky(vyl, zap) if vyl else None
-
-    def _krok(self, S, ch):
-        klic = (S, ch)
-        r = self._cache.get(klic)
-        if r is None:
-            out = set()
-            mezera = ch.isspace()
-            for s in S:
-                for t in self._prechody[s].get(ch, ()):
-                    out |= self._uzaver[t]
-                if mezera and s in self._mezera:
-                    out |= self._uzaver[self._mezera[s]]
-            r = frozenset(out)
-            if len(self._cache) >= CACHE:
-                self._cache.clear()
-            self._cache[klic] = r
-        return r
-
-    def _platny_konec(self, text, j):
-        """Za nálezem nesmí být kombinující znak (kategorie M, všechny režimy) a mimo volne ani malé písmeno."""
-        if j == len(text):
-            return True
-        c = text[j]
-        if self.tvary != "volne" and c in MALA:
-            return False
-        return not (self._konec_znaku and unicodedata.category(c)[0] == "M")
-
-    def _konec(self, text, p):
-        """Nejdelší platný konec shody začínající na p, nebo None."""
-        S, j, konec = self._start, p, None
-        stop = min(len(text), p + self.maxlen)
-        while True:
-            pr = self._prijima.get(S)
-            if pr is None:
-                pr = self._prijima[S] = not S.isdisjoint(self._prijmout)
-            if pr and self._platny_konec(text, j):
-                konec = j
-            if j >= stop:
-                return konec
-            S = self._krok(S, text[j])
-            j += 1
-            if not S:
-                return konec
+            jadro = f"(?:{jadro}|{re.escape(slovo[1:3].lower())}{R[3]})"   # OCR vynechalo první písmeno
+        konec = _nebo((len(k), re.escape(k)) for k in KONCOVKY) + "?" if self.tvary == "ceske" else ""
+        za = (_tr(MALA)[1:-1] if self.tvary != "volne" else "") + (_znaky_m() if zap else "")
+        self._re = re.compile(f"(?<![{re.escape(PISMENA)}\\-]){jadro}{konec}" + (f"(?![{za}])" if za else ""))
+        # výjimka, kterou vzor výjimek najde v hledaném slově, neplatí (Strasse s výjimkou Straße)
+        vyl = [t for t in p.get("vyloucit", {}) if not _vyjimky_re([t], zap).search(puvodni.casefold())]
+        self._vyloucit = _vyjimky_re(vyl, zap) if vyl else None
 
     def najdi(self, text, limit=None):
-        """Nálezy (začátek, konec) v textu; s limit jen ty, které začínají před ním."""
+        """Nálezy (začátek, konec) v textu; s limit jen ty, které začínají před ním. Nález se zahodí, když úsek od
+        jeho začátku do mezery obsahuje výjimku."""
         limit = len(text) if limit is None else limit
-        token = None   # (začátek, konec, nejzazší začátek výjimky) – jednou na token
         pos = 0
         while pos < limit:
-            m = self._pred.search(text, pos, limit)
-            if not m:
+            m = self._re.search(text, pos)
+            if not m or m.start() >= limit:
                 return
-            p = m.start()
-            e = self._konec(text, p)
-            if e is None:
-                pos = p + 1
-                continue
+            p, e = m.span()
             if self._vyloucit:
-                if token is None or not (token[0] <= p < token[1]):
-                    token = self._token(text, p)
-                if p <= token[2]:   # úsek text[p:] do mezery obsahuje vyloučený text
+                w = MEZERA_RE.search(text, p)
+                if self._vyloucit.search(text[p:w.start() if w else len(text)].casefold()):
                     pos = p + 1
                     continue
             yield p, e
             pos = e
-
-    def _token(self, text, p):
-        """Úsek od p do první mezery a index znaku, kde v něm začíná nejzazší výjimka (-1 = žádná)."""
-        m = MEZERA_RE.search(text, p)
-        konec = m.start() if m else len(text)
-        return p, konec, self._vyloucit.nejzazsi(text, p, konec)
 
 
 # --- soubory ----------------------------------------------------------------------------------------------------
@@ -665,7 +518,7 @@ def kolnsky_kod(slovo):
 
 def fonetika(slova, cesty, pravidla=None, tvary=None):
     """{slovo: {tvar: [počet, (soubor, řádek, text)]}}: slova s velkým prvním písmenem, která mají stejný kölnský kód
-    jako hledané slovo a automat je nenajde. Jeden průchod soubory pro všechna slova; nejsou to nálezy."""
+    jako hledané slovo a hledání je nenajde. Jeden průchod soubory pro všechna slova; nejsou to nálezy."""
     vzory = [Vzor(s, pravidla, tvary) for s in slova]
     kody = {}
     for x, s in enumerate(slova):

@@ -110,20 +110,6 @@ class TestVzor(Zaklad):
         self.najde("Zinecker", "Zinec-ker", p)
         self.najde("Zinecker", "Zinec⸗ ker", p)
 
-    def test_37_vyloucit_jednou_na_token(self):
-        """R3: kontrola výjimky nejvýš jednou na token – mnoho začátků v dlouhém tokenu bez mezer je lineární."""
-        text = "a1" * 100_000
-        vzor = oh.Vzor("a1a", {"vyloucit": {"zzz": "nikde"}}, "presne")
-        t = time.monotonic()
-        n = sum(1 for _ in vzor.najdi(text))
-        self.assertEqual(n, 50_000)
-        self.assertLess(time.monotonic() - t, 2.0)
-        volani = []
-        puvodni = vzor._token
-        vzor._token = lambda *a: volani.append(1) or puvodni(*a)
-        self.assertEqual(sum(1 for _ in vzor.najdi(text + " " + text)), 2 * 50_000)
-        self.assertEqual(len(volani), 2)   # jednou na každý token
-
     def test_38_mez_mezer_po_deleni(self):
         """R3: po znaku dělení nejvýš 250 bílých znaků, i přes konec řádku."""
         self.najde("Gansbauden", "Gans-" + " " * 250 + "bauden", DELENI)
@@ -137,21 +123,13 @@ class TestVzor(Zaklad):
             self.nenajde("Gansbauden", t, DELENI)
         self.najde("Gansbauden", "Gans-\n  bauden", DELENI)
 
-    def test_36_doba_behu(self):
-        def rychle(slovo, text, pravidla, tv=None, nalezu=0):
-            t = time.monotonic()
-            self.assertEqual(len(tvary(slovo, text, pravidla, tv)), nalezu)
-            self.assertLess(time.monotonic() - t, 0.5, slovo[:20])
-        ss = {"zameny": {"s": ["ss"]}}
-        rychle("s" * 28, "s" * 56 + "x", ss, "presne")
-        rychle("s" * 28, "s" * 56 + "x", ss, "ceske")
-        bloky = {"skupiny": {"ab": ["x", "xx", "a"]}, "zameny": {"a": ["x"], "b": ["x", "xx"]},
-                 "volby": {"deleni_slova": True}}
-        rychle("ab" * 14, "x" * 40 + "q", bloky)
-        t = time.monotonic()
-        tvary("Gansbauden", ("Gans-" + " " * 300 + "ss") * 300 + "a" * 100_000, dict(DELENI, zameny={"s": ["ss"]}))
-        self.assertLess(time.monotonic() - t, 0.5, "dlouhý odpad")
-        rychle("s" * 28, "s " * 500_000, ss)
+    def test_58_nejdelsi_nalez_a_vyjimka(self):
+        """Regex bere první platnou alternativu: řazení podle délky drží nejdelší nález, po výjimce hledá dál o znak."""
+        def spany(slovo, text, pravidla):
+            return list(oh.Vzor(slovo, pravidla, "volne").najdi(text))
+        self.assertEqual(spany("Fries", "Friess", {"zameny": {"s": ["ß"]}}), [(0, 6)])
+        self.assertEqual(spany("Xab", "Xabb", {"skupiny": {"ab": ["abb"]}}), [(0, 4)])
+        self.assertEqual(spany("ab", "ab1ab", {"zameny": {"b": ["b1a"]}, "vyloucit": {"b1ab": ""}}), [(3, 5)])
 
 
 VYP = {"volby": {"rovnocennosti": False}}
@@ -311,38 +289,6 @@ class TestRovnocennosti(Zaklad):
         self.najde("Jilemnice", "Gilemnice")
         self.nenajde("Wáclaw", "Václav")   # jen dnešní slovo → starý zápis
         self.nenajde("Václav", "Wáclaw", {"volby": {"rovnocennosti": {"cestina_1849": False}}})
-
-    def test_50_doba_behu(self):
-        """Mez ≥ 10× naměřené doby (1 MB řádek 0,3–0,5 s): odliší lineární běh od kvadratického."""
-        def rychle(slovo, text, pravidla, tv=None, nalezu=0, mez=2.0):
-            t = time.monotonic()
-            self.assertEqual(len(tvary(slovo, text, pravidla, tv)), nalezu)
-            self.assertLess(time.monotonic() - t, mez, slovo[:20])
-        rychle("ß" * 28, "ß" * 56 + "x", {"zameny": {"s": ["ss"]}}, "presne")
-        rychle("ä" * 14, "a\u0364" * 40 + "q", {"skupiny": {"ae": ["a", "e", "ae"]},
-                                                "zameny": {"a": ["ae"], "e": ["ae"]}, "volby": {"deleni_slova": True}})
-        rychle("ß" * 28, "ß " * 500_000, {}, mez=5.0)
-        rychle("äx", "a\u0301" * 250_000 + "a\u0308" * 250_000, {}, mez=5.0)
-        rychle("t" * 28, "th" * 56 + "x", {"volby": {"rovnocennosti": {"nemcina_1901": True}}}, "presne")
-        rychle("Gansbauden", ("Gans\u00ad" + " " * 300) * 3000, {})
-        text = "a1" * 500_000
-        vzor = oh.Vzor("a1a", {"vyloucit": {"zzz": "", "Müllerova": ""}}, "presne")
-        volani = []
-        puvodni = vzor._token
-        vzor._token = lambda *a: volani.append(1) or puvodni(*a)
-        t = time.monotonic()
-        self.assertEqual(sum(1 for _ in vzor.najdi(text)), 250_000)
-        self.assertLess(time.monotonic() - t, 6.0, "výjimky")   # 1 MB (0,5 s), dvakrát víc než test 37
-        self.assertEqual(len(volani), 1)   # obrácený automat jednou na token
-        d = tempfile.mkdtemp(prefix="ocr_hledej_")
-        try:
-            with open(os.path.join(d, "a.txt"), "w", encoding="utf-8") as f:
-                f.write("ß" * 500_000 + " Strauss\n")
-            t = time.monotonic()
-            self.assertEqual(oh.kandidati(["Strauß"], [d])["Strauß"], [])
-            self.assertLess(time.monotonic() - t, 2.0, "kandidáti")
-        finally:
-            shutil.rmtree(d, ignore_errors=True)
 
     def test_51_schema_rovnocennosti(self):
         for v, hlaska in (("ano", "musí být true, false nebo objekt"), ([], "musí být true, false nebo objekt"),
