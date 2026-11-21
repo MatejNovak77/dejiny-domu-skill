@@ -508,6 +508,21 @@ class TestSoubory(unittest.TestCase):
         self.assertEqual(k[0][3], ["zamena d b"])
         self.assertEqual(k[0][4][1], 1)
 
+    def test_65_kandidati_prvni_slovo_po_deleni(self):
+        """První slovo řádku po rozdělení s velkým písmenem (vedlejší sloupec) se posoudí i samo, malé pokračování
+        slova ne; osamělá „-“ („6,-“) se nespojí, takže se slovo nepočítá dvakrát."""
+        f = self.soubor("a.txt", "in die Kirde ge-\nZineaker aus\nHedwig 6,-\nZinseker Johann\n")
+        for p in ({}, DELENI):
+            with self.subTest(p=p):
+                k = oh.kandidati(["Zinecker"], [f], p)["Zinecker"]
+                self.assertEqual([(w, n, d, pr[1]) for w, n, d, _, pr in k],
+                                 [("Zineaker", 1, 1, 2), ("Zinseker", 1, 2, 4)])
+        self.assertIn(("geZineaker", 1), [(w, i) for w, i, _ in oh._slova(f, True)])   # spojený tvar dál
+        g = self.soubor("b.txt", "Lehrer Gott-\nfried Kunze\n")
+        self.assertEqual([(w, i) for w, i, _ in oh._slova(g, True)],
+                         [("Gottfried", 1), ("Lehrer", 1), ("Kunze", 2)])
+        self.assertEqual(oh.kandidati(["Fries"], [g], DELENI)["Fries"], [])
+
     def test_24_mez_podle_delky(self):
         self.soubor("a.txt", "Frles Frlez Abcdxfy Zined&er\n")
         with self.assertRaises(ValueError) as e:
