@@ -185,6 +185,11 @@ def uprav_slovo(s, zap):
     return s
 
 
+def slovo_pravidel(slovo):
+    """Slovo celé verzálkami bere pravidla jako slovo s velkým prvním písmenem (FRIES jako Fries)."""
+    return slovo[0] + slovo[1:].lower() if slovo.isupper() and len(slovo) > 1 else slovo
+
+
 def _precti(cesta):
     """Pravidla ze souboru (chybějící = None); chybný soubor ukončí program srozumitelnou hláškou."""
     if not os.path.exists(cesta):
@@ -365,7 +370,8 @@ def _vyjimky_re(texty, zap):
 
 class Vzor:
     """Slovo, jeho rovnocenné zápisy a zkomoleniny podle pravidel jako jeden regex. Text se nemění: rovnocennosti
-    jsou alternativy ve vzoru. Velikost písmen se nerozlišuje; pravidla platí pro písmeno, jak stojí ve slově. Doba běhu není omezená pro umělé vstupy (místní nástroj, vlastní pravidla a texty)."""
+    jsou alternativy ve vzoru. Velikost písmen se nerozlišuje; pravidla platí pro písmeno, jak stojí ve slově
+    (slovo_pravidel). Doba běhu není omezená pro umělé vstupy (místní nástroj, vlastní pravidla a texty)."""
 
     def __init__(self, slovo, pravidla=None, tvary=None):
         if not slovo:
@@ -374,9 +380,7 @@ class Vzor:
         volby = p.get("volby", {})
         zap = self.zapnute = zapnute(p)
         zameny, skupiny = _uprav_pravidla(*_sloucena(p, zap), zap)
-        if slovo.isupper() and len(slovo) > 1:   # FRIES: pravidla jako u Fries (velikost se při hledání nerozlišuje)
-            slovo = slovo[0] + slovo[1:].lower()
-        puvodni, slovo = slovo, uprav_slovo(slovo, zap)
+        puvodni, slovo = slovo, uprav_slovo(slovo_pravidel(slovo), zap)
         self.slovo = slovo
         self.tvary = tvary or volby.get("tvary", "ceske")
         if self.tvary not in TVARY:
@@ -601,7 +605,7 @@ def navrh(cil, tvar, pravidla=None):
     """Pravidla, se kterými by hledání slova cil našlo tvar (texty jako argumenty `pridej`); existující vynechá.
     Jen záměna, skupina a volba; jiný rozdíl (koncovka, předpona, mezera, víc znaků) návrh nemá. Velikost písmen
     se nerozlišuje stejně jako při hledání."""
-    p = pravidla or {}
+    p, cil = pravidla or {}, slovo_pravidel(cil)
     zameny, skupiny, volby = p.get("zameny", {}), p.get("skupiny", {}), p.get("volby", {})
     cil_cf, tvar_cf = [c.casefold() for c in cil], [c.casefold() for c in tvar]
     n, m = len(cil), len(tvar)

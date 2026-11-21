@@ -475,6 +475,10 @@ class TestSoubory(unittest.TestCase):
         ((tvar, _, _, text, sloupec),) = oh.hledej("Gansbauden", [f], DELENI)
         self.assertEqual(tvar, "Gans-⏎bauden")
         self.assertIn("Gans-", oh.ukazka(text, sloupec, tvar))
+        f = self.soubor("b.txt", "\ufeff\t" + " " * 60 + "x Gansbauden y\n")   # odsazení delší než 40 znaků před nálezem
+        ((tvar, _, _, text, sloupec),) = oh.hledej("Gansbauden", [f])
+        self.assertEqual(text[sloupec:sloupec + len(tvar)], "Gansbauden")
+        self.assertIn("Gansbauden", oh.ukazka(text, sloupec, tvar))
 
     def test_60_souhrn_podle_tvaru(self):
         self.soubor("a.txt", "Gansbauden\nx Gansbauden\nGansbauden y\nGanſbauden\n")
@@ -586,6 +590,12 @@ class TestNavrh(unittest.TestCase):
 
     def test_21_existujici_vynecha(self):
         self.assertEqual(oh.navrh("Gansbauden", "Gdnsbaudeh", {"zameny": {"a": ["d"]}}), ["zamena n h"])
+
+    def test_64_navrh_pro_verzalky(self):
+        """Návrh pro slovo verzálkami má klíč, který hledání použije (FRIES bere pravidla jako Fries)."""
+        self.assertEqual(oh.navrh("GANSBAUDEN", "GANSSBAUDEN"), ["zamena n NS"])
+        self.assertEqual(oh.navrh("FRIES", "FRIEF"), ["zamena s F"])
+        self.assertTrue(list(oh.Vzor("FRIES", {"zameny": {"s": ["F"]}}).najdi("FRIEF")))
 
 
 class TestDokumentace(unittest.TestCase):
