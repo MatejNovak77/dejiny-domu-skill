@@ -1280,15 +1280,54 @@ class TestOcrHledej(Projekt):
             return f.read()
 
     def test_pridej_zalozi_soubor_a_hledej_ho_pouzije(self):
-        p = self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
+        with open(self.path("pracovni", "ocr.txt"), "w", encoding="utf-8") as f:
+            f.write("Wenzel aus Gansbauben\n")
+        p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
+        self.assertNotIn("Gansbauben", p.stdout)   # bez pravidla nic (ſ by našla už výchozí rovnocennost)
+        p = self.nastroj("ocr_hledej.py", "pridej", "zamena", "d", "b")
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("přidáno", p.stdout)
+        self.assertEqual(self.data("ocr_zameny"), {"zameny": {"d": ["b"]}})
+        p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("Gansbauden\tGansbauben\tpracovni/ocr.txt:1", p.stdout.replace(os.sep, "/"))
+
+    def test_rovnocennost_pridej_odeber(self):
+        p = self.nastroj("ocr_hledej.py", "odeber", "rovnocennost", "prehlasky")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(self.data("ocr_zameny"), {"volby": {"rovnocennosti": {"prehlasky": False}}})
+        p = self.nastroj("ocr_hledej.py", "pravidla")
+        self.assertIn("- prehlasky", p.stdout)
+        self.assertIn("+ dlouhe_s", p.stdout)
+        p = self.nastroj("ocr_hledej.py", "pridej", "rovnocennost", "prehlasky")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(self.data("ocr_zameny"), {})
+        p = self.nastroj("ocr_hledej.py", "odeber", "rovnocennost", "vse")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(self.data("ocr_zameny"), {"volby": {"rovnocennosti": False}})
+        with open(self.path("pracovni", "ocr.txt"), "w", encoding="utf-8") as f:
+            f.write("x\n")
+        p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
+        self.assertIn("rovnocennosti: žádné", p.stderr)
+        pred = self.bajty()
+        p = self.nastroj("ocr_hledej.py", "pridej", "rovnocennost", "nesmysl")
+        self.assertNotEqual(p.returncode, 0)
+        self.assertNotIn("Traceback", p.stderr)
+        self.assertEqual(self.bajty(), pred)
+
+    def test_pridej_zamena_pokryta_rovnocennosti(self):
+        p = self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("už pokryto výchozí rovnocenností dlouhe_s, uloženo pro případ vypnutí", p.stdout)
         self.assertEqual(self.data("ocr_zameny"), {"zameny": {"s": ["ſ"]}})
+        self.nastroj("ocr_hledej.py", "odeber", "rovnocennost", "dlouhe_s")
         with open(self.path("pracovni", "ocr.txt"), "w", encoding="utf-8") as f:
             f.write("Wenzel aus Ganſbauden\n")
         p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
-        self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertIn("Gansbauden\tGanſbauden\tpracovni/ocr.txt:1", p.stdout.replace(os.sep, "/"))
+        self.assertIn("Gansbauden\tGanſbauden", p.stdout)   # uložené pravidlo platí i po vypnutí
+        self.nastroj("ocr_hledej.py", "odeber", "zamena", "s", "ſ")
+        p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
+        self.assertNotIn("Ganſbauden", p.stdout)
 
     def test_pridej_znovu_nic_nezmeni(self):
         self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
