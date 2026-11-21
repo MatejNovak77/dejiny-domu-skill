@@ -582,7 +582,8 @@ def navrh(cil, tvar, pravidla=None):
 def _slova(soubor, spojit, mekke=False):
     """(slovo, číslo řádku, řádek) po souborech; slovo rozdělené na konci řádku se spojí s prvním slovem dalšího
     (s volbou deleni_slova bez znaku dělení, jinak se znakem – návrh pak řekne „volba deleni_slova“; měkké dělení
-    U+00AD se s mekke vynechá vždy)."""
+    U+00AD se s mekke vynechá vždy). První slovo dalšího řádku s velkým písmenem se vrátí i samo: znak dělení může
+    patřit vedlejšímu sloupci (pokračování slova „Gott-/fried“ je malé). Osamělý znak dělení („6,-“) se nespojuje."""
     preskocit = False
     znaky = DELENI + (MEKKE if mekke else "")
     for i, radek, dalsi in _dvojice(soubor):
@@ -590,13 +591,14 @@ def _slova(soubor, spojit, mekke=False):
         if preskocit and slova:
             slova = slova[1:]
         preskocit = False
-        if slova and dalsi is not None and _deleny(radek, znaky) and slova[-1].end() == len(radek.rstrip()):
+        if (slova and dalsi is not None and _deleny(radek, znaky) and slova[-1].end() == len(radek.rstrip())
+                and len(slova[-1].group(0)) > 1):
             prvni = SLOVO_RE.match(dalsi, len(dalsi) - len(dalsi.lstrip()))
             if prvni:
                 posledni = slova.pop().group(0)
                 zkratit = spojit or posledni[-1] == MEKKE
                 yield (posledni[:-1] if zkratit else posledni) + prvni.group(0), i, radek
-                preskocit = True
+                preskocit = not prvni.group(0)[0].isupper()
         for s in slova:
             yield s.group(0), i, radek
 
