@@ -11,7 +11,7 @@ Použití (z kořene projektu):
   ocr.py modely                    známé modely a kde jsou nainstalované
   ocr.py nastaveni                 platné nastavení (data/ocr.json a výchozí hodnoty)
   ocr.py nastav <klíč> <hodnota|vychozi>
-      klíče: model, stare_znaky (zjednodusit|ponechat|jen_s), prikaz (JSON seznam), prikaz_verze, davka,
+      klíče: model, stare_znaky (zjednodusit|ponechat|jen_s), prikaz (JSON seznam), davka,
       soubezne, dpi, tessdata; zastaralé dlouhe_s (s|ponechat) se zapíše jako stare_znaky
   ocr.py stahni <model>…           stáhne známý model (jen po souhlasu uživatele; jen přes slusne.py)
 Exit: 0 vše hotovo, 1 selhání nebo nesoulad, 2 něco není nainstalované.
@@ -36,7 +36,6 @@ ZASTUPCE_RE = re.compile(r"\{([^{}]*)\}")
 ZASTUPCI = ("slozka", "vystup", "model")
 MANIFEST = "ocr_manifest.json"
 ZAMEK = ".ocr.lock"
-NEOVERENY = "neověřený"
 MIN_MODEL = 100_000   # menší stažený soubor není model (chybová stránka)
 PRO_UZIVATELE = "příkaz pro uživatele (spustí ho sám, v Claude Code `! sudo apt install …`; Claude sudo nespouští)"
 PO_SOUHLASU = "(po souhlasu smí Claude spustit)"
@@ -64,7 +63,7 @@ ZNAME = {   # model: (url, sha256, MB, popis)
     "pol": (f"{BEST}/pol.traineddata", "e80cc4cefbdface06e9223f43f089556b9dcf104020fbc0a200f6863c57d4405", 12.0,
             "polština"),
 }
-POLE = ("model", "stare_znaky", "dlouhe_s", "prikaz", "prikaz_verze", "davka", "soubezne", "dpi", "tessdata")
+POLE = ("model", "stare_znaky", "dlouhe_s", "prikaz", "davka", "soubezne", "dpi", "tessdata")
 # stare_znaky: zjednodusit = ſ → s, ꝛ → r, aͤ oͤ uͤ → ä ö ü (výchozí); ponechat = věrný přepis; jen_s = jen ſ → s
 # (dřívější dlouhe_s: s; staré výstupy se dodělávají stejně). Zastaralé dlouhe_s se převádí: s → jen_s.
 STARE_ZNAKY = ("zjednodusit", "ponechat", "jen_s")
@@ -339,20 +338,16 @@ def over_nastaveni(d):
     if "prikaz" in d:
         p = d["prikaz"]
         if not isinstance(p, list) or not p or not all(isinstance(x, str) and x for x in p):
-            chyby.append('prikaz: musí být neprázdný seznam neprázdných textů, např. ["ocr", "{slozka}", "--out", '
-                         '"{vystup}"]')
+            chyby.append('prikaz: musí být neprázdný seznam neprázdných textů, např. ["ocr", "{slozka}", "--lang", '
+                         '"{model}", "--out", "{vystup}"]')
         else:
             nalezene = [z for x in p for z in ZASTUPCE_RE.findall(x)]
             for z in nalezene:
                 if z not in ZASTUPCI:
                     chyby.append(f"prikaz: neznámé {{{z}}} (povolené jsou {{slozka}}, {{vystup}}, {{model}})")
-            for z in ("slozka", "vystup"):
+            for z in ZASTUPCI:   # {model} povinný: manifest pak nese model, který program skutečně použil
                 if z not in nalezene:
                     chyby.append(f"prikaz: chybí {{{z}}}")
-    if "prikaz_verze" in d:
-        v = d["prikaz_verze"]
-        if not isinstance(v, str) or not v.strip() or len(v) > 100:
-            chyby.append("prikaz_verze: neprázdný text do 100 znaků (změň ho při každé změně programu nebo modelu)")
     for k, (lo, hi) in ROZSAHY.items():
         if k in d:
             v = d[k]
@@ -374,7 +369,7 @@ def uloz_nastaveni(d, cesta=None):
 def platne(nast, model=None):
     """Výsledné hodnoty: --model, pak soubor, pak výchozí."""
     return {"model": model or nast.get("model") or "german_print", "stare_znaky": stare_znaky(nast) or "zjednodusit",
-            "prikaz": nast.get("prikaz"), "prikaz_verze": nast.get("prikaz_verze"),
+            "prikaz": nast.get("prikaz"),
             "davka": nast.get("davka", 100), "soubezne": nast.get("soubezne", vychozi_soubezne()),
             "dpi": nast.get("dpi", 300), "tessdata": nast.get("tessdata")}
 
@@ -639,28 +634,18 @@ def prikaz_argv(sablona, slozka, vystup, model):
     return argv
 
 
-def vysledky_davky(vystup, jmena, davka_jmeno):
-    """Výstup vlastního příkazu → ({strana: text}, spojeny). (a) <strana>.txt pro každou stranu;
-    (b) jeden <davka_jmeno>.txt, kde každá strana končí \\f (přesně N znaků \\f, za posledním jen bílé znaky)."""
-    soubory = sorted(f for f in os.listdir(vystup) if f.endswith(".txt"))
-    kmeny = [f[:-4] for f in soubory]
-
-    def cti(f):
-        with open(os.path.join(vystup, f), encoding="utf-8", errors="replace", newline="") as g:
-            return g.read()
-
-    if set(kmeny) == set(jmena) and len(kmeny) == len(jmena):
-        return {k: cti(k + ".txt") for k in kmeny}, False
-    if kmeny == [davka_jmeno] and davka_jmeno not in jmena:
-        text, n = cti(davka_jmeno + ".txt"), len(jmena)
-        kusy = text.split("\f")
-        if text.count("\f") != n or kusy[n].strip():
-            raise Chyba(f"vlastní příkaz: spojený výstup má {text.count(chr(12))} konců stran (\\f), čekáno {n}"
-                        + (" a za posledním je text" if text.count("\f") == n else "") + ".")
-        return dict(zip(jmena, kusy[:n])), True
-    cizi = sorted(set(kmeny) - set(jmena))
-    chybi = sorted(set(jmena) - set(kmeny))
-    raise Chyba(f"vlastní příkaz: nečekaný výstup (chybí {', '.join(chybi) or '–'}; cizí {', '.join(cizi) or '–'}).")
+def vysledky_davky(vystup, jmena):
+    """Výstup vlastního příkazu → {strana: text}: ve {vystup} právě jeden .txt, za každou stranou \\f
+    (tak píše např. `ocr --no-pdf`); za posledním \\f jen bílé znaky."""
+    soubory = [f for f in os.listdir(vystup) if f.endswith(".txt")]
+    if len(soubory) != 1:
+        raise Chyba(f"vlastní příkaz: čekán jeden soubor .txt se všemi stranami, je jich {len(soubory)}.")
+    with open(os.path.join(vystup, soubory[0]), encoding="utf-8", errors="replace", newline="") as f:
+        kusy = f.read().split("\f")
+    if len(kusy) != len(jmena) + 1 or kusy[-1].strip():
+        raise Chyba(f"vlastní příkaz: {len(kusy) - 1} konců stran (\\f), čekáno {len(jmena)} – jiný počet stran "
+                    "(vícestránkový TIFF?), nebo text za posledním \\f.")
+    return dict(zip(jmena, kusy))
 
 
 # --- příkazy --------------------------------------------------------------------------------------------------
@@ -689,18 +674,11 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None, znovu=False):
     vystup = vystup or os.path.join(ROOT, "pracovni", "ocr", dokument)
     sablona = p["prikaz"]
     # kontroly (Tesseract, modely) před zámkem: bez nich nevznikne prázdná výstupní složka
+    model = p["model"]
+    rozloz_model(model)
     if sablona:
-        ma_model = any("{model}" in x for x in sablona)
-        model = p["model"] if ma_model else NEOVERENY
-        if ma_model:
-            rozloz_model(model)
-        else:
-            print("Varování: vlastní příkaz nemá {model} – model je „neověřený“ (skill ho nezná).",
-                  file=sys.stderr)
         programy, tess, tdir = {"prikaz": sablona}, None, None
     else:
-        model = p["model"]
-        rozloz_model(model)
         varuj_model(model)
         tess, verze = _tesseract()
         tdir = priprav_modely(tess, model, nast)
@@ -741,8 +719,6 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None, znovu=False):
             if rozdil:
                 raise Chyba(f"{vystup}: hotové strany vznikly jinak – {'; '.join(rozdil)}. Spusť s --znovu (smaže "
                             "hotové strany a udělá dokument celý znovu), nebo zvol --vystup s novou složkou.")
-            if stary.get("vystup_prikazu"):
-                novy["vystup_prikazu"] = stary["vystup_prikazu"]
         zapis_json(mpath, novy)
 
         hotove = [s for s in vyber if s["jmeno"] in txt]
@@ -752,7 +728,7 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None, znovu=False):
             return 0
         try:
             if sablona:
-                return _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup, novy, mpath)
+                return _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup)
             return _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup)
         except KeyboardInterrupt:
             h = len({f[:-4] for f in os.listdir(vystup) if f.endswith(".txt")} & {s["jmeno"] for s in vyber})
@@ -790,30 +766,27 @@ def _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup)
     return chyby
 
 
-def _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup, man, mpath):
+def _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup):
     for i in range(0, len(todo), p["davka"]):
         davka = todo[i:i + p["davka"]]
         slozka = tempfile.mkdtemp(prefix="ocr_davka_")
         vyst = tempfile.mkdtemp(prefix="ocr_vystup_")
         try:
-            for s in davka:
+            # pořadová jména: program řadící abecedně i „přirozeně“ (1, 2, 10) vidí strany ve stejném pořadí jako my
+            sirka = max(4, len(str(len(davka))))
+            for k, s in enumerate(davka, 1):
+                cil = os.path.join(slozka, "p%0*d" % (sirka, k))
                 if druh == "pdf":
-                    vykresli(pdftoppm, vstup, s["cislo"], p["dpi"], os.path.join(slozka, s["jmeno"]))
+                    vykresli(pdftoppm, vstup, s["cislo"], p["dpi"], cil)
                 else:
-                    shutil.copyfile(s["obrazek"], os.path.join(slozka, s["jmeno"] + os.path.splitext(s["obrazek"])[1]))
+                    shutil.copyfile(s["obrazek"], cil + os.path.splitext(s["obrazek"])[1])
             argv = prikaz_argv(sablona, slozka, vyst, model)
             print(f"  vlastní příkaz: dávka {i // p['davka'] + 1}, strany {davka[0]['jmeno']}–{davka[-1]['jmeno']}",
                   flush=True)
             rc = spust_prikaz(argv)
             if rc != 0:
                 raise Chyba(f"vlastní příkaz skončil kódem {rc}; dávka zahozena, hotové dávky zůstaly.")
-            texty, spojeny = vysledky_davky(vyst, [s["jmeno"] for s in davka], os.path.basename(slozka))
-            if spojeny:
-                print("Varování: vlastní příkaz dal jeden spojený text – pořadí stran v něm nelze ověřit "
-                      "(kontrola: davka 1, nebo porovnat pár stran se skenem).", file=sys.stderr)
-                if man.get("vystup_prikazu") != "spojeny":
-                    man["vystup_prikazu"] = "spojeny"
-                    zapis_json(mpath, man)
+            texty = vysledky_davky(vyst, [s["jmeno"] for s in davka])
             for s in davka:
                 zapis_stranu(vystup, s["jmeno"], uprav_text(texty[s["jmeno"]], p["stare_znaky"]))
         except Chyba as e:
@@ -870,7 +843,7 @@ def prikaz_stav(nast, model_arg=None):
         else:
             print(f"složka modelů pro běh: {tdir or sdir} ({'--tessdata-dir' if tdir else 'systémová'})")
     if p["prikaz"]:
-        print(f"vlastní příkaz: {json.dumps(p['prikaz'], ensure_ascii=False)} (verze: {p['prikaz_verze'] or 'nenastavena'})")
+        print(f"vlastní příkaz: {json.dumps(p['prikaz'], ensure_ascii=False)}")
     print(f"staré znaky: {p['stare_znaky']} " + ("(nastaveno v data/ocr.json)" if stare_znaky(nast) else
                                                   "(výchozí, nenastaveno – u fraktury se zeptej uživatele)"))
     return 2 if chybi else 0
@@ -996,7 +969,7 @@ def main(argv):
             except Chyba as e:
                 if e.kod != 1:
                     raise
-                print(f"CHYBA: {v}: {e}", file=sys.stderr)
+                print(f"CHYBA: {e}", file=sys.stderr)   # hlášky vstup nebo jeho složku jmenují samy
                 nehotove.append(v)
         if chyby:
             print(f"Nehotové strany: {chyby}. Spusť znovu – dodělá jen chybějící.", file=sys.stderr)
