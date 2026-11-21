@@ -25,9 +25,9 @@ class Zaklad(unittest.TestCase):
 
 class TestVzor(Zaklad):
     def test_01_presne_bez_pravidel(self):
-        for text in ("Gansbauden", "22Gansbauden", "(Gansbauden)", "gansbauden"):   # velikost se nerozlišuje
+        for text in ("Gansbauden", "22Gansbauden", "(Gansbauden)", "gansbauden", "GansbaudenNr"):   # velikost se nerozlišuje
             self.najde("Gansbauden", text, tv="presne")
-        for text in ("Gansbaudener", "GansbaudenNr", "XGansbauden", "ČGansbauden", "-Gansbauden", "Gans-bauden"):
+        for text in ("Gansbaudener", "XGansbauden", "ČGansbauden", "-Gansbauden", "Gans-bauden"):
             self.nenajde("Gansbauden", text, tv="presne")
 
     def test_02_bez_escapovani(self):
@@ -157,6 +157,27 @@ class TestVzor(Zaklad):
             self.assertEqual([k[0] for k in oh.kandidati(["Zinecker"], [d])["Zinecker"]], ["Zineker"])
         finally:
             shutil.rmtree(d, ignore_errors=True)
+
+    def test_66_hranice_za_nalezem(self):
+        """Za nálezem smí být velké písmeno po malém (OCR slepilo jméno s dalším slovem), ne malé a ne velké po
+        velkém (slovo celé verzálkami: FRIESEN, FISCHERDAVID). Výhled je v regexu: kratší konec se zkusí znovu."""
+        for slovo, text, cekam in (("Fischer", "FischerDavid", "Fischer"),
+                                   ("Zinecker", "ZineckerS Fuchsbergbaude", "Zinecker"),
+                                   ("Zinecker", "ZineckerAdolf", "Zinecker"), ("Zinecker", "ZineckeraAdolf", "Zineckera"),
+                                   ("Zinecker", "ZineckerEDUARD", "Zinecker"),   # konec E po velkém ne → zpět na r
+                                   ("Zinecker", "ZineckerŠimon", "Zinecker"), ("Bönisch", "BönischÜ", "Bönisch"),
+                                   ("Fischer", "FiſcherD", "Fiſcher"), ("Fischer", "fischerDavid", "fischer")):
+            with self.subTest(text=text):
+                self.assertEqual(tvary(slovo, text), [cekam])
+        self.assertEqual(tvary("Gansbauden", "GansbaudenNr", None, "presne"), ["Gansbauden"])
+        for slovo, text, tv in (("Fischer", "Fischerei", None), ("Fischer", "FISCHERDAVID", None),
+                                ("Fries", "FRIESEN", "presne"), ("Kraus", "KRAUSE", "presne"), ("Kraus", "KrauSX", None),
+                                ("Zinecker", "Zineckerá", None), ("Kraus", "Krausſ", None),
+                                ("Beranek", "Beranek\u0365W", None)):
+            with self.subTest(text=text, tv=tv):
+                self.nenajde(slovo, text, tv=tv)
+        self.assertEqual(tvary("Gansbauden", "Gans-\nbaudenHof", DELENI), ["Gans-\nbauden"])   # výhled přes řádek
+        self.assertEqual(tvary("Kraus", "KrausDi", None, "volne"), ["Kraus"])
 
 VYP = {"volby": {"rovnocennosti": False}}
 

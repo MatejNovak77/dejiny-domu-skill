@@ -8,7 +8,8 @@ Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všec
   ocr_hledej.py hledej <slovo>… [--tvary ceske|presne|volne] [--vypis souhrn|radky]
                 [--pravidla <json>] [-- <soubor|složka>…]
       → souhrn podle nalezeného tvaru: slovo, tvar, počet×, první tři místa (+ kolik dalších), ukázka (tabulátory);
-        --vypis radky: řádek na nález (slovo, tvar, soubor:řádek, ukázka); počty a počet souborů na stderr
+        --vypis radky: řádek na nález (slovo, tvar, soubor:řádek, ukázka); počty a počet souborů na stderr;
+        za nálezem nesmí být malé písmeno, velké jen po malém (slepené FischerDavid; FISCHERDAVID ne)
   ocr_hledej.py kandidati <slovo>… [--vzdalenost N] [--max 40] [--tvary …] [--pravidla <json>] [-- …]
       → slova blízká hledanému, která pravidla nenajdou, s počtem, ukázkou a návrhem pravidla; nic nezapíše
   ocr_hledej.py pridej|odeber zamena <znak> <čtení>…
@@ -33,7 +34,8 @@ PRAVIDLA = os.path.join(ROOT, "data", "ocr_zameny.json")
 
 _LATIN = [chr(i) for i in range(0x250)]
 PISMENA = "".join(c for c in _LATIN if c.isalpha())    # před slovem nesmí být písmeno (číslice smí: „22Gansbauden“)
-MALA = frozenset(c for c in _LATIN if c.islower())       # za slovem nesmí pokračovat malé písmeno
+MALA = frozenset(c for c in _LATIN if c.islower())       # za slovem nesmí pokračovat malé písmeno (velké jen po malém)
+VELKA = frozenset(c for c in _LATIN if c.isupper())      # velké za slovem jen po malém: slepené „FischerDavid“, ne „FRIESEN“
 DELENI = "-⸗=¬"                                          # znaky dělení slova („Gans-bauden“, „Gans⸗ bauden“)
 MEZER_PO_DELENI = 250                                    # nejvíc bílých znaků po znaku dělení (i přes konec řádku)
 KONCOVKY = ("a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův ova ovo ovu ovy ovic").split()
@@ -364,7 +366,8 @@ def _vyjimky_re(texty, zap):
 class Vzor:
     """Slovo, jeho rovnocenné zápisy a zkomoleniny podle pravidel jako jeden regex. Text se nemění: rovnocennosti
     jsou alternativy ve vzoru. Velikost písmen se nerozlišuje; pravidla platí pro písmeno, jak stojí ve slově
-    (slovo_pravidel). Doba běhu není omezená pro umělé vstupy (místní nástroj, vlastní pravidla a texty)."""
+    (slovo_pravidel). Za slovem nesmí být malé písmeno, velké jen po malém (výhled bez IGNORECASE, `(?-i:…)`).
+    Doba běhu není omezená pro umělé vstupy (místní nástroj, vlastní pravidla a texty)."""
 
     def __init__(self, slovo, pravidla=None, tvary=None):
         if not slovo:
@@ -386,8 +389,10 @@ class Vzor:
                 and not any(zaklad[i:i + len(k)] == k for i in range(3) for k in skupiny)):
             jadro = f"(?:{jadro}|{re.escape(slovo[1:3].lower())}{R[3]})"   # OCR vynechalo první písmeno
         konec = _nebo((len(k), re.escape(k)) for k in KONCOVKY) + "?" if self.tvary == "ceske" else ""
-        za = (_tr(MALA)[1:-1] if self.tvary != "volne" else "") + (_znaky_m() if zap else "")
-        self._re = re.compile(f"(?<![{re.escape(PISMENA)}\\-]){jadro}{konec}" + (f"(?![{za}])" if za else ""), re.IGNORECASE)
+        m = _tr(MALA)
+        za = ((f"(?-i:(?!{m}|(?<!{m}){_tr(VELKA)}))" if self.tvary != "volne" else "")
+              + (f"(?![{_znaky_m()}])" if zap else ""))
+        self._re = re.compile(f"(?<![{re.escape(PISMENA)}\\-]){jadro}{konec}{za}", re.IGNORECASE)
         # výjimka, kterou vzor výjimek najde v hledaném slově, neplatí (Strasse s výjimkou Straße)
         vyl = [t for t in p.get("vyloucit", {}) if not _vyjimky_re([t], zap).search(puvodni.casefold())]
         self._vyloucit = _vyjimky_re(vyl, zap) if vyl else None
