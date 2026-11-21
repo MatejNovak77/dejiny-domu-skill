@@ -5,15 +5,10 @@ from unittest import mock
 
 KOREN = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILL = os.path.join(KOREN, "skills", "dejiny-domu")
-DATA = os.path.join(KOREN, "tests", "data")
 sys.path.insert(0, os.path.join(SKILL, "tools"))
 import ocr  # noqa: E402
 PUVODNI_NAJDI = ocr.najdi
 PUVODNI_SPUST_PRIKAZ = ocr.spust_prikaz
-
-TIFF1 = os.path.join(DATA, "ocr_jedna.tif")
-TIFF2 = os.path.join(DATA, "ocr_vicestrankovy.tif")
-
 
 def cti_soubor(p, mod="r"):
     with open(p, mod, **({} if "b" in mod else {"encoding": "utf-8"})) as f:
@@ -28,6 +23,7 @@ class FalesnySpust:
         self.volani = []
         self.selhat = set()      # jména obrázků (bez přípony), na kterých tesseract selže
         self.prerusit = set()    # jména obrázků, na kterých přijde Ctrl-C (KeyboardInterrupt)
+        self.vystupy = {}        # jméno obrázku → vlastní výstup tesseractu (např. víc stran oddělených \f)
         self.prikaz = None       # funkce(argv) -> návratový kód
         self.verze = {"tesseract": "5.5.4", "pdftoppm": "26.11.0"}
 
@@ -51,6 +47,8 @@ class FalesnySpust:
                 return ok(err=b"Error in pixReadStream", rc=1)
             if jmeno in self.prerusit:
                 raise KeyboardInterrupt
+            if jmeno in self.vystupy:
+                return ok(self.vystupy[jmeno].encode())
             with open(obr, encoding="utf-8") as f:
                 obsah = f.read().strip()
             return ok(f"Menſch {obsah} {argv[-1]}\r\n\f".encode())
@@ -455,50 +453,18 @@ class TestVstupy(Zaklad):
         self.assertIn("stejný soubor a.txt", err)
         self.assertEqual(self.fake.volani, [])
 
-    def test_tiff_vicestrankovy_odmitne(self):
-        d = os.path.join(self.tmp, "dokumenty", "tif")
-        os.makedirs(d)
-        shutil.copy(TIFF1, os.path.join(d, "a.tif"))
-        shutil.copy(TIFF2, os.path.join(d, "b.tif"))
+    def test_tiff_vice_stran(self):
+        """Vícestránkový TIFF pozná \\f ve výstupu Tesseractu (i s prázdným prvním snímkem); koncové \\f
+        (Tesseract 4, prázdná poslední strana) projde jako jedna strana."""
+        d = self.obrazky("a.tif", "b.tif", "c.tif", "d.tif", "e.tif", slozka="tif")
+        self.fake.vystupy = {"b": "a\fb\n", "c": "a\n\f", "d": "\f", "e": "\fb\n"}
         rc, _, err = self.spust(d)
         self.assertEqual(rc, 1)
+        for j in ("b", "e"):
+            self.assertIn(f"{j}: CHYBA víc stran v jednom souboru", err)
         self.assertIn("magick", err)
-        self.assertEqual(self.fake.volani, [])
-        rc, _, err = self.spust(TIFF2)
-        self.assertEqual(rc, 1)
-        self.assertIn("víc snímků", err)
-        self.assertEqual(ocr.jeden_snimek_tiff(TIFF1), (True, ""))
-        for obsah, proc in ((b"II*\x00", "useknutá hlavička"), (b"", "useknutá hlavička"),
-                            (b"MM\x00+\x00\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10", "BigTIFF"),
-                            (b"GIF89a\x00\x00", "není to TIFF")):
-            p = os.path.join(self.tmp, "x.tif")
-            with open(p, "wb") as f:
-                f.write(obsah)
-            self.assertEqual(ocr.jeden_snimek_tiff(p), (False, proc) if proc != "BigTIFF" else
-                             (False, "BigTIFF není podporovaný"), obsah)
-
-    def test_tiff_poskozeny(self):
-        with open(TIFF1, "rb") as f:
-            puvodni = f.read()
-        ifd = int.from_bytes(puvodni[4:8], "little")
-        pocet = int.from_bytes(puvodni[ifd:ifd + 2], "little")
-        dalsi = ifd + 2 + pocet * 12
-        varianty = {   # název: (bajty, čekaný důvod)
-            "cyklus": (puvodni[:dalsi] + ifd.to_bytes(4, "little") + puvodni[dalsi + 4:], "víc snímků (stran)"),
-            "ifd za koncem": (puvodni[:4] + (len(puvodni) + 10).to_bytes(4, "little") + puvodni[8:],
-                              "první IFD je mimo soubor"),
-            "počet přesahuje": (puvodni[:ifd] + (0xFFFF).to_bytes(2, "little") + puvodni[ifd + 2:], "useknutá IFD"),
-            "useknutý v IFD": (puvodni[:ifd + 2 + 5 * 12], "useknutá IFD"),
-        }
-        for nazev, (obsah, cekany) in varianty.items():
-            p = os.path.join(self.tmp, "poskozeny.tif")
-            with open(p, "wb") as f:
-                f.write(obsah)
-            zacatek = time.time()
-            ok, proc = ocr.jeden_snimek_tiff(p)
-            self.assertFalse(ok, nazev)
-            self.assertEqual(proc, cekany, nazev)
-            self.assertLess(time.time() - zacatek, 1, nazev)
+        self.assertEqual(sorted(f for f in os.listdir(self.vystup("tif")) if f.endswith(".txt")),
+                         ["a.txt", "c.txt", "d.txt"])
 
     def test_vic_vstupu_pokracuje(self):
         neni = os.path.join(self.tmp, "dokumenty", "neexistuje.pdf")

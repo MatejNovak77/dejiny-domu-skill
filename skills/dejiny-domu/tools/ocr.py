@@ -17,7 +17,7 @@ Použití (z kořene projektu):
 Exit: 0 vše hotovo, 1 selhání nebo nesoulad, 2 něco není nainstalované.
 Samotné OCR nic nestahuje.
 """
-import concurrent.futures, contextlib, glob, hashlib, itertools, json, ntpath, os, re, shutil, struct, subprocess, sys, tempfile
+import concurrent.futures, contextlib, glob, hashlib, itertools, json, ntpath, os, re, shutil, subprocess, sys, tempfile
 
 for _s in (sys.stdout, sys.stderr):   # UTF-8 výstup i na Windows bez -X utf8 (cp1250 neumí třeba „→“)
     if hasattr(_s, "reconfigure"):
@@ -433,54 +433,10 @@ def stahni(model, cil, otevri=None):
 
 # --- vstupy ---------------------------------------------------------------------------------------------------
 
-def jeden_snimek_tiff(cesta):
-    """Klasický TIFF s jediným snímkem? Čte jen hlavičku a první IFD (meze proti velikosti souboru); další IFD
-    nenásleduje, takže se nedá zacyklit. → (bool, důvod)."""
-    try:
-        velikost = os.path.getsize(cesta)
-        with open(cesta, "rb") as f:
-            h = f.read(8)
-            if len(h) < 8:
-                return False, "useknutá hlavička"
-            if h[:2] == b"II":
-                o = "<"
-            elif h[:2] == b"MM":
-                o = ">"
-            else:
-                return False, "není to TIFF"
-            magie = struct.unpack(o + "H", h[2:4])[0]
-            if magie == 43:
-                return False, "BigTIFF není podporovaný"
-            if magie != 42:
-                return False, "není to TIFF"
-            ifd = struct.unpack(o + "I", h[4:8])[0]
-            if ifd < 8 or ifd + 2 > velikost:
-                return False, "první IFD je mimo soubor"
-            f.seek(ifd)
-            pocet = struct.unpack(o + "H", f.read(2))[0]
-            konec = ifd + 2 + pocet * 12
-            if konec + 4 > velikost:
-                return False, "useknutá IFD"
-            f.seek(konec)
-            dalsi = struct.unpack(o + "I", f.read(4))[0]
-    except (OSError, struct.error) as e:
-        return False, f"nejde přečíst ({e})"
-    if dalsi != 0:
-        return False, "víc snímků (stran)"
-    return True, ""
-
-
 def _rada_tiff(cesta):
     jmeno = os.path.splitext(os.path.basename(cesta))[0]
     return (f"Rozděl ho na snímky: magick \"{cesta}\" pracovni/{jmeno}/s-%03d.tif – a jako vstup dej složku "
             f"pracovni/{jmeno}/.")
-
-
-def over_tiff(cesta):
-    if cesta.lower().endswith((".tif", ".tiff")):
-        ok, proc = jeden_snimek_tiff(cesta)
-        if not ok:
-            raise Chyba(f"{cesta}: TIFF odmítnut – {proc}. {_rada_tiff(cesta)}")
 
 
 def pocet_stran_pdf(pdfinfo, pdf):
@@ -492,7 +448,7 @@ def pocet_stran_pdf(pdfinfo, pdf):
 
 
 def strany(vstup):
-    """→ (druh, [{"jmeno", "obrazek"|"cislo"}], poppler). Kolize jmen a vícestránkový TIFF jsou chyba před OCR."""
+    """→ (druh, [{"jmeno", "obrazek"|"cislo"}], poppler). Kolize jmen jsou chyba před OCR."""
     if os.path.isdir(vstup):
         obr = sorted(f for f in os.listdir(vstup) if f.lower().endswith(PRIPONY) and not f.startswith("."))
         if not obr:
@@ -505,9 +461,7 @@ def strany(vstup):
             kmeny[k.lower()] = f
         out = []
         for f in obr:
-            p = os.path.join(vstup, f)
-            over_tiff(p)
-            out.append({"jmeno": os.path.splitext(f)[0], "obrazek": p})
+            out.append({"jmeno": os.path.splitext(f)[0], "obrazek": os.path.join(vstup, f)})
         return "slozka", out, None
     if not os.path.isfile(vstup):
         raise Chyba(f"{vstup}: soubor ani složka neexistuje.")
@@ -519,7 +473,6 @@ def strany(vstup):
         sirka = max(4, len(str(n)))
         return "pdf", [{"jmeno": "s%0*d" % (sirka, i), "cislo": i} for i in range(1, n + 1)], pdftoppm
     if vstup.lower().endswith(PRIPONY):
-        over_tiff(vstup)
         return "obrazek", [{"jmeno": os.path.splitext(os.path.basename(vstup))[0], "obrazek": vstup}], None
     raise Chyba(f"{vstup}: nepodporovaný vstup (PDF, {' '.join(PRIPONY)} nebo složka obrázků).")
 
@@ -742,6 +695,8 @@ def _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup)
             obr = s["obrazek"] if druh != "pdf" else vykresli(pdftoppm, vstup, s["cislo"], p["dpi"],
                                                                os.path.join(t, s["jmeno"]))
             text = tesseract_strana(tess, obr, model, tdir)
+        if "\f" in text.rstrip():   # Tesseract odděluje snímky vícestránkového TIFF znakem \f (i před prázdným prvním)
+            raise Chyba(f"víc stran v jednom souboru (vícestránkový TIFF). {_rada_tiff(obr)}")
         zapis_stranu(vystup, s["jmeno"], uprav_text(text, p["stare_znaky"]))
 
     # v poolu nejvýš `soubezne` stran, nic nečeká ve frontě: po Ctrl-C se čeká jen na právě běžící strany
