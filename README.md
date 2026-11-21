@@ -50,6 +50,7 @@ výměnek čp. 30 a statek čp. 1 v Lništi (obec Slavče, okres České Budějo
   dost kreditů; tarif Pro stačí na vyzkoušení. Skill funguje i v **Codexu** od OpenAI (instalace variantou B),
   vyzkoušený je hlavně v Claude Code.
 - Programy **Python 3, Node.js, ImageMagick a git**. Claude zkontroluje, co chybí, a pomůže s instalací.
+- Volitelně **Tesseract** a **Poppler**, pokud chcete převést na text vlastní skeny tištěných knih (OCR).
 - Volitelně účet na [Netlify](https://www.netlify.com) (zdarma), pokud chcete web zveřejnit.
 - Volitelně osobní klíč [Europeany](https://pro.europeana.eu/page/get-api) (zdarma) na staré obrázky obce
   z evropských sbírek. Klíč zůstane uložený u vás a posílá se jen Europeaně. Claude vám řekne, kde ho získat.
@@ -122,7 +123,10 @@ Skill je text (návod pro Clauda) a skripty v Pythonu, které si můžete před 
 MCP servery; skripty spouští jen Claude, když je potřebuje, a Claude Code se vás na ně zeptá. Zapisují do složky
 projektu, jen společný limit rychlosti k archivům si drží stav ve `~/.cache/dejiny-domu/`. Do projektu skill zapíše
 hook (`.claude/settings.json` → `tools/hlidac.py`), který Claudovi nedovolí posílat na weby dotazy mimo ten limit –
-archivy po sérii rychlých dotazů blokují IP adresu. Chodí na:
+archivy po sérii rychlých dotazů blokují IP adresu – ani spustit `sudo`, `su` nebo `doas` (ani s vaším souhlasem).
+Program, který potřebuje práva správce (např. Tesseract na Linuxu), vám Claude napíše jako příkaz a vy ho spustíte
+sami (v Claude Code `! sudo apt install …`, jinak v terminálu); `brew` a `winget` smí po vašem souhlasu spustit sám.
+Hook je pojistka proti omylu, ne neprůstřelná ochrana. Chodí na:
 - archivní portály, které to dovolují (ARON, AHMP, eBadatelna SOA Praha a MZA Brno – jen hledání, SOA Litoměřice
   – obrázkový server, Matricula, policejní přihlášky Národního archivu, sčítání Brna, Národní archivní portál);
   kde archiv nástroje nepouští (ZA Opava, snímky eBadatelny), otevřete snímek v prohlížeči vy,
