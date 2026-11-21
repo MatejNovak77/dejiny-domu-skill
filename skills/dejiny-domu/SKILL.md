@@ -24,6 +24,7 @@ Data se točí kolem **čísla popisného** a jeho držitelů a obyvatel v čase
 - `reference/metodika.md` – když běžný postup nestačí: čím spojit zápisy domu a lidí v čase, kdy zápis patří
   k tomuto domu a kdy jde o tutéž osobu, typické chyby, mrtvé body (vznik domu, staré číslo, před 1770, 20. století),
   prameny a lhůty mimo ČR
+- `reference/ocr.md` – hledání jmen v OCR textech, i zkomolených (pravidla záměn písmen projektu)
 
 ## Jak mluvit s uživatelem
 - **Česky, stručně, lidsky.** Žádný žargon bez vysvětlení (grunt, vejrunk, emfyteuze, indikační skica). Místo „commitnu“ „uložím“.
@@ -136,6 +137,13 @@ Pravidla kvality:
   (klíč zápisu, výřez, otázka, možnosti, tvůj návrh) a udělej z nich jednu stránku, kde uživatel u každého klikne na
   odpověď (artefakt s ukládáním odpovědí, jinak HTML s tlačítkem „stáhnout odpovědi“). Odpovědi zapiš i do deníku.
 
+### Hledání v OCR textech
+OCR staré sazby komolí jména („Gansbauden“ → „Sansbauben“). V textech hledej `tools/ocr_hledej.py hledej <jméno>`;
+`ocr_hledej.py kandidati <jméno>` najde blízká slova, která pravidla minula, a navrhne pravidlo do
+`data/ocr_zameny.json`. Pravidlo přidej (`pridej`) jen po souhlasu uživatele. Hledání zkomolenin sám nabídni, když
+přibyly OCR texty, když hledání čekaného jména vrátí méně než 3 nálezy, nebo když najdeš zkomoleninu, kterou nástroj
+minul – nejvýš jednou za konverzaci na slovo, nikdy po každém hledání. Postup: `reference/ocr.md`.
+
 ### Webové aplikace bez API – prohlížeč
 Když portál nemá nástroj ani čitelné API (mapové aplikace, prohlížeče snímků, nahlizenidokn, chartae-antiquae),
 **použij sám prohlížeč přes skill `agent-browser`**, nenechávej to na uživateli. **Neplatí** pro portály, které podle
@@ -244,6 +252,7 @@ Obecně a stručně, bez osobních údajů. Nic sám neposílej.
 | `data/pametnici.md`, `data/archivni_dotazy.md` | co víme od lidí; co jen v archivu |
 | `data/zajimavosti.md`, `data/pribeh.md`, `data/web.json`, `data/dokumenty.json`, `data/mista.json` | texty a nastavení webu, fotky, body na mapě |
 | `vyrezy/`, `zdroje/` | výřezy zápisů, map a dokumentů (web / plné rozlišení), název = klíč + `.jpg` |
+| `data/ocr_zameny.json` | záměny písmen v OCR textech projektu (`ocr_hledej.py`, zapisuje jen `pridej` po souhlasu) |
 | `dokumenty/`, `pracovni/` | originály od uživatele; pracovní soubory (nejdou na web) |
 | `tools/`, `web/` | nástroje (kopie ze skillu), web (Astro; data do něj jen přes `npm run data`) |
 
@@ -298,6 +307,7 @@ Vždy **projektovou kopii** `tools/`, nikdy `SKILL_DIR/tools/` (zapisovala by do
 | `ortofota.py serie <místo> [polomer] [--zapsat skupina]` | letecké snímky domu po letech 1998–2023 (ČÚZK, CC BY) a starší či chybějící ročníky krajů (jen ke čtení), stejný výřez (rovnou do `mapy.json`) |
 | `ipr_praha.py serie <místo> [polomer] [--zapsat skupina]` | Praha: staré plány 1791–1944 a letecké snímky 1938–2002 se stejným výřezem (rovnou do `mapy.json`) |
 | `dnnt.py hledej / kontext / ocr / adresa` | tisk 20. století (adresáře, Stavitelské listy, noviny): úryvky z neveřejných stran, OCR veřejných (i veřejných jen v jiné knihovně), hledání adresy. Neveřejné (DNNT) čte uživatel sám podle čtecího listu |
+| `ocr_hledej.py hledej / kandidati / pridej / odeber / pravidla` | jména v OCR textech `pracovni/` i zkomolená podle `data/ocr_zameny.json`; kandidáti s návrhem pravidla (`reference/ocr.md`) |
 | `zapis.py <soubor> <klíč> <vstup.json> [--sloucit \| --prepsat]` | přidá / změní položku v `zaznamy`, `svazky`, `prepisy`, `mapy`, `web` (pole nastavení webu)… beze změny formátu; náhradu, která by smazala pole, odmítne |
 | `zapis.py denik "<zdroj>" "<rozsah>" "<hledáno>" "<výsledek>" "<citace>"` | řádek deníku `research_log.md` s číslem a datem (pod zámkem, souběžné session) |
 | `kontrola.py` | kontrola dat, soukromí, kdy psát příběh |
