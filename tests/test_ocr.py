@@ -300,25 +300,20 @@ class TestDetekce(Zaklad):
         self.assertIn("tesseract: CHYBÍ", out)
 
     def test_windows_program_files(self):
-        env = {"ProgramFiles": r"C:\Program Files", "LOCALAPPDATA": r"C:\Users\x\AppData\Local"}
-        tess = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
         najdi = PUVODNI_NAJDI   # Zaklad ocr.najdi nahrazuje
-        self.assertEqual(najdi("tesseract", "win32", env, which=lambda p: None, existuje=lambda p: p == tess,
-                               hledej=lambda v: []), tess)
-        pop = [r"C:\Users\x\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin\pdftoppm.exe",
-               r"C:\Users\x\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-26.09.0\Library\bin\pdftoppm.exe"]
-        vzory = []
-        hledej = lambda v: (vzory.append(v), pop if v.startswith(env["LOCALAPPDATA"]) else [])[1]
-        self.assertEqual(najdi("pdftoppm", "win32", env, which=lambda p: None, existuje=lambda p: False,
-                               hledej=hledej), pop[1])
-        self.assertTrue(any(r"WinGet\Packages\oschwartz10612.Poppler*" in v for v in vzory))
-        links = r"C:\Users\x\AppData\Local\Microsoft\WinGet\Links\pdfinfo.exe"
-        self.assertEqual(najdi("pdfinfo", "win32", env, which=lambda p: None, existuje=lambda p: p == links,
-                               hledej=lambda v: []), links)
-        self.assertIsNone(najdi("tesseract", "linux", env, which=lambda p: None, existuje=lambda p: True,
-                                hledej=lambda v: ["x"]))
-        self.assertEqual(najdi("tesseract", "win32", env, which=lambda p: "C:\\bin\\tesseract.exe"),
-                         "C:\\bin\\tesseract.exe")
+        nikde = lambda p: None
+        self.assertEqual(najdi("tesseract", "win32", {"ProgramFiles": r"D:\Prg"}, which=nikde,
+                               existuje=lambda p: p == r"D:\Prg\Tesseract-OCR\tesseract.exe"),
+                         r"D:\Prg\Tesseract-OCR\tesseract.exe")
+        self.assertEqual(najdi("tesseract", "win32", {}, which=nikde,
+                               existuje=lambda p: p == r"C:\Program Files\Tesseract-OCR\tesseract.exe"),
+                         r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+        winget = lambda p: "WinGet" in p   # složky WinGet se už nehádají (Poppler patří do PATH)
+        self.assertIsNone(najdi("pdftoppm", "win32", {"LOCALAPPDATA": r"C:\Users\x\AppData\Local"}, which=nikde,
+                                existuje=winget))
+        self.assertEqual(najdi("pdftoppm", "win32", {}, which=lambda p: r"C:\bin\pdftoppm.exe", existuje=winget),
+                         r"C:\bin\pdftoppm.exe")
+        self.assertIsNone(najdi("tesseract", "linux", {}, which=nikde, existuje=lambda p: True))
 
     def test_list_langs_parse(self):
         self.assertEqual(ocr.rozbor_jazyku('List of available languages in "/opt/homebrew/share/tessdata/" (2):\n'

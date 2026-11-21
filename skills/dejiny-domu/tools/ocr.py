@@ -106,34 +106,15 @@ def vychozi_soubezne():
 
 # --- hledání programů a návody --------------------------------------------------------------------------------
 
-def najdi(program, platform=None, env=None, which=shutil.which, existuje=os.path.isfile, hledej=glob.glob):
-    """Cesta k programu: PATH, na Windows i obvyklé složky instalátorů (bez restartu po instalaci)."""
+def najdi(program, platform=None, env=None, which=shutil.which, existuje=os.path.isfile):
+    """Cesta k programu v PATH; na Windows navíc Program Files\\Tesseract-OCR (instalátor Tesseractu PATH nenastaví)."""
     platform = sys.platform if platform is None else platform
     env = os.environ if env is None else env
     p = which(program)
-    if p:
+    if p or platform != "win32":
         return p
-    if platform != "win32":
-        return None
-    exe = program + ".exe"
-    j = ntpath.join
-    kandidati, vzory = [], []
-    for pf in (env.get("ProgramFiles"), env.get("ProgramFiles(x86)"), r"C:\Program Files"):
-        if pf:
-            kandidati.append(j(pf, "Tesseract-OCR", exe))
-            vzory.append(j(pf, "WinGet", "Packages", "oschwartz10612.Poppler*", "*", "Library", "bin", exe))
-    la = env.get("LOCALAPPDATA")
-    if la:
-        kandidati += [j(la, "Programs", "Tesseract-OCR", exe), j(la, "Microsoft", "WinGet", "Links", exe)]
-        vzory.append(j(la, "Microsoft", "WinGet", "Packages", "oschwartz10612.Poppler*", "*", "Library", "bin", exe))
-    for k in kandidati:
-        if existuje(k):
-            return k
-    for v in vzory:
-        nalez = sorted(hledej(v))
-        if nalez:
-            return nalez[-1]   # nejnovější verze (poppler-26.09.0 > poppler-25.07.0)
-    return None
+    k = ntpath.join(env.get("ProgramFiles") or r"C:\Program Files", "Tesseract-OCR", program + ".exe")
+    return k if existuje(k) else None
 
 
 def navod(co, platform=None):
@@ -146,9 +127,11 @@ def navod(co, platform=None):
     if platform == "win32":
         return {"tesseract": f"Windows {PO_SOUHLASU}: winget install --id UB-Mannheim.TesseractOCR -e   (dá 5.4.0; novější instalátor "
                              "na https://github.com/UB-Mannheim/tesseract/wiki). PATH se nenastaví, ocr.py ho najde "
-                             "v Program Files i bez restartu.",
-                "poppler": f"Windows {PO_SOUHLASU}: winget install --id oschwartz10612.Poppler -e   (přenosný balíček; ocr.py ho "
-                           "najde ve WinGet\\Packages i bez restartu)"}[co]
+                             "ve výchozí složce Program Files\\Tesseract-OCR.",
+                "poppler": f"Windows {PO_SOUHLASU}: winget install --id oschwartz10612.Poppler -e   (přenosný balíček; winget "
+                           "přidá jeho složku do PATH, ale běžící terminál ji nevidí – zavři a znovu otevři terminál "
+                           "i Claude Code a ověř `where pdftoppm`; když ho nenajde, přidej složku …\\Library\\bin "
+                           "s pdftoppm.exe do proměnné PATH svého účtu)"}[co]
     return {"tesseract": f"Linux, {PRO_UZIVATELE}: sudo apt install tesseract-ocr   (Fedora: sudo dnf install tesseract)",
             "poppler": f"Linux, {PRO_UZIVATELE}: sudo apt install poppler-utils   (Fedora: sudo dnf install poppler-utils)"}[co]
 
