@@ -182,7 +182,8 @@ Postup:
 3. Čeština ve fraktuře (švabach, tisky před ~1850): model `german_print+ces`. Čeština antikvou: `ces`.
 4. `ocr.py <vstup>`; texty jsou `lit`, dokud nález neověříš ve skenu.
 
-Komplikace: Windows – Tesseract ani Poppler nejsou v PATH, `ocr.py` je najde v obvyklých složkách (restart není nutný).
+Komplikace: Windows – Tesseract instalátor do PATH nedá, `ocr.py` ho najde v `Program Files\Tesseract-OCR`; Poppler
+musí být v PATH (winget ho tam přidá, ale až nový terminál a nové Claude Code ho uvidí – ověř `where pdftoppm`).
 Uživatel na Linuxu bez práv `sudo` – příkaz dá správci. Selže stažení modelu – hláška obsahuje adresu a cílovou složku
 pro ruční stažení.
 
@@ -190,7 +191,7 @@ pro ruční stažení.
 | Systém | Tesseract | Poppler (jen PDF) |
 |---|---|---|
 | macOS | `brew install tesseract` (5.5.x) | `brew install poppler` |
-| Windows (neověřeno) | `winget install --id UB-Mannheim.TesseractOCR -e` (winget dává 5.4.0; novější instalátor na wiki UB Mannheim) | `winget install --id oschwartz10612.Poppler -e` (přenosný balíček ve `%LOCALAPPDATA%\Microsoft\WinGet\Packages\…\Library\bin`) |
+| Windows (neověřeno) | `winget install --id UB-Mannheim.TesseractOCR -e` (winget dává 5.4.0; novější instalátor na wiki UB Mannheim) | `winget install --id oschwartz10612.Poppler -e` (přenosný balíček; složku přidá do PATH – pak nový terminál; jinak `…\Library\bin` do PATH účtu ručně) |
 | Debian / Ubuntu | `sudo apt install tesseract-ocr` (Debian 12: 5.3, 13: 5.5, Ubuntu 22.04: 4.1) | `sudo apt install poppler-utils` |
 | Fedora | `sudo dnf install tesseract` | `sudo dnf install poppler-utils` |
 
@@ -241,7 +242,7 @@ Všechna pole jsou volitelná; aktualizace skillu soubor nepřepíše. Zapisuj h
 (`vychozi` pole smaže), prohlédni `ocr.py nastaveni`.
 ```json
 {"model": "german_print", "stare_znaky": "zjednodusit", "davka": 100, "soubezne": 4, "dpi": 300, "tessdata": "~/.local/share/tessdata",
- "prikaz": ["/cesta/k/programu", "{slozka}", "--lang", "{model}", "--out", "{vystup}"], "prikaz_verze": "program 2026-11"}
+ "prikaz": ["/cesta/k/programu", "{slozka}", "--lang", "{model}", "--out", "{vystup}"]}
 ```
 - `model` (přebije ho `--model`), `stare_znaky` `zjednodusit`|`ponechat`|`jen_s`, `dpi` 72–1200 (převod PDF), `soubezne` 1–64 (procesů
   Tesseractu najednou, výchozí polovina jader, nejvýš 4), `davka` 1–10000 (strany na jedno volání vlastního příkazu),
@@ -249,28 +250,36 @@ Všechna pole jsou volitelná; aktualizace skillu soubor nepřepíše. Zapisuj h
 - Chybný soubor nástroj odmítne s řádkem nebo polem (exit 1); neznámá pole jen vypíše jako varování.
 
 ## Vlastní příkaz
-Kdo má vlastní OCR program (třeba výpočetní cluster), nastaví `prikaz` – argv bez shellu. Nahrazují se jen
-`{slozka}` (dočasná složka se stranami `<strana>.<přípona>`, abecední pořadí = pořadí stran), `{vystup}` (prázdná
-dočasná složka) a `{model}`; `{slozka}` a `{vystup}` jsou povinné. Program musí do `{vystup}` zapsat buď
-(a) `<strana>.txt` pro každou stranu (doporučeno), nebo (b) jeden `<jméno {slozka}>.txt`, kde **každá** strana končí
-znakem `\f`. U (b) nejde pořadí stran ověřit: nástroj varuje a do manifestu zapíše `"vystup_prikazu": "spojeny"`;
-ověř pár stran podle skenu, nebo nastav `davka 1`.
-- Bez `{model}` je model „neověřený“. Ani s ním skill soubory modelu neověří (`model_overen: false`).
+Kdo má vlastní OCR program (třeba výpočetní cluster), nastaví `prikaz` – argv bez shellu. Nahrazují se `{slozka}`
+(dočasná složka se stranami `p0001.<přípona>`, `p0002…` – pořadí jmen = pořadí stran), `{vystup}` (prázdná dočasná
+složka) a `{model}`; všechny tři jsou povinné (manifest pak nese model, který program opravdu použil). Program zapíše
+do `{vystup}` **jeden** `.txt` (jméno libovolné), za **každou** stranou znak konce stránky `\f` (tak píše např.
+`ocr --no-pdf`); jiný počet `\f` nebo text za posledním je chyba dávky.
 - Návratový kód ≠ 0 nebo nesedící výstup: dávka se zahodí, hotové dávky zůstanou, exit 1.
-- Dodělat složku z dřívějšího běhu jde jen s `prikaz_verze` (text, který změníš při každé změně programu nebo modelu).
-  Bez něj další běh do složky se stranami skončí exit 1; zvol `--vystup` s novou složkou.
-- Výstup vlastního příkazu a vestavěného Tesseractu se ve stejné složce nikdy nesmíchá.
+- Dodělává se stejně jako u vestavěného Tesseractu (i složka, kterou začal Tesseract) – hlídá se model, ne program.
+  Změníš-li program, ale ne model, spusť s `--znovu`.
+- Program může staré znaky převádět sám (např. `ſ → s` vždy), takže `stare_znaky ponechat` pak `ſ` nevrátí.
+- Vícestránkový TIFF před vlastním příkazem rozděl (`magick`, níže): program, který čte jen první snímek, zbytek
+  tiše vynechá a nástroj to nepozná (počet stran sedí).
+- Ctrl-C během příkazu: nástroj počká, až program skončí (další Ctrl-C ho ukončí hned).
 
 ## Výstup, manifest a dodělání
 - `pracovni/ocr/<dokument>/<strana>.txt` (UTF-8, LF): PDF dává `s0001.txt`…, obrázek své jméno (`a-001.jpg` →
-  `a-001.txt`). Jinam `--vystup SLOŽKA`, jen část PDF `--strany 1-40`.
-- Vícestránkový TIFF se odmítne; rozdělí ho `magick vstup.tif pracovni/<jméno>/s-%03d.tif` a vstupem je pak složka.
-- `ocr_manifest.json` (zapíše se před první stranou) drží sha256 vstupu (u složky každého obrázku), model a sha256
-  použitých souborů modelu, verzi Tesseractu nebo šablonu příkazu, převod PDF (dpi, verze pdftoppm) a staré znaky
-  (`stare_znaky`; starší manifest má `dlouhe_s`, `s` se bere jako `jen_s`).
-- Opakované spuštění dodělá jen chybějící strany (hotová = existující `.txt`, i prázdný). Liší-li se cokoli z manifestu
-  (jiné bajty PDF, jiný model, dpi, staré znaky, změněný obrázek hotové strany), skončí exit 1 se jmény polí a nic
-  nezmění; pak `--vystup` s novou složkou, nebo starou složku smaž. Nové obrázky ve složce se jen připíšou.
-- Do jedné složky zapisuje vždy jen jeden běh (`.ocr.lock`); druhý hned skončí „jiný běh OCR“.
+  `a-001.txt`). Jinam `--vystup SLOŽKA`, jen část PDF `--strany 1-40`. Víc vstupů najednou: vadný vstup ostatní
+  nezastaví, na konci je výpis „Nehotové vstupy“ a exit 1.
+- Vícestránkový TIFF (Tesseract z něj vrátí víc stran) je chyba té strany; rozdělí ho
+  `magick vstup.tif pracovni/<jméno>/s-%03d.tif` a vstupem je pak složka.
+- `ocr_manifest.json` (zapíše se před první stranou) hlídá, aby se v jedné složce nesmíchaly dva druhy výstupu:
+  porovnává zdroj (druh, jméno, u PDF počet stran), model, staré znaky a u PDF dpi. Verze Tesseractu, Poppleru nebo
+  šablonu příkazu jen zaznamená – aktualizace programů dodělání neblokuje.
+- **Nehlídá** obsah souborů: vyměníš-li sken nebo PDF pod stejným jménem (a počtem stran) nebo soubor modelu pod
+  stejným názvem, spusť s `--znovu`, jinak se nové strany přimíchají ke starým.
+- Opakované spuštění dodělá jen chybějící strany (hotová = existující `.txt`, i prázdný). Nesoulad s manifestem:
+  exit 1, výpis `pole: staré → nové`, nic se nezmění. Pak `--znovu` (smaže texty stran a manifest v té složce, jiné
+  soubory nechá, a udělá dokument celý znovu), nebo `--vystup` s novou složkou. `--znovu` ve složce se stranami bez
+  manifestu nic nesmaže (složka nemusí být nástroje). Nové obrázky ve složce se jen připíšou.
+- Do jedné složky zapisuje vždy jen jeden běh (`.ocr.lock`); druhý hned skončí „jiný běh OCR“. Tesseract a modely
+  se kontrolují dřív, než výstupní složka vznikne.
+- Ctrl-C: běh skončí hned po právě rozpracovaných stranách, vypíše, kolik je hotovo, a další spuštění dodělá zbytek.
 - Exit: 0 hotovo, 1 selhání nebo nesoulad (vadné strany se při dalším běhu dodělají), 2 něco chybí (Tesseract,
-  Poppler, model).
+  Poppler, model – skončí hned, i při víc vstupech), 130 přerušeno (Ctrl-C).

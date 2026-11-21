@@ -2,11 +2,11 @@
 Postup, volba modelu, staré znaky (ſ, ꝛ, aͤ) a vlastní příkaz: reference/ocr.md.
 
 Použití (z kořene projektu):
-  ocr.py <vstup>… [--model M] [--vystup SLOŽKA] [--strany A-B]
+  ocr.py <vstup>… [--model M] [--vystup SLOŽKA] [--strany A-B] [--znovu]
       vstup = PDF (potřebuje Poppler: pdftoppm, pdfinfo), obrázek (.jpg .jpeg .png .tif .tiff) nebo složka obrázků
       (pořadí stran = abecední pořadí jmen). Text: <strana>.txt (PDF s0001.txt…, obrázek a-001.jpg → a-001.txt).
-      Opakované spuštění dodělá jen chybějící strany; ocr_manifest.json hlídá, že se nemíchají různé vstupy,
-      modely ani cesty OCR (jinak exit 1 s výpisem rozdílných polí).
+      Opakované spuštění dodělá jen chybějící strany; ocr_manifest.json hlídá, že se nemíchají různé zdroje, modely,
+      staré znaky ani dpi (jinak exit 1 s výpisem rozdílů). --znovu smaže hotové strany a udělá dokument celý znovu.
   ocr.py stav [--model M]          co chybí (Tesseract, Poppler, model) a návod pro tento systém; bez sítě
   ocr.py modely                    známé modely a kde jsou nainstalované
   ocr.py nastaveni                 platné nastavení (data/ocr.json a výchozí hodnoty)
@@ -14,7 +14,7 @@ Použití (z kořene projektu):
       klíče: model, stare_znaky (zjednodusit|ponechat|jen_s), prikaz (JSON seznam), davka,
       soubezne, dpi, tessdata; zastaralé dlouhe_s (s|ponechat) se zapíše jako stare_znaky
   ocr.py stahni <model>…           stáhne známý model (jen po souhlasu uživatele; jen přes slusne.py)
-Exit: 0 vše hotovo, 1 selhání nebo nesoulad, 2 něco není nainstalované.
+Exit: 0 vše hotovo, 1 selhání nebo nesoulad, 2 něco není nainstalované, 130 přerušeno (Ctrl-C; další běh dodělá).
 Samotné OCR nic nestahuje.
 """
 import concurrent.futures, contextlib, glob, hashlib, itertools, json, ntpath, os, re, shutil, subprocess, sys, tempfile
