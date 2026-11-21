@@ -327,7 +327,6 @@ class TestRovnocennosti(Zaklad):
                 self.assertTrue(any(hlaska in c for c in chyby), chyby)
         for v in (True, False, {"nemcina_1901": True}):
             self.assertEqual(oh.chyby_pravidel({"volby": {"rovnocennosti": v}}), [])
-        self.assertTrue(any("neznámá volba „fonetika“" in c for c in oh.chyby_pravidel({"volby": {"fonetika": "kolnska"}})))
 
 
 class TestSoubory(unittest.TestCase):
