@@ -1,6 +1,6 @@
 """Testy ocr_hledej.py: hledání v OCR textech se záměnami písmen podle pravidel projektu. Bez internetu.
 Zápis pravidel (pridej / odeber) přes skutečný nástroj v projektu testuje test_nastroje.py (TestOcrHledej)."""
-import contextlib, inspect, io, os, re, shutil, sys, tempfile, time, unittest
+import contextlib, inspect, io, os, re, shutil, sys, tempfile, unittest
 
 KOREN = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILL = os.path.join(KOREN, "skills", "dejiny-domu")
@@ -327,34 +327,7 @@ class TestRovnocennosti(Zaklad):
                 self.assertTrue(any(hlaska in c for c in chyby), chyby)
         for v in (True, False, {"nemcina_1901": True}):
             self.assertEqual(oh.chyby_pravidel({"volby": {"rovnocennosti": v}}), [])
-        self.assertEqual(oh.chyby_pravidel({"volby": {"fonetika": "kolnska"}}), [])
-        self.assertTrue(oh.chyby_pravidel({"volby": {"fonetika": "soundex"}}))
-
-    def test_55_kolnsky_kod(self):
-        k = oh.kolnsky_kod
-        self.assertEqual(k("Müller-Lüdenscheidt"), "65752682")
-        self.assertEqual(k("Wikipedia"), "3412")
-        self.assertEqual(k("Breschnew"), "17863")
-        self.assertEqual({k(w) for w in ("Meyer", "Maier", "Mayer", "Meier")}, {"67"})
-        self.assertEqual({k(w) for w in ("Müller", "Mueller", "Mu\u0364ller")}, {"657"})
-        self.assertEqual({k(w) for w in ("Schmid", "Schmidt", "Schmitt")}, {"862"})
-        self.assertEqual(k("Christoph"), "47823")    # C na začátku před H → 4, P před H → 3
-        self.assertEqual(k("Kerschner"), "47867")    # C po S → 8
-        self.assertEqual(k("Kx"), "48")              # X po K → 8
-        self.assertEqual(k("Ax"), "048")             # X jinde → 48, samohláska na začátku 0
-        self.assertEqual(k("Fruß"), k("Fruss"))
-
-    def test_57_fonetika_doba(self):
-        d = tempfile.mkdtemp(prefix="ocr_hledej_")
-        try:
-            with open(os.path.join(d, "a.txt"), "w", encoding="utf-8") as f:
-                f.write("Aa " * 500_000 + "\n" + "Z" * 1_000_000 + "\n")
-                f.write(" ".join(f"Z{i}" for i in range(200_001)) + "\n")
-            t = time.monotonic()
-            self.assertEqual(oh.fonetika(["Zinecker"], [d]), {"Zinecker": {}})
-            self.assertLess(time.monotonic() - t, 10.0)   # naměřeno ~1 s
-        finally:
-            shutil.rmtree(d, ignore_errors=True)
+        self.assertTrue(any("neznámá volba „fonetika“" in c for c in oh.chyby_pravidel({"volby": {"fonetika": "kolnska"}})))
 
 
 class TestSoubory(unittest.TestCase):
@@ -430,29 +403,6 @@ class TestSoubory(unittest.TestCase):
             for tvar, _, _, r, _ in oh.hledej(slovo, [f]):
                 self.assertEqual(r.encode("utf-8"), radek.encode("utf-8"))
                 self.assertIn(tvar, radek)
-
-    def test_56_fonetika(self):
-        f = self.soubor("a.txt", "Herr Zinnecker und Zinecker\nZinnecker zinnecker Meyer\n")
-        self.assertEqual([t for t, *_ in oh.hledej("Zinecker", [f])], ["Zinecker"])
-        fon = oh.fonetika(["Zinecker", "Gansbauden"], [f])
-        self.assertEqual(fon["Gansbauden"], {})
-        fon = fon["Zinecker"]
-        self.assertEqual(list(fon), ["Zinnecker"])           # Zinecker najde automat, malé zinnecker ne
-        self.assertEqual(fon["Zinnecker"][0], 2)
-        self.assertEqual(fon["Zinnecker"][1][1], 1)
-        out, err = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as e:
-            oh.main(["hledej", "Meyer", "--fonetika", "kolnska", "--", f])
-        self.assertIn("krátký kód", str(e.exception.code))
-        self.assertEqual(out.getvalue(), "")
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            oh.main(["hledej", "Zinecker", "--fonetika", "kolnska", "--", f])
-        self.assertIn("Zinecker\tfonetika\tZinnecker\t2×", out.getvalue())
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            oh.main(["hledej", "Zinecker", "--", f])
-        self.assertNotIn("fonetika", out.getvalue())
 
     def cli(self, *argv):
         out, err = io.StringIO(), io.StringIO()
