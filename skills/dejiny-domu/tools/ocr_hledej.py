@@ -2,7 +2,7 @@
 Výchozí rovnocennosti platí i bez souboru pravidel: ſ = s, ꝛ = r, ß = ss, ä ö ü = ae oe ue = aͤ oͤ uͤ, rozložené
 tvary písmen (e + U+030C = ě), měkké dělení U+00AD a česká sada pravopisu před 1849 (Wáclaw, Gilemnice). Jsou to
 čtení hledaného slova – prohledávaný text se nemění. Záměny písmen z OCR jsou pravidla projektu
-v data/ocr_zameny.json (bez souboru = celé slovo s rovnocennostmi a českými koncovkami). Postup: reference/ocr.md.
+v data/ocr_zameny.json (bez souboru = celé slovo s rovnocennostmi, českými koncovkami a genitivem -s/-es). Postup: reference/ocr.md.
 
 Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všech *.txt v pracovni/):
   ocr_hledej.py hledej <slovo>… [--tvary ceske|presne|volne] [--vypis souhrn|radky]
@@ -41,7 +41,7 @@ VELKA = frozenset(c for c in _LATIN if c.isupper())      # velké za slovem jen 
 DELENI = "-⸗=¬"                                          # znaky dělení slova („Gans-bauden“, „Gans⸗ bauden“)
 MEZER_PO_DELENI = 250                                    # nejvíc bílých znaků po znaku dělení (i přes konec řádku)
 KONCOVKY = ("a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův ova ovo ovu ovy ovic").split()
-NEMECKE = ("es", "s")   # německý genitiv (Zineckers, Krauses); holé s ne po s ß x z (Krauss je jiný pravopis)
+NEMECKE = ("es", "s")   # německý genitiv (Zineckers, Krauses); holé s ne po s ß ſ x z (Krauss je jiný pravopis)
 TVARY = ("ceske", "presne", "volne")
 SEKCE = ("poznamka", "zameny", "skupiny", "vyloucit", "volby")
 VOLBY_BOOL = ("deleni_slova", "chybi_prvni_pismeno")
@@ -393,7 +393,7 @@ class Vzor:
             # OCR vynechalo první písmeno: další dvě písmena jen s rovnocennostmi (ö = oe, ß = ss), bez záměn
             # projektu (jinak Bönisch najde „Erich“), zbytek od pozice čtvrtého znaku (přehláska = dvě pozice)
             jadro = f"(?:{jadro}|{_cteni_re(slovo[1:3].lower(), zap)[1]}{R[zac[3]]})"
-        nem = [k for k in NEMECKE if k != "s" or slovo[-1].lower() not in "sßxz"]
+        nem = [k for k in NEMECKE if k != "s" or slovo[-1].lower() not in "sßſxz"]
         konec = _nebo((len(k), re.escape(k)) for k in KONCOVKY + nem) + "?" if self.tvary == "ceske" else ""
         m = _tr(MALA)
         za = ((f"(?-i:(?!{m}|(?<!{m}){_tr(VELKA)}))" if self.tvary != "volne" else "")
@@ -920,7 +920,7 @@ def main(argv):
     if prikaz == "pravidla":
         p = _precti(PRAVIDLA)
         if p is None:
-            print("Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo s českými koncovkami.")
+            print("Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo s českými koncovkami a genitivem -s/-es.")
         else:
             print(json.dumps(p, ensure_ascii=False, indent=1))
         zap = zapnute(p)

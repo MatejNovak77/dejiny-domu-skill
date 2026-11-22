@@ -203,6 +203,7 @@ class TestVzor(Zaklad):
                             ("Zinecker", "Zineckerss"), ("Zinecker", "Zineckerses"), ("Zinecker", "Zineckerovas")):
             with self.subTest(text=text):
                 self.nenajde(slovo, text)
+        self.nenajde("Frieſ", "Frieſs", VYP)   # bez rovnocenností zůstane ſ ve slově – strážce ho bere jako s
 
 VYP = {"volby": {"rovnocennosti": False}}
 
