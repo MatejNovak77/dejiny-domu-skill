@@ -1382,7 +1382,9 @@ class TestOcrHledej(Projekt):
                 self.assertNotEqual(p.returncode, 0)
                 self.assertEqual(p.stdout, "")
                 self.assertIn("--volba", p.stderr)
+        self.assertIn("celé slovo i rozdělené přes řádek", self.nastroj("ocr_hledej.py", "pravidla").stdout)
         self.nast("nastav", "ocr_hledej.deleni_slova", "ne")   # z nastavení bez --volba, --volba ho přebije
+        self.assertIn("hledá se celé slovo, s českými", self.nastroj("ocr_hledej.py", "pravidla").stdout)
         p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
         self.assertIn("# Lhotecky: 0 výskytů", p.stderr)
         p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", "--volba", "deleni_slova=ano")

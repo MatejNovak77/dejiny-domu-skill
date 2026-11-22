@@ -948,11 +948,12 @@ def main(argv):
         return
     if prikaz == "pravidla":
         p = _precti(PRAVIDLA)
+        v = volby_hledani()
         if p is None:
-            print("Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo i rozdělené přes řádek, s českými koncovkami a genitivem -s/-es.")
+            deleni = " i rozdělené přes řádek" if v["deleni_slova"] else ""
+            print(f"Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo{deleni}, s českými koncovkami a genitivem -s/-es.")
         else:
             print(json.dumps(p, ensure_ascii=False, indent=1))
-        v = volby_hledani()
         zap = zapnute({"volby": v})
         print(f"Volby: deleni_slova={'ano' if v['deleni_slova'] else 'ne'}, "
               f"chybi_prvni_pismeno={'ano' if v['chybi_prvni_pismeno'] else 'ne'}, tvary={v['tvary']} "
