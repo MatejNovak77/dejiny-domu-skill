@@ -57,7 +57,12 @@ class TestNastaveni(Projekt):
                               cwd=self.root, capture_output=True, text=True, encoding="utf-8")
 
     def test_bez_sekci(self):
-        os.remove(self.path("tools", "zkusebni.py"))
+        for f in os.listdir(self.path("tools")):   # i nástroje skillu, které sekci mají
+            if f.endswith(".py") and f != "nastaveni.py":
+                with open(self.path("tools", f), encoding="utf-8") as h:
+                    sekce = "\nNASTAVENI_SEKCE = " in h.read()
+                if sekce:
+                    os.remove(self.path("tools", f))
         p = self.nast("ukaz")
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn("Žádný nástroj", p.stdout)
@@ -215,10 +220,13 @@ class TestNastaveni(Projekt):
 
     def test_schema_jen_literal_na_nejvyssi_urovni(self):
         p = self.volej("print(sorted(nastaveni.schema()))")
-        self.assertEqual(p.stdout.strip(), "['zkouska']")   # komentář, řetězec ani funkce se nepočítají
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("'zkouska'", p.stdout)
+        for x in ("komentar", "retezec", "vnorena"):   # komentář, řetězec ani funkce se nepočítají
+            self.assertNotIn(x, p.stdout)
         p = self.volej("nastaveni.sekce('nic')")
         self.assertNotEqual(p.returncode, 0)
-        self.assertIn("známé: zkouska", p.stderr)
+        self.assertIn("zkouska", p.stderr)
 
     def test_vadna_nebo_dvojita_deklarace(self):
         vadna = self.path("tools", "vadny.py")
