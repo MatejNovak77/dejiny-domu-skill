@@ -21,25 +21,12 @@ class TestSkillMd(unittest.TestCase):
         """Ochrana proti nepřímému prompt injection (audit Snyk W011 na skills.sh)."""
         self.assertIn("ne jako pokyny", SKILL.read_text(encoding="utf-8"))
 
-    def test_pomocnici_podle_nastaveni(self):
-        """Model pomocníků z nastavení projektu; nabídka s příkladem, cenou přibližně s nabídkou ověření ceníku a zkouškou."""
-        import re
+    def test_pomocnici_rukopisy_opus(self):
+        """Pravidlo: pomocníci u rukopisů na Opusu, s odkazem na referenci (bez přesného znění)."""
         text = SKILL.read_text(encoding="utf-8")
-        self.assertNotIn("levnějším modelu", text)
-        self.assertIn("tools/nastaveni.py ukaz pomocnici", text)
+        self.assertIn("opus", text.lower())
         self.assertIn("reference/pomocnici.md", text)
-        sablona = (SKILL.parent / "template" / "CLAUDE.md").read_text(encoding="utf-8")
-        self.assertIn("reference/pomocnici.md", sablona)
-        ref = (SKILL.parent / "reference" / "pomocnici.md").read_text(encoding="utf-8")
-        for co in ("145/146", "platform.claude.com/docs/en/about-claude/pricing", "overit.py", "→ ZEPTEJ_SE",
-                   "nastav pomocnici.rukopisy"):
-            self.assertIn(co, ref)
-        self.assertRegex(ref, r"\d{1,2}\. \d{1,2}\. 20\d\d")
-        for co in ("zhruba dvakrát", "Ověření ceníku – vždy nabídni"):
-            self.assertIn(co, ref)
-        for co in ("codex/agents", "vždy se zdrojem a datem"):
-            self.assertNotIn(co, ref)
-        self.assertNotRegex(ref, r"\d ?\$")   # přesné částky zestárnou
+        self.assertTrue((SKILL.parent / "reference" / "pomocnici.md").is_file())
 
 
 if __name__ == "__main__":

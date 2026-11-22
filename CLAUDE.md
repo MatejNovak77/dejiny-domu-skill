@@ -46,8 +46,6 @@ Nejnižší Node = nejvyšší `engines.node` v locku (teď undici ≥ 22.19): o
 
 `python3 -I skills/dejiny-domu/tools/zdravi.py` – všechny portály musí projít (výpadek zkus znovu za chvíli).
 
-Poměr cen Opus/Sonnet v `reference/pomocnici.md`: ověř na ceníku a aktualizuj datum.
-
 ## Vydání verze
 
 1. Verze v `.claude-plugin/plugin.json`, `skills/dejiny-domu/VERZE` a README („Aktuální verze“) → commit `release: X.Y.Z`.
