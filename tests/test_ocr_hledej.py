@@ -204,6 +204,15 @@ class TestVzor(Zaklad):
             with self.subTest(text=text):
                 self.nenajde(slovo, text)
         self.nenajde("Frieſ", "Frieſs", VYP)   # bez rovnocenností zůstane ſ ve slově – strážce ho bere jako s
+        # genitiv jen za slovem s rovnocennostmi, ne přes záměny projektu (šum Kreuzes, Kranzes v korpusu HB)
+        z = {"zameny": {"a": ["e"], "s": ["z"], "d": ["b"]}}
+        for slovo, je, neni in (("Kraus", "Kreuz", "Kreuzes"), ("Krause", "Kreuze", "Kreuzes"),
+                                ("Adolf", "Abolf", "Abolfs")):
+            with self.subTest(slovo=slovo):
+                self.najde(slovo, je, z)
+                self.nenajde(slovo, neni, z)
+        for slovo, text in (("Kraus", "Krauses"), ("Adolf", "Adolfs"), ("Fischer", "Fiſchers"), ("Hackel", "HACKELS")):
+            self.najde(slovo, text, z)
 
 VYP = {"volby": {"rovnocennosti": False}}
 

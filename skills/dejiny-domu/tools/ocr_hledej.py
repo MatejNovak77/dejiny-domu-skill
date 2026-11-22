@@ -11,7 +11,8 @@ Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všec
         --vypis radky: řádek na nález (slovo, tvar, soubor:řádek, ukázka); počty a počet souborů na stderr
       hranice (mimo --tvary volne): za nálezem nesmí být malé písmeno, velké jen po malém (FischerDavid ano,
         FISCHERDAVID ne)
-      --tvary ceske (výchozí): české koncovky a německý genitiv -s/-es (Zineckers, Krauses; ne Krauss)
+      --tvary ceske (výchozí): české koncovky a německý genitiv -s/-es (Zineckers, Krauses; ne Krauss),
+        genitiv jen za slovem bez záměn projektu
   ocr_hledej.py kandidati <slovo>… [--vzdalenost N] [--max 40] [--tvary …] [--pravidla <json>] [-- …]
       → slova blízká hledanému, která pravidla nenajdou, s počtem, ukázkou a návrhem pravidla; nic nezapíše
   ocr_hledej.py pridej|odeber zamena <znak> <čtení>…
@@ -41,7 +42,8 @@ VELKA = frozenset(c for c in _LATIN if c.isupper())      # velké za slovem jen 
 DELENI = "-⸗=¬"                                          # znaky dělení slova („Gans-bauden“, „Gans⸗ bauden“)
 MEZER_PO_DELENI = 250                                    # nejvíc bílých znaků po znaku dělení (i přes konec řádku)
 KONCOVKY = ("a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův ova ovo ovu ovy ovic").split()
-NEMECKE = ("es", "s")   # německý genitiv (Zineckers, Krauses); holé s ne po s ß ſ x z (Krauss je jiný pravopis)
+NEMECKE = ("es", "s")   # německý genitiv (Zineckers, Krauses) jen za slovem bez záměn projektu; holé s ne po
+                        # s ß ſ x z (Krauss je jiný pravopis)
 TVARY = ("ceske", "presne", "volne")
 SEKCE = ("poznamka", "zameny", "skupiny", "vyloucit", "volby")
 VOLBY_BOOL = ("deleni_slova", "chybi_prvni_pismeno")
@@ -393,12 +395,17 @@ class Vzor:
             # OCR vynechalo první písmeno: další dvě písmena jen s rovnocennostmi (ö = oe, ß = ss), bez záměn
             # projektu (jinak Bönisch najde „Erich“), zbytek od pozice čtvrtého znaku (přehláska = dvě pozice)
             jadro = f"(?:{jadro}|{_cteni_re(slovo[1:3].lower(), zap)[1]}{R[zac[3]]})"
-        nem = [k for k in NEMECKE if k != "s" or slovo[-1].lower() not in "sßſxz"]
-        konec = _nebo((len(k), re.escape(k)) for k in KONCOVKY + nem) + "?" if self.tvary == "ceske" else ""
+        konec = _nebo((len(k), re.escape(k)) for k in KONCOVKY) + "?" if self.tvary == "ceske" else ""
+        jadro += konec
+        if self.tvary == "ceske":
+            # genitiv jen za slovem čteným s rovnocennostmi, ne přes záměny projektu (Kraus + záměny ≠ „Kreuzes“)
+            nem = [(len(k), re.escape(k)) for k in NEMECKE if k != "s" or slovo[-1].lower() not in "sßſxz"]
+            cele = _slovo_re(slovo, *_uprav_pravidla(*_sloucena({}, zap), zap), zap, self.znaky_deleni)[0][0]
+            jadro = f"(?:{cele}{_nebo(nem)}|{jadro})"
         m = _tr(MALA)
         za = ((f"(?-i:(?!{m}|(?<!{m}){_tr(VELKA)}))" if self.tvary != "volne" else "")
               + (f"(?![{_znaky_m()}])" if zap else ""))
-        self._re = re.compile(f"(?<![{re.escape(PISMENA)}\\-]){jadro}{konec}{za}", re.IGNORECASE)
+        self._re = re.compile(f"(?<![{re.escape(PISMENA)}\\-]){jadro}{za}", re.IGNORECASE)
         # výjimka, kterou vzor výjimek najde v hledaném slově, neplatí (Strasse s výjimkou Straße)
         vyl = [t for t in p.get("vyloucit", {}) if not _vyjimky_re([t], zap).search(puvodni.casefold())]
         self._vyloucit = _vyjimky_re(vyl, zap) if vyl else None
