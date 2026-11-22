@@ -12,31 +12,32 @@ a složky. Soubory se čtou po řádcích (i stovky MB), kódování UTF-8 (jina
 ## Příkazy
 ```
 python3 -I tools/ocr_hledej.py hledej Gansbauden Zinecker [--tvary ceske|presne|volne] [-- složka/ soubor.txt]
+python3 -I tools/ocr_hledej.py hledej Lniště --volba deleni_slova=ne    # volba jen pro tento běh, nic nezapíše
 python3 -I tools/ocr_hledej.py hledej Zinecker --vypis radky   # řádek na každý nález místo souhrnu
 python3 -I tools/ocr_hledej.py kandidati Gansbauden [--vzdalenost N] [--max 40] [-- …]
 python3 -I tools/ocr_hledej.py pridej zamena s f &        # odeber … totéž obráceně
 python3 -I tools/ocr_hledej.py pridej skupina ck d &
 python3 -I tools/ocr_hledej.py pridej vyloucit hald --proc "Gänshalde: b→h a au→al"
-python3 -I tools/ocr_hledej.py pridej volba deleni_slova   # [ano|ne]; volba tvary presne
-python3 -I tools/ocr_hledej.py odeber rovnocennost prehlasky   # pridej … zapne; vse = všechny (odeber vse = vypnout)
 python3 -I tools/ocr_hledej.py pravidla                    # pravidla + zapnuté rovnocennosti
+python3 -I tools/nastaveni.py ukaz ocr_hledej              # volby hledání s hodnotou, výchozí hodnotou a popisem
+python3 -I tools/nastaveni.py nastav ocr_hledej.deleni_slova ne    # volba; „vychozi“ ji vrátí na výchozí
 ```
 `hledej` vypíše souhrn: řádek na každý nalezený tvar (doslova, jak stojí v textu) – slovo, tvar, počet×, první tři
 místa `soubor:řádek` (a kolik dalších), ukázka kolem prvního nálezu; od nejčastějšího tvaru. `--vypis radky` dá řádek
 na každý nález (slovo, tvar, `soubor:řádek`, ukázka). Na stderr pravidla a rovnocennosti, počet prohledaných souborů
 a počet výskytů každého slova; hledané slovo, které je existující cesta, ohlásí (soubory a složky patří za `--`). `kandidati` vypíše slova blízká hledanému, která pravidla nenajdou: tvar, počet, vzdálenost,
-**návrh pravidla** (přesně jako argumenty `pridej`) a první výskyt. Nic nezapíše. Slova do 4 písmen chtějí
+**návrh pravidla** (přesně jako argumenty `pridej`) nebo volby (`nastav ocr_hledej.…` = argumenty `nastaveni.py`)
+a první výskyt. Nic nezapíše. Slova do 4 písmen chtějí
 `--vzdalenost N` (jinak by kandidátů bylo moc).
 
 ## Formát `data/ocr_zameny.json`
-Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s výchozími rovnocennostmi, českými koncovkami a genitivem `-s`/`-es`.
+Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo i rozdělené přes řádek, s výchozími
+rovnocennostmi, českými koncovkami a genitivem `-s`/`-es`.
 ```json
 {"poznamka": "fraktura, Tesseract",
  "zameny":   {"s": ["f", "&"], "G": ["S", "B"], "m": ["rn"]},
  "skupiny":  {"ck": ["&", "d"], "au": ["ml"]},
- "vyloucit": {"hald": "Gänshalde: b→h a au→al"},
- "volby":    {"deleni_slova": true, "chybi_prvni_pismeno": true, "tvary": "ceske",
-              "rovnocennosti": {"nemcina_1901": true}}}
+ "vyloucit": {"hald": "Gänshalde: b→h a au→al"}}
 ```
 - `zameny`: jeden znak → čím ho OCR čte (doslovné texty, ne regex). Velikost písmen se při hledání nerozlišuje
   (Fries najde FRIES i fries). Pravidlo platí pro písmeno, jak stojí v hledaném slově: „s“ pro s, „S“ pro S – velká
@@ -47,17 +48,23 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
 - `vyloucit`: text → důvod. Nález, jehož slovo (od začátku nálezu do mezery) text obsahuje, se zahodí; časté falešné
   shody záměn. Bez ohledu na velikost písmen a s rovnocennostmi (`Müllerova` vyloučí i `Muellerova`, `MÜLLEROVA`;
   `Straße` i `STRASSE`). Neplatí, když je text v hledaném slově.
-- `volby.deleni_slova`: slovo rozdělené znakem `- ⸗ = ¬` (i přes konec řádku; nález se hlásí na prvním řádku, tvar s ⏎).
-- `volby.chybi_prvni_pismeno`: OCR vynechalo první písmeno (jen slova delší než 6; další dvě písmena musí sedět –
+
+Volby hledání nejsou v souboru pravidel, ale v nastavení projektu (`data/nastaveni.json`, sekce `ocr_hledej`): vypíše
+je `nastaveni.py ukaz ocr_hledej`, zapíše se souhlasem uživatele `nastaveni.py nastav ocr_hledej.<klíč> <hodnota>`, na jeden
+běh bez zápisu `--volba <klíč>=<hodnota>`. Soubor pravidel se starou sekcí `volby` nástroj odmítne a vypíše přesné
+příkazy, jak volby přenést – proveď je po souhlasu uživatele a sekci `volby` ze souboru smaž.
+- `deleni_slova` (ano/ne, výchozí ano): slovo rozdělené znakem `- ⸗ = ¬` (i přes konec řádku; nález se hlásí na
+  prvním řádku, tvar s ⏎). V adresářích a novinách je dělení časté: u názvů ulic přidá asi desetinu nálezů.
+- `chybi_prvni_pismeno` (ano/ne, výchozí ne): OCR vynechalo první písmeno (jen slova delší než 6; další dvě písmena musí sedět –
   rovnocennosti ano, ö = oe, záměny a skupiny projektu ne; zbytek slova se čte s pravidly): `5153.uchberger`, `12.önisch`.
-- `volby.tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův
+- `tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův
   ova ovo ovu ovy ovic`) a německý genitiv `-s`/`-es` (Zineckers, Krauses; jen za slovem s rovnocennostmi, i bez
   prvního písmene, ne přes záměny a skupiny projektu – jinak by Kraus našel „Kreuzes“; holé `-s` ne po s ß ſ x z –
   Krauss je jiný pravopis): Zineckera, Zineckerové, „Friesovy boudy“. **Známý zbytek:** -e/-i/-a pustí i německé tvary
   („Friese“). `presne` = jen celé slovo (i slepené s dalším, viz níže), `volne` = cokoli za slovem (Friesen,
-  Friesland).
-- `volby.rovnocennosti`: `true` (výchozí, klíč chybí) | `false` (žádné; `ſ` = `s` platí vždy) | objekt jen
-  s odchylkami od výchozích (`{"prehlasky": false, "nemcina_1901": true}`). Mění se příkazem `pridej|odeber rovnocennost`.
+  Friesland). `--tvary` ji přebije pro jeden běh.
+- rovnocennosti a sady pravopisu: každá má vlastní klíč ano/ne (tabulka v oddílu Rovnocenné znaky).
+
 Před slovem nesmí být písmeno ani `-` (číslice smí: „22Gansbauden“). Za slovem nesmí být kombinující znak (`Mu`
 nenajde začátek rozloženého `Mü`), mimo `volne` ani malé písmeno (Fischer nenajde Fischerei). Velké písmeno smí,
 když nález končí malým: OCR slepí jméno s dalším slovem (`FischerDavid`, `ZineckerAdolf`). Slovo celé
@@ -70,28 +77,30 @@ hledání `--tvary volne`. Chybný soubor nástroj odmítne s číslem řádku.
 2. `kandidati` na totéž jméno – taky sám, bez ptaní (jen čte, nic nezapíše).
 3. **Počet z jednoho výpisu, ne od oka.** Navržená pravidla zapiš do `pracovni/navrh_zamen.json` (kopie
    `data/ocr_zameny.json`, pokud existuje, + návrhy z `kandidati`; `--pravidla` soubor projektu **nahrazuje**, proto
-   kopie). Soubor vytvoř nástrojem pro zápis souborů (Write), ne `cat >` ani heredocem v Bashi (ty můžou být
-   zamítnuté). Pak spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json`; `data/` se tím nemění. Řádek
+   kopie). Pak spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json`; `data/` se tím nemění. Řádek
    `# <jméno>: N výskytů` je počet; nikdy nesčítej nálezy z několika výpisů sám. Když návrh změníš, spusť výpis znovu.
-   Dělení slova (`volba deleni_slova`) je pravidlo jako ostatní, ve výchozím stavu vypnuté.
+   Navrženou volbu (`nastav ocr_hledej.…`) přidej do téhož výpisu jako `--volba <klíč>=ano` – počítá se stejně
+   jako nezapsané pravidlo.
 4. Uživateli ukaž **dvě tabulky** z toho výpisu:
    - *nálezy*: řádek na tvar ze souhrnu – tvar doslova, počet, místa (první tři `soubor:řádek` a „+M dalších“),
      čím se našel (přesně / rovnocennost / navržené pravidlo); pod ní N. Všechna místa dá `--vypis radky`, když je
      uživatel chce;
-   - *navržená pravidla*: přesně jako argumenty `pridej …` (z `kandidati`), co každé chytí navíc. Řekni, co by
+   - *navržená pravidla*: přesně jako argumenty `pridej …` nebo `nastav …` (z `kandidati`), co každé chytí navíc. Řekni, co by
      pravidlo chytilo i mimo jméno (široké pravidlo, např. `i → in`, chytí i cizí slova).
    Do deníku (`zapis.py denik`) zapiš až tohle N, s poznámkou „s nezapsanými pravidly“, dokud je uživatel neschválí.
    Když uživatel řekne „zatím nepřidávej“, tabulku nálezů ukaž znovu celou (ne odkazem na předchozí zprávu).
 5. Pravidlo přidej `pridej` **jen po souhlasu** uživatele (nebo na jeho výslovný pokyn). Totéž platí pro každý zápis
-   do `data/ocr_zameny.json`: `odeber`, zapnutí sady pravopisu.
-6. `hledej` znovu (bez `--pravidla`) a řekni rozdíl („teď 72 místo 59, nové: …“). Nevhodné pravidlo vrátí `odeber`.
+   do `data/ocr_zameny.json` (`odeber`) a pro volbu (`nastaveni.py nastav ocr_hledej.…`, i zapnutí sady pravopisu).
+6. `hledej` znovu (bez `--pravidla` a `--volba`) a řekni rozdíl („teď 72 místo 59, nové: …“). Nevhodné pravidlo vrátí
+   `odeber`, volbu `nastaveni.py nastav ocr_hledej.<klíč> vychozi`.
 
 ## Návrhy kandidátů
-Sloupec návrhu v `kandidati` obsahuje jen pravidla, která jde přidat tak, jak stojí (`pridej …`, po souhlasu):
+Sloupec návrhu v `kandidati` obsahuje jen pravidla a volby, které jde provést tak, jak stojí (po souhlasu):
 - `zamena X Y` – OCR čte znak X jako Y → `pridej zamena X Y`;
 - `skupina xy Z` – OCR čte dvojici xy jako Z → `pridej skupina xy Z`;
-- `volba deleni_slova` – slovo rozdělené znakem dělení → `pridej volba deleni_slova`;
-- `volba chybi_prvni_pismeno` – OCR vynechalo první písmeno → `pridej volba chybi_prvni_pismeno`.
+- `nastav ocr_hledej.deleni_slova ano` – slovo rozdělené znakem dělení, když je dělení vypnuté → `nastaveni.py nastav ocr_hledej.deleni_slova ano`;
+- `nastav ocr_hledej.chybi_prvni_pismeno ano` – OCR vynechalo první písmeno →
+  `nastaveni.py nastav ocr_hledej.chybi_prvni_pismeno ano`.
 
 Prázdný sloupec = rozdíl, na který pravidlo není: jiná koncovka (Zineckerin) → `--tvary volne` nebo tvar hledej jako
 samostatné slovo; něco před slovem (InZinecker), jiný pravopis, mezera ve slově nebo víc změn najednou → samostatné
@@ -104,9 +113,9 @@ konverzaci na jedno slovo; po odmítnutí znovu až s novými texty), když:
 - `hledej` na jméno, které v textech čekáš, vrátí méně než 3 nálezy;
 - našel jsi zkomoleninu, kterou nástroj minul.
 Nikdy ne po každém hledání. Stejně (nejvýš jednou za konverzaci, zapsat jen po souhlasu) nabídni:
-- **`nemcina_1901`**, když hledáš v německém tisku před 1901 (datum vydání, v obecných slovech `th` a `c`: `Thal`,
+- **`nemcina_1901`** (`nastaveni.py nastav ocr_hledej.nemcina_1901 ano`), když hledáš v německém tisku před 1901 (datum vydání, v obecných slovech `th` a `c`: `Thal`,
   `Thür`, `Concert`, `Centrum`);
-- **vypnutí `cestina_1849`** (`odeber rovnocennost cestina_1849`), jen když jsou české texty mladší než 1849 a sada
+- **vypnutí `cestina_1849`** (`nastaveni.py nastav ocr_hledej.cestina_1849 ne`), jen když jsou české texty mladší než 1849 a sada
   přidává zjevně falešné nálezy; jinak ji nech zapnutou.
 
 ## Rovnocenné znaky
@@ -125,8 +134,8 @@ hlásí doslova (`Fiſcher`, `Muͤller`). Velikost písmen se nerozlišuje (`Mü
 | `cestina_1849` | sada českého pravopisu před 1849 (níže) | zapnuto |
 | `nemcina_1901` | sada německého pravopisu před 1901 (níže) | vypnuto |
 
-Vypnout: `odeber rovnocennost <název>`, všechny `odeber rovnocennost vse` (zapíše `"rovnocennosti": false`); vrátit
-výchozí `pridej rovnocennost vse`. Pravidlo, které už rovnocennost pokrývá (záměna ü na ue), nástroj přesto uloží
+Vypnout: `nastaveni.py nastav ocr_hledej.<název> ne` (po souhlasu), vrátit výchozí `… <název> vychozi`; jen pro jeden
+běh `--volba <název>=ne`. Pravidlo, které už rovnocennost pokrývá (záměna ü na ue), nástroj přesto uloží
 a řekne „už pokryto…“ – platí pak i po vypnutí rovnocennosti.
 
 **Sady historického pravopisu** jsou pravidla (rozšiřují nálezy, můžou přidat falešné), sloučí se s pravidly projektu:
@@ -174,8 +183,8 @@ Postup:
    `! sudo apt install …`, jinak v terminálu), a počkej.
 2. **Fraktura** (německý tisk 18.–20. stol., lomené písmo): nabídni `ocr.py stahni german_print` (3,5 MB, server
    UB Mannheim – ne GitHub, licence neuvedená; jen po souhlasu) a **zeptej se na staré znaky** (níže), pokud
-   `ocr.py stav` u nich neukáže „nastaveno“. Volbu zapiš `ocr.py nastav …`; v projektu se už neptej. Velikost, server
-   a licenci ber z tabulky „Volba modelu“ nebo z `ocr.py modely`, ne z paměti.
+   `ocr.py stav` u nich neukáže „nastaveno“. Volbu zapiš `nastaveni.py nastav ocr.stare_znaky …`; v projektu se už
+   neptej. Velikost, server a licenci ber z tabulky „Volba modelu“ nebo z `ocr.py modely`, ne z paměti.
 3. Čeština ve fraktuře (švabach, tisky před ~1850): model `german_print+ces`. Čeština antikvou: `ces`.
 4. `ocr.py <vstup>`; texty jsou `lit`, dokud nález neověříš ve skenu.
 
@@ -194,7 +203,7 @@ pro ruční stažení.
 
 Potřeba je Tesseract ≥ 4. Systémové modely jsou ve složce, kterou vypíše `tesseract --list-langs` (Debian/Ubuntu
 `/usr/share/tesseract-ocr/5/tessdata`, u Tesseractu 4 `…/4.00/tessdata`; Homebrew `/opt/homebrew/share/tessdata`).
-`TESSDATA_PREFIX` ukazuje na **rodiče** složky `tessdata`, kdežto `--tessdata-dir` (a pole `tessdata` níže) na složku,
+`TESSDATA_PREFIX` ukazuje na **rodiče** složky `tessdata`, kdežto `--tessdata-dir` (a volba `ocr.tessdata` níže) na složku,
 ve které `*.traineddata` přímo leží.
 
 ## Volba modelu
@@ -217,37 +226,42 @@ Měření (Tesseract 5.5.4, 19. 11. 2026): jednotlivé řádky (GT4HistOCR, 19. 
 Model se stahuje jen po souhlasu uživatele: `ocr.py stahni german_print` (jen přes `slusne.py`; sha256 je v nástroji
 připnutý, nesedí-li, nic se nenainstaluje). `ocr.py modely` vypíše známé modely a kde jsou.
 
-**Kde se modely hledají:** systémová složka (z `tesseract --list-langs`) a uživatelská (`tessdata` z nastavení, jinak
+**Kde se modely hledají:** systémová složka (z `tesseract --list-langs`) a uživatelská (`ocr.tessdata` z nastavení, jinak
 `$XDG_DATA_HOME/tessdata` nebo `~/.local/share/tessdata`, na Windows `%LOCALAPPDATA%\tessdata`).
-1. Jsou-li v systémové složce všechny části modelu, běží se bez `--tessdata-dir` (nastavené `tessdata` systém nepřebije).
+1. Jsou-li v systémové složce všechny části modelu, běží se bez `--tessdata-dir` (nastavené `ocr.tessdata` systém nepřebije).
 2. Jinak `--tessdata-dir <uživatelská>`; části, které jsou jen v systémové složce, se tam před během zkopírují.
 3. Co není ani v jedné, je exit 2 s návodem. `ocr.py stav` vypíše, kterou složku běh použije.
 
 ## Staré znaky (ſ, ꝛ, aͤ)
 Fraktura má dlouhé s (`Fiſchzuchtanſtalt`), r rotundu (`ꝛc.`) a přehlásky se znaménkem e nad písmenem (`Muͤller`).
 U fraktury se zeptej jednou za projekt:
-- **zjednodušit** (výchozí, `ocr.py nastav stare_znaky zjednodusit`): do textu se zapíše `ſ → s`, `ꝛ → r`,
+- **zjednodušit** (výchozí, `nastaveni.py nastav ocr.stare_znaky zjednodusit`): do textu se zapíše `ſ → s`, `ꝛ → r`,
   `aͤ oͤ uͤ → ä ö ü` (i velká); text se čte a cituje běžnými slovy;
-- **ponechat** (věrný přepis, `ocr.py nastav stare_znaky ponechat`).
+- **ponechat** (věrný přepis, `nastaveni.py nastav ocr.stare_znaky ponechat`).
 Hledání (`ocr_hledej.py`) najde `ſ`, `ꝛ` i `aͤ` samo (výchozí rovnocennosti), takže ani při „ponechat“ se žádné
-pravidlo nepřidává. `jen_s` (jen `ſ → s`) mají výstupy z doby, kdy volba byla `dlouhe_s`; zastaralé `dlouhe_s` v
-nastavení nástroj převede (`s` → `jen_s`) a varuje. Volba platí pro nové texty; složka s hotovými stranami se dodělá
+pravidlo nepřidává. `jen_s` = jen `ſ → s`. Volba platí pro nové texty; složka s hotovými stranami se dodělá
 stejně, jak vznikla (není-li volba nastavená, převezme ji z manifestu), výslovně jiná volba se odmítne (manifest, níže).
 
-## Nastavení `data/ocr.json`
-Všechna pole jsou volitelná; aktualizace skillu soubor nepřepíše. Zapisuj ho `ocr.py nastav <klíč> <hodnota>`
-(`vychozi` pole smaže), prohlédni `ocr.py nastaveni`.
+## Nastavení (sekce `ocr` v `data/nastaveni.json`)
+Volby OCR jsou v nastavení projektu; aktualizace skillu soubor nepřepíše. Vypíše je
+`python3 -I tools/nastaveni.py ukaz ocr`, zapíše se souhlasem uživatele `nastaveni.py nastav ocr.<klíč> <hodnota>`
+(`vychozi` volbu smaže). Na staré znaky se ptej (`→ ZEPTEJ_SE ocr.stare_znaky`); `prikaz`, `soubezne` a `tessdata`
+jsou „nenastaveno“ a ptát se na ně nemusíš.
 ```json
-{"model": "german_print", "stare_znaky": "zjednodusit", "davka": 100, "soubezne": 4, "dpi": 300, "tessdata": "~/.local/share/tessdata",
- "prikaz": ["/cesta/k/programu", "{slozka}", "--lang", "{model}", "--out", "{vystup}"]}
+{"verze": 1, "ocr": {"model": "german_print", "stare_znaky": "zjednodusit", "davka": 100, "soubezne": 4, "dpi": 300,
+ "tessdata": "~/.local/share/tessdata", "prikaz": ["/cesta/k/programu", "{slozka}", "--lang", "{model}", "--out", "{vystup}"]}}
 ```
 - `model` (přebije ho `--model`), `stare_znaky` `zjednodusit`|`ponechat`|`jen_s`, `dpi` 72–1200 (převod PDF), `soubezne` 1–64 (procesů
   Tesseractu najednou, výchozí polovina jader, nejvýš 4), `davka` 1–10000 (strany na jedno volání vlastního příkazu),
   `tessdata` (uživatelská složka modelů; `~` se rozbalí, relativní cesta platí od kořene projektu).
-- Chybný soubor nástroj odmítne s řádkem nebo polem (exit 1); neznámá pole jen vypíše jako varování.
+- `prikaz` se zapisuje jako JSON seznam v apostrofech: `nastaveni.py nastav ocr.prikaz '["/cesta/k/programu",
+  "{slozka}", "--out", "{vystup}", "-l", "{model}"]'`. Model a zástupce v příkazu kontroluje až `ocr.py` – po zápisu
+  spusť `ocr.py stav`.
+- Neplatná hodnota, neznámý klíč (překlep), neplatný model nebo `prikaz` bez zástupce: `ocr.py` skončí chybou (exit 1)
+  dřív, než začne OCR – výchozí hodnotu potichu nepoužije.
 
 ## Vlastní příkaz
-Kdo má vlastní OCR program (třeba výpočetní cluster), nastaví `prikaz` – argv bez shellu. Nahrazují se `{slozka}`
+Kdo má vlastní OCR program (třeba výpočetní cluster), nastaví `ocr.prikaz` – argv bez shellu. Nahrazují se `{slozka}`
 (dočasná složka se stranami `p0001.<přípona>`, `p0002…` – pořadí jmen = pořadí stran), `{vystup}` (prázdná dočasná
 složka) a `{model}`; všechny tři jsou povinné (manifest pak nese model, který program opravdu použil). Program zapíše
 do `{vystup}` **jeden** `.txt` (jméno libovolné), za **každou** stranou znak konce stránky `\f` (tak píše např.

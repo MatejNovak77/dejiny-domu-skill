@@ -6,15 +6,18 @@ Použití (z kořene projektu):
                                                 hodnotami; řádek „→ ZEPTEJ_SE <klíč>“ = volba nenastavená, zeptej
                                                 se uživatele, než ji použiješ
   nastaveni.py nastav <sekce.klíč> <hodnota>    uloží volbu (jen se souhlasem uživatele); „vychozi“ volbu smaže
-Příklad: nastaveni.py nastav pomocnici.rukopisy opus
+Příklad: nastaveni.py nastav <sekce>.<klíč> <hodnota>
 
 Sekce si deklaruje každý nástroj sám literálem na nejvyšší úrovni souboru:
-  NASTAVENI_SEKCE = {"<sekce>": {"<klíč>": {"vychozi": …, "hodnoty": [...] | "cele": [min, max] | "text": True,
-                                            "popis": "…"}}}
-„text“ = neprázdný text bez mezer na okrajích; s „"mala": True“ se ukládá malými písmeny.
-„vychozi“: None = nenastaveno, zeptej se uživatele. nastaveni.py je najde v tools/*.py bez importu (ast).
-Z Pythonu: import nastaveni; nastaveni.sekce("pomocnici") → {klíč: hodnota}; výjimka nastaveni.Chyba.
-Neznámé sekce a klíče (z novější verze skillu) jen varují a zápis je zachová.
+  NASTAVENI_SEKCE = {"<sekce>": {"<klíč>": {"vychozi": …, "hodnoty": [...] | "cele": [min, max] | "text": True
+                                            | "seznam": True, "popis": "…"}}}
+„text“ = neprázdný text bez mezer na okrajích; „seznam“ = neprázdný seznam neprázdných textů (na příkazové řádce
+jako JSON: nastav <sekce>.<klíč> '["a", "b"]').
+„vychozi“: None = nenastaveno, zeptej se uživatele; s „"nepovinne": True“ se neptej (nástroj si poradí sám,
+třeba spočte hodnotu podle stroje). nastaveni.py je najde v tools/*.py bez importu (ast).
+Z Pythonu: import nastaveni; nastaveni.sekce("<sekce>") → {klíč: hodnota}; výjimka nastaveni.Chyba.
+Neznámá sekce (z novější verze skillu) jen varuje a zápis ji zachová; neznámý klíč známé sekce (překlep) je
+chyba – nástroj by jinak potichu běžel s výchozí hodnotou.
 """
 import ast, json, os, sys
 for _s in (sys.stdout, sys.stderr):   # UTF-8 výstup i na Windows bez -X utf8 (cp1250 neumí třeba „→“)
@@ -28,19 +31,6 @@ ROOT = os.path.dirname(TOOLS)
 SOUBOR = os.path.join(ROOT, "data", "nastaveni.json")
 VERZE = 1   # verze formátu souboru, kterou tenhle nástroj zná
 VYCHOZI = "vychozi"
-
-NASTAVENI_SEKCE = {
-    "pomocnici": {   # pomocníky (subagenty) pouští Claude podle SKILL.md, žádný nástroj; viz reference/pomocnici.md
-        "rukopisy": {"vychozi": None, "text": True, "mala": True,
-                     "popis": "model pomocníků, kteří čtou snímky ručně psaného textu (matriky, gruntovní "
-                              "a pozemkové knihy, sčítací operáty, kurent); název modelu, jak ho zná hostitel "
-                              "(v Claude Code alias sonnet, opus, haiku nebo fable)"},
-        "ostatni": {"vychozi": "sonnet", "text": True, "mala": True,
-                    "popis": "model pomocníků pro ostatní práci (tištěné zdroje, OCR texty, procházení portálů); "
-                             "název modelu jako u rukopisů"},
-    },
-}
-
 
 class Chyba(Exception):
     """Neplatné nastavení nebo deklarace sekce; text je hláška pro uživatele."""
@@ -62,9 +52,9 @@ def _deklarace(soubor, sekce):
             k = f"{kde}: {nazev}.{klic}"
             if not isinstance(klic, str) or not klic or "." in klic or not isinstance(popis, dict):
                 raise Chyba(f"{k} – klíč musí být jméno bez tečky s popisem ve slovníku")
-            druhy = [d for d in ("hodnoty", "cele", "text") if d in popis]
+            druhy = [d for d in ("hodnoty", "cele", "text", "seznam") if d in popis]
             if len(druhy) != 1 or "vychozi" not in popis or not isinstance(popis.get("popis"), str):
-                raise Chyba(f"{k} – potřebuje „vychozi“, „popis“ a právě jedno z „hodnoty“, „cele“, „text“")
+                raise Chyba(f"{k} – potřebuje „vychozi“, „popis“ a právě jedno z „hodnoty“, „cele“, „text“, „seznam“")
             h = popis[druhy[0]]
             if druhy[0] == "hodnoty" and not (isinstance(h, list) and h
                                               and all(isinstance(x, str) and x == x.lower() for x in h)):
@@ -72,8 +62,10 @@ def _deklarace(soubor, sekce):
             if druhy[0] == "cele" and not (isinstance(h, list) and len(h) == 2
                                            and all(type(x) is int for x in h) and h[0] <= h[1]):
                 raise Chyba(f"{k} – „cele“ musí být [min, max] (celá čísla)")
-            if druhy[0] == "text" and h is not True:
-                raise Chyba(f"{k} – „text“ musí být True")
+            if druhy[0] in ("text", "seznam") and h is not True:
+                raise Chyba(f"{k} – „{druhy[0]}“ musí být True")
+            if "nepovinne" in popis and (popis["nepovinne"] is not True or popis["vychozi"] is not None):
+                raise Chyba(f"{k} – „nepovinne“ smí být jen True a jen s „vychozi“: None")
             if popis["vychozi"] is not None and not _platna(popis, popis["vychozi"]):
                 raise Chyba(f"{k} – výchozí hodnota {popis['vychozi']!r} není povolená")
 
@@ -114,6 +106,8 @@ def _platna(popis, v):
         return isinstance(v, str) and v in popis["hodnoty"]
     if "cele" in popis:
         return type(v) is int and popis["cele"][0] <= v <= popis["cele"][1]
+    if "seznam" in popis:
+        return isinstance(v, list) and len(v) > 0 and all(isinstance(x, str) and x for x in v)
     return isinstance(v, str) and v.strip() != ""
 
 
@@ -122,7 +116,9 @@ def _povoleno(popis):
         return ", ".join(popis["hodnoty"])
     if "cele" in popis:
         return f"celé číslo {popis['cele'][0]}–{popis['cele'][1]}"
-    return "neprázdný text" + (" (ukládá se malými písmeny)" if popis.get("mala") else "")
+    if "seznam" in popis:
+        return 'JSON seznam neprázdných textů, např. ["a", "b"]'
+    return "neprázdný text"
 
 
 def _nacti():
@@ -155,12 +151,12 @@ def _sekce_ze_souboru(d, nazev):
 
 
 def _hodnoty_sekce(d, nazev, klice):
-    """[(klíč, hodnota nebo None, nastaveno?, chyba nebo None)] jedné sekce; neznámé klíče jen varují."""
+    """[(klíč, hodnota nebo None, nastaveno?, chyba nebo None)] jedné sekce; neznámý klíč = chyba (překlep)."""
     s = _sekce_ze_souboru(d, nazev)
-    for k in s:
-        if k not in klice:
-            varuj(f"neznámá volba „{nazev}.{k}“ v data/nastaveni.json (novější skill?) – nechávám ji být.")
-    out = []
+    out = [(k, None, True, f"neznámá volba „{nazev}.{k}“ v data/nastaveni.json – oprav překlep nebo řádek smaž "
+                           f"(v sekci {nazev} jsou: {', '.join(klice)}); nastaveni.py ukaz {nazev} ukáže platné "
+                           "hodnoty")
+           for k in s if k not in klice]
     for k, popis in klice.items():
         if k not in s:
             out.append((k, popis["vychozi"], False, None))
@@ -198,8 +194,15 @@ def _prevod(klic, popis, text):
             v = None
         if v is not None and _platna(popis, v):
             return v
+    elif "seznam" in popis:
+        try:
+            v = json.loads(text)
+        except ValueError:
+            v = None
+        if _platna(popis, v):
+            return v
     elif text.strip():
-        return text.strip().lower() if popis.get("mala") else text.strip()
+        return text.strip()
     raise Chyba(f"{klic}: neplatná hodnota „{text}“ (povoleno: {_povoleno(popis)}, nebo {VYCHOZI}) – "
                 "nic jsem nezměnil.")
 
@@ -239,6 +242,11 @@ def nastav(klic, hodnota):
     return nova
 
 
+def _text(v):
+    """Hodnota pro výpis: text jak je, jinak JSON (seznam se dá zkopírovat zpět do nastav)."""
+    return v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
+
+
 def ukaz(jen=None):
     """Vypíše volby; vrátí počet chyb (platné volby vypíše i tak)."""
     sch = schema()
@@ -248,6 +256,9 @@ def ukaz(jen=None):
     for x in d:
         if x != "verze" and x not in sch:
             varuj(f"neznámá sekce „{x}“ v data/nastaveni.json (novější skill?) – nechávám ji být.")
+    if not sch:
+        print("Žádný nástroj v tools/ zatím nemá volby – nastavení je prázdné.")
+        return 0
     chyby, zeptat = 0, False
     for nazev, klice in sch.items():
         if jen is not None and nazev != jen:
@@ -259,20 +270,23 @@ def ukaz(jen=None):
             chyby += 1
             continue
         for k, v, nastaveno, chyba in radky:
-            popis = klice[k]
-            info = f"{_povoleno(popis)} – {popis['popis']}"
             if chyba:
                 print(f"CHYBA: {chyba}", file=sys.stderr)
                 chyby += 1
+                continue
+            popis = klice[k]
+            info = f"{_povoleno(popis)} – {popis['popis']}"
+            if v is None and popis.get("nepovinne"):
+                print(f"{nazev}.{k} nenastaveno   ({info})")
             elif v is None:
                 print(f"→ ZEPTEJ_SE {nazev}.{k}   (nenastaveno; {info})")
                 zeptat = True
             else:
-                print(f"{nazev}.{k} = {json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v}   "
+                print(f"{nazev}.{k} = {_text(v)}   "
                       f"({'nastaveno' if nastaveno else 'výchozí'}; {info})")
     if zeptat:
-        print("Nenastavenou volbu nejdřív nabídni uživateli; ulož ji (nastaveni.py nastav <klíč> <hodnota>) "
-              "jen když s uložením výslovně souhlasí.")
+        print("Volbu s → ZEPTEJ_SE nejdřív nabídni uživateli; ulož ji (nastaveni.py nastav <sekce>.<klíč> "
+              "<hodnota>) jen když s uložením výslovně souhlasí.")
     return chyby
 
 
@@ -283,7 +297,7 @@ def main():
             sys.exit(1 if ukaz(a[1] if len(a) == 2 else None) else 0)
         if a[:1] == ["nastav"] and len(a) == 3:
             v = nastav(a[1], a[2])
-            print(f"{a[1]} = {v}" if v is not None else f"{a[1]}: smazáno, platí výchozí hodnota")
+            print(f"{a[1]} = {_text(v)}" if v is not None else f"{a[1]}: smazáno, platí výchozí hodnota")
             sys.exit(0)
     except Chyba as e:
         sys.exit(f"nastaveni.py: {e}")
