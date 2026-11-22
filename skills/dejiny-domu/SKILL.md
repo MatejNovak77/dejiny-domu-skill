@@ -138,16 +138,9 @@ Pravidla kvality:
   odpověď (artefakt s ukládáním odpovědí, jinak HTML s tlačítkem „stáhnout odpovědi“). Odpovědi zapiš i do deníku.
 
 ### Hledání v OCR textech
-OCR staré sazby komolí jména („Gansbauden“ → „Sansbauben“). V textech hledej `tools/ocr_hledej.py hledej <jméno>`;
-stejné znaky jinak zapsané (ſ, ß/ss, ü/ue, rozložené ě) i jinou velikost písmen najde samo; vypíše souhrn podle
-nalezeného tvaru, všechny řádky dá `--vypis radky`. `ocr_hledej.py kandidati <jméno>` najde blízká
-slova, která pravidla minula, a navrhne pravidlo do `data/ocr_zameny.json`. `hledej` i `kandidati` jen čtou – spusť je
-sám, když přibyly OCR texty, když hledání čekaného jména vrátí méně než 3 nálezy, nebo když najdeš zkomoleninu, kterou
-nástroj minul. Zápis (`pridej`/`odeber` pravidla, sady pravopisu `nemcina_1901`) jen po souhlasu uživatele;
-nabídni ho nejvýš jednou za konverzaci na slovo, nikdy po každém hledání. **Počet zmínek nikdy nesčítej sám**
-(ani z `hledej` + `kandidati`): návrhy z `kandidati` zapiš nástrojem Write do `pracovni/navrh_zamen.json` (pravidla
-projektu + navržená), spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json` a číslo z řádku `# <jméno>: N výskytů`
-řekni i zapiš do deníku. Ukaž tabulku nálezů a tabulku navržených pravidel (`pridej …`). Postup: `reference/ocr.md`.
+Jména v OCR textech (`pracovni/*.txt`) hledej `tools/ocr_hledej.py hledej <jméno>`, ne grepem: najde i ſ/ß/ü jinak
+zapsané, jinou velikost písmen, české tvary a slova rozdělená přes řádek. Při méně než 3 nálezech čekaného jména,
+nových OCR textech, před návrhem pravidel záměn a před sdělením počtu zmínek přečti `reference/ocr.md`.
 
 ### Webové aplikace bez API – prohlížeč
 Když portál nemá nástroj ani čitelné API (mapové aplikace, prohlížeče snímků, nahlizenidokn, chartae-antiquae),

@@ -1297,6 +1297,7 @@ class TestOcrHledej(Projekt):
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertEqual(self.data("ocr_zameny"), {"volby": {"rovnocennosti": {"prehlasky": False}}})
         p = self.nastroj("ocr_hledej.py", "pravidla")
+        self.assertIn("Volby: deleni_slova=ano, chybi_prvni_pismeno=ne", p.stdout)   # výchozí, i bez zápisu
         self.assertIn("- prehlasky", p.stdout)
         self.assertIn("+ dlouhe_s", p.stdout)
         p = self.nastroj("ocr_hledej.py", "pridej", "rovnocennost", "prehlasky")
