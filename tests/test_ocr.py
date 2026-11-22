@@ -8,7 +8,6 @@ SKILL = os.path.join(KOREN, "skills", "dejiny-domu")
 sys.path.insert(0, os.path.join(SKILL, "tools"))
 import ocr  # noqa: E402
 PUVODNI_NAJDI = ocr.najdi
-PUVODNI_SPUST_PRIKAZ = ocr.spust_prikaz
 
 def cti_soubor(p, mod="r"):
     with open(p, mod, **({} if "b" in mod else {"encoding": "utf-8"})) as f:
@@ -16,7 +15,7 @@ def cti_soubor(p, mod="r"):
 
 
 class FalesnySpust:
-    """Náhrada tesseract / pdftoppm / pdfinfo / vlastního příkazu („fakeocr“)."""
+    """Náhrada tesseract / pdftoppm / pdfinfo."""
 
     def __init__(self, sysdir):
         self.sysdir = sysdir
@@ -24,15 +23,12 @@ class FalesnySpust:
         self.selhat = set()      # jména obrázků (bez přípony), na kterých tesseract selže
         self.prerusit = set()    # jména obrázků, na kterých přijde Ctrl-C (KeyboardInterrupt)
         self.vystupy = {}        # jméno obrázku → vlastní výstup tesseractu (např. víc stran oddělených \f)
-        self.prikaz = None       # funkce(argv) -> návratový kód
         self.verze = {"tesseract": "5.5.4", "pdftoppm": "26.11.0"}
 
     def __call__(self, argv, **kw):
         self.volani.append(list(argv))
         ok = lambda out=b"", err=b"", rc=0: subprocess.CompletedProcess(argv, rc, out, err)
         p = os.path.basename(argv[0])
-        if p == "fakeocr":
-            return ok(rc=self.prikaz(argv))
         if p == "tesseract":
             if argv[1:] == ["--version"]:
                 return ok(f"tesseract {self.verze['tesseract']}\n leptonica-1.87.0\n".encode())
@@ -72,9 +68,6 @@ class FalesnySpust:
                 if os.path.basename(a[0]) == "tesseract" and a[-1] != "--list-langs" and a[1:] != ["--version"]]
 
 
-Z = {"s": "jen_s", "ponechat": "ponechat"}   # dřívější dlouhe_s → stare_znaky
-
-
 class Zaklad(unittest.TestCase):
     """Dočasný kořen projektu (ocr.ROOT), systémová a uživatelská složka modelů, falešné programy."""
 
@@ -89,7 +82,6 @@ class Zaklad(unittest.TestCase):
         self.fake = FalesnySpust(self.sysdir)
         self.programy = {"tesseract": "/x/tesseract", "pdftoppm": "/x/pdftoppm", "pdfinfo": "/x/pdfinfo"}
         for p in (mock.patch.object(ocr, "ROOT", self.tmp), mock.patch.object(ocr, "spust", self.fake),
-                  mock.patch.object(ocr, "spust_prikaz", lambda argv: self.fake(argv).returncode),
                   mock.patch.object(ocr, "najdi", lambda program: self.programy.get(program))):
             p.start()
             self.addCleanup(p.stop)
@@ -179,40 +171,12 @@ class TestNastaveni(Zaklad):
         self.assertEqual(ocr.nacti_nastaveni(p), {"model": "ces"})
 
     def test_nastaveni_typy(self):
-        spatne = [{"prikaz": "ocr {slozka} {vystup}"}, {"prikaz": []}, {"prikaz": ["ocr", "{vystup}", "{model}"]},
-                  {"prikaz": ["ocr", "{slozka}", "{model}"]}, {"prikaz": ["ocr", "{slozka}", "{vystup}"]},
-                  {"prikaz": ["ocr", "{slozka}", "{vystup}", "{model}", "{neznamy}"]},
-                  {"davka": 0}, {"davka": "10"}, {"davka": True}, {"dpi": 50}, {"soubezne": 0}, {"dlouhe_s": "x"},
-                  {"stare_znaky": "x"}, {"stare_znaky": "s"}, {"dlouhe_s": "s", "stare_znaky": "ponechat"},
-                  {"tessdata": 3}, []]
+        spatne = [{"soubezne": 0}, {"soubezne": "4"}, {"soubezne": True}, {"dpi": 50},
+                  {"stare_znaky": "x"}, {"stare_znaky": "s"}, {"tessdata": 3}, []]
         for d in spatne:
             self.assertTrue(ocr.over_nastaveni(d)[0], d)
-        dobre = {"model": "german_print+ces", "stare_znaky": "ponechat", "prikaz": ["~/ocr", "{slozka}", "--out={vystup}",
-                 "-l", "{model}"], "davka": 10000, "soubezne": 64, "dpi": 72,
-                 "tessdata": "~/td"}
+        dobre = {"model": "german_print+ces", "stare_znaky": "ponechat", "soubezne": 64, "dpi": 72, "tessdata": "~/td"}
         self.assertEqual(ocr.over_nastaveni(dobre), ([], []))
-
-    def test_o2_dlouhe_s_zastarale(self):
-        for d, cekam in (({"dlouhe_s": "s"}, "jen_s"), ({"dlouhe_s": "ponechat"}, "ponechat"), ({}, "zjednodusit"),
-                         ({"stare_znaky": "jen_s"}, "jen_s")):
-            chyby, varovani = ocr.over_nastaveni(d)
-            self.assertEqual(chyby, [], d)
-            self.assertEqual(any("dlouhe_s je zastaralé" in v for v in varovani), "dlouhe_s" in d)
-            self.assertEqual(ocr.platne(d)["stare_znaky"], cekam)
-        chyby, _ = ocr.over_nastaveni({"dlouhe_s": "s", "stare_znaky": "ponechat"})
-        self.assertTrue(any("odporují" in c for c in chyby))
-        self.assertEqual(ocr.over_nastaveni({"dlouhe_s": "s", "stare_znaky": "jen_s"})[0], [])
-        p = os.path.join(self.tmp, "data", "ocr.json")
-        with open(p, "w", encoding="utf-8") as f:
-            f.write('{"model": "ces", "dlouhe_s": "ponechat"}')
-        with contextlib.redirect_stdout(io.StringIO()):
-            ocr.prikaz_nastav(p, "dlouhe_s", "s")
-        self.assertEqual(json.loads(cti_soubor(p)), {"model": "ces", "stare_znaky": "jen_s"})
-        with open(p, "w", encoding="utf-8") as f:
-            f.write('{"dlouhe_s": "ponechat"}')
-        with contextlib.redirect_stdout(io.StringIO()):
-            ocr.prikaz_nastav(p, "stare_znaky", "zjednodusit")
-        self.assertEqual(json.loads(cti_soubor(p)), {"stare_znaky": "zjednodusit"})
 
     def test_nastaveni_nezname_pole_varuje(self):
         chyby, varovani = ocr.over_nastaveni({"model": "ces", "barva": "modra"})
@@ -224,18 +188,15 @@ class TestNastaveni(Zaklad):
         with open(p, "w", encoding="utf-8") as f:
             f.write('{"model": "ces", "x_vlastni": 1, "dpi": 200}')
         with contextlib.redirect_stdout(io.StringIO()):
-            ocr.prikaz_nastav(p, "davka", "5")
+            ocr.prikaz_nastav(p, "soubezne", "5")
             self.assertEqual(json.loads(cti_soubor(p)), {"model": "ces", "x_vlastni": 1, "dpi": 200,
-                                                                     "davka": 5})
+                                                                     "soubezne": 5})
             ocr.prikaz_nastav(p, "dpi", "vychozi")
-            ocr.prikaz_nastav(p, "prikaz", '["ocr", "{slozka}", "{vystup}", "{model}"]')
         d = json.loads(cti_soubor(p))
-        self.assertEqual(d, {"model": "ces", "x_vlastni": 1, "davka": 5,
-                             "prikaz": ["ocr", "{slozka}", "{vystup}", "{model}"]})
+        self.assertEqual(d, {"model": "ces", "x_vlastni": 1, "soubezne": 5})
         pred = cti_soubor(p, "rb")
         self.assertTrue(pred.endswith(b"\n") and b"\r" not in pred)
-        for k, v in (("davka", "0"), ("dpi", "abc"), ("dlouhe_s", "x"), ("stare_znaky", "s"), ("prikaz", '["ocr"]'),
-                     ("neznamy", "1")):
+        for k, v in (("soubezne", "0"), ("dpi", "abc"), ("stare_znaky", "s"), ("neznamy", "1")):
             with self.assertRaises(ocr.Chyba):
                 ocr.prikaz_nastav(p, k, v)
         self.assertEqual(cti_soubor(p, "rb"), pred)
@@ -285,9 +246,6 @@ class TestDetekce(Zaklad):
         self.nastav({"tessdata": self.uziv, "stare_znaky": "ponechat"})
         rc, out, _ = self.spust("stav")
         self.assertIn("staré znaky: ponechat (nastaveno v data/ocr.json)", out)
-        self.nastav({"tessdata": self.uziv, "dlouhe_s": "s"})   # zastaralé pole se počítá jako nastavené
-        rc, out, _ = self.spust("stav")
-        self.assertIn("staré znaky: jen_s (nastaveno v data/ocr.json)", out)
 
     def test_chybi_tesseract_exit2(self):
         del self.programy["tesseract"]
@@ -691,154 +649,17 @@ class TestPreruseni(Zaklad):
         self.assertEqual(self.spust(self.pdf(10))[0], 0)
         self.assertEqual(self.fake.tesseract_obrazky(), ["s%04d" % i for i in range(3, 11)])
 
-    def test_spust_prikaz_ceka(self):
-        for wait, kill in (([KeyboardInterrupt, 0], 0), ([KeyboardInterrupt, KeyboardInterrupt, 0], 1)):
-            proc = mock.Mock()
-            proc.wait.side_effect = wait
-            with mock.patch.object(subprocess, "Popen", return_value=proc), \
-                    contextlib.redirect_stderr(io.StringIO()) as err:
-                with self.assertRaises(KeyboardInterrupt):
-                    PUVODNI_SPUST_PRIKAZ(["x"])
-            self.assertEqual(proc.wait.call_count, len(wait))
-            self.assertEqual(proc.kill.call_count, kill)
-            self.assertIn("čekám", err.getvalue())
-        with self.assertRaises(ocr.Chyba) as c:   # překlep v cestě: hláška místo tracebacku
-            PUVODNI_SPUST_PRIKAZ([os.path.join(self.tmp, "neexistuje", "ocr")])
-        self.assertIn("nejde spustit", str(c.exception))
-
-
-class TestPrikaz(Zaklad):
-    SABLONA = ["fakeocr", "{slozka}", "--lang", "{model}", "--out", "{vystup}"]
-
-    def setUp(self):
-        super().setUp()
-        self.davky, self.jmena_v_davce = [], []
-        self.fake.prikaz = self.soubory
-
-    def nastav_prikaz(self, sablona=None, **kw):
-        self.nastav(dict({"tessdata": self.uziv, "prikaz": sablona or self.SABLONA}, **kw))
-
-    def soubory(self, argv):
-        """Jako `ocr --no-pdf`: jeden <slozka>.txt, za každou stranou \\f. Řadí „přirozeně“ (1, 2, 10), aby test
-        poznal, kdyby nástroj dal do dávky jména, která tak řadí jinak než on. self.davky = strany podle obsahu."""
-        slozka, vystup = argv[1], argv[argv.index("--out") + 1]
-        obr = sorted(os.listdir(slozka), key=lambda f: [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", f)])
-        self.jmena_v_davce.append(obr)
-        texty = [cti_soubor(os.path.join(slozka, f)) for f in obr]
-        self.davky.append([("s%04d" % int(x.split()[1])) if x.startswith("strana ") else os.path.splitext(x.split()[1])[0]
-                           for x in texty])
-        with open(os.path.join(vystup, os.path.basename(slozka) + ".txt"), "w", encoding="utf-8") as h:
-            h.write("".join("P " + x + "\n\f" for x in texty))
-        return 0
-
-    def test_prikaz_argv(self):
-        a = ocr.prikaz_argv(["~/bin/ocr", "{slozka}", "--out={vystup}", "-l", "{model}", "~/x"], "/t/d", "/t/v", "ces")
-        self.assertEqual(a, [os.path.expanduser("~/bin/ocr"), "/t/d", "--out=/t/v", "-l", "ces", "~/x"])
-
-    def test_prikaz_vystup(self):
-        v = os.path.join(self.tmp, "v")
-        os.makedirs(v)
-
-        def davka(text, jmena=("x1", "x2", "x3"), soubory=("ocr_davka_1.txt",)):
-            for f in os.listdir(v):
-                os.remove(os.path.join(v, f))
-            for f in soubory:
-                with open(os.path.join(v, f), "w", encoding="utf-8", newline="") as g:
-                    g.write(text)
-            return ocr.vysledky_davky(v, list(jmena))
-        self.assertEqual(davka("\fb\f\f"), {"x1": "", "x2": "b", "x3": ""})
-        self.assertEqual(davka("a\fb\fc\f\n "), {"x1": "a", "x2": "b", "x3": "c"})
-        self.assertEqual(davka("a\f", ["x1"]), {"x1": "a"})
-        for spatne, soubory in (("a\fb", None), ("a\fb\fc\fd\f", None), ("a\fb\fc\fX", None),
-                                ("a\fb\fc\f", ()), ("a\fb\fc\f", ("a.txt", "b.txt"))):
-            with self.assertRaises(ocr.Chyba, msg=repr(spatne)) as c:
-                davka(spatne, soubory=soubory or (() if soubory == () else ("ocr_davka_1.txt",)))
-            if spatne == "a\fb\fc\fd\f":
-                self.assertIn("vícestránkový TIFF", str(c.exception))
-        self.nastav_prikaz()
-        self.assertEqual(self.spust(self.pdf(3))[0], 0)
-        for i in (1, 2, 3):
-            self.assertEqual(self.cti("kniha", f"s000{i}.txt"), f"P strana {i} z %PDF n=3 v1\n")
-        m = self.manifest("kniha")
-        self.assertEqual((m["model"], m["programy"]), ("german_print", {"prikaz": self.SABLONA, "pdftoppm": "26.11.0"}))
-        self.assertEqual(self.fake.tesseract_obrazky(), [])
-        # 1, 10, 2 (naše abecední pořadí) – v dávce pořadová jména, takže „přirozeně“ řadící program nic neprohodí
-        self.jmena_v_davce.clear()
-        self.assertEqual(self.spust(self.obrazky("1.jpg", "2.jpg", "10.jpg", slozka="cisla"))[0], 0)
-        self.assertEqual(self.jmena_v_davce, [["p0001.jpg", "p0002.jpg", "p0003.jpg"]])
-        for j in ("1", "2", "10"):
-            self.assertEqual(self.cti("cisla", j + ".txt"), f"P obrazek {j}.jpg\n")
-
-    def test_preruseni_prikaz(self):
-        self.nastav_prikaz(davka=2)
-        davky = []
-
-        def prikaz(argv):
-            davky.append(1)
-            if len(davky) == 2:
-                raise KeyboardInterrupt
-            return self.soubory(argv)
-        self.fake.prikaz = prikaz
-        tmp = os.path.join(self.tmp, "tmp")
-        os.makedirs(tmp)
-        with mock.patch.object(tempfile, "tempdir", tmp):
-            rc, _, err = self.spust(self.pdf(5))
-        self.assertEqual(rc, 130)
-        self.assertIn("hotovo 2 z 5", err)
-        self.assertEqual(sorted(f for f in os.listdir(self.vystup("kniha")) if f.endswith(".txt")),
-                         ["s0001.txt", "s0002.txt"])
-        self.assertEqual(os.listdir(tmp), [])
-
-    def test_prikaz_rc_nenula(self):
-        self.fake.prikaz = lambda argv: 3
-        self.nastav_prikaz()
-        rc, _, err = self.spust(self.pdf(2))
-        self.assertEqual(rc, 1)
-        self.assertIn("kódem 3", err)
-        self.assertEqual([f for f in os.listdir(self.vystup("kniha")) if f.endswith(".txt")], [])
-
-    def test_prikaz_davky(self):
-        self.nastav_prikaz(davka=2)
-        volani = []
-
-        def druha_selze(argv):
-            volani.append(1)
-            return 1 if len(volani) == 2 else self.soubory(argv)
-        self.fake.prikaz = druha_selze
-        rc, _, _ = self.spust(self.pdf(5))
-        self.assertEqual(rc, 1)
-        self.assertEqual(sorted(f for f in os.listdir(self.vystup("kniha")) if f.endswith(".txt")),
-                         ["s0001.txt", "s0002.txt"])
-        self.fake.prikaz = self.soubory
-        self.davky.clear()
-        self.assertEqual(self.spust(self.pdf(5))[0], 0)
-        self.assertEqual(self.davky, [["s0003", "s0004"], ["s0005"]])
-
-    def test_prikaz_dodela(self):
-        """Dodělání bez prikaz_verze, stejně jako vestavěná cesta; i ve složce hotové vestavěným Tesseractem."""
-        self.nastav_prikaz()
-        self.assertEqual(self.spust(self.pdf(3))[0], 0)
-        os.remove(self.vystup("kniha", "s0002.txt"))
-        self.davky.clear()
-        self.assertEqual(self.spust(self.pdf(3))[0], 0)
-        self.assertEqual(self.davky, [["s0002"]])
-        self.nastav({"tessdata": self.uziv})
-        self.assertEqual(self.spust(self.pdf(3), "--strany", "1-2", "--vystup", self.vystup("k2"))[0], 0)
-        self.nastav_prikaz()
-        self.davky.clear()
-        self.assertEqual(self.spust(self.pdf(3), "--vystup", self.vystup("k2"))[0], 0)
-        self.assertEqual(self.davky, [["s0003"]])
-        os.remove(self.vystup("k2", "s0003.txt"))
-        rc, _, err = self.spust(self.pdf(3), "--vystup", self.vystup("k2"), "--model", "frak2021")
-        self.assertEqual(rc, 1)
-        self.assertIn('model: "german_print" → "frak2021"', err)
-
-
-FAKE_OCR = """import os, sys
-slozka, vystup = sys.argv[1], sys.argv[2]
-with open(os.path.join(vystup, os.path.basename(slozka) + ".txt"), "w", encoding="utf-8") as g:
-    for f in sorted(os.listdir(slozka)):
-        g.write("text " + f + "\\n\\f")
+FAKE_TESSERACT = """#!%s
+import os, sys
+a = sys.argv[1:]
+if a == ["--version"]:
+    print("tesseract 5.5.4")
+elif a[-1] == "--list-langs":
+    d = a[1]
+    print('List of available languages in "%%s/":' %% d)
+    print("\\n".join(f[:-12] for f in os.listdir(d) if f.endswith(".traineddata")))
+else:
+    print("text " + os.path.basename(a[-4]))
 """
 DRZ_ZAMEK = """import os, sys, time
 sys.path.insert(0, sys.argv[1])
@@ -868,7 +689,8 @@ class TestCli(unittest.TestCase):
 
     def ocr(self, *args, timeout=60):
         return subprocess.run([sys.executable, "-I", "-X", "utf8", self.path("tools", "ocr.py"), *args], cwd=self.root,
-                              capture_output=True, text=True, encoding="utf-8", timeout=timeout)
+                              capture_output=True, text=True, encoding="utf-8", timeout=timeout,
+                              env=getattr(self, "env", None))
 
     def test_nastaveni_poskozene(self):
         with open(self.path("data", "ocr.json"), "w", encoding="utf-8") as f:
@@ -879,10 +701,10 @@ class TestCli(unittest.TestCase):
         self.assertIn("řádku 2", p.stderr)
         self.assertNotIn("Traceback", p.stderr + p.stdout)
         with open(self.path("data", "ocr.json"), "w", encoding="utf-8") as f:
-            f.write('{"davka": "10"}')
+            f.write('{"dpi": "300"}')
         p = self.ocr("stav")
         self.assertEqual(p.returncode, 1)
-        self.assertIn("davka", p.stderr)
+        self.assertIn("dpi", p.stderr)
         self.assertNotIn("Traceback", p.stderr + p.stdout)
 
     def test_nastaveni_prezije_aktualizaci(self):
@@ -914,16 +736,24 @@ class TestCli(unittest.TestCase):
         self.assertFalse(os.path.exists(td) and any(f.endswith(".part") for f in os.listdir(td)))
         self.assertNotIn("Traceback", p.stderr)
 
-    def _prikaz(self):
-        with open(self.path("pracovni", "fake_ocr.py"), "w", encoding="utf-8") as f:
-            f.write(FAKE_OCR)
-        sablona = [sys.executable, "-I", self.path("pracovni", "fake_ocr.py"), "{slozka}", "{vystup}", "{model}"]
-        self.assertEqual(self.ocr("nastav", "prikaz", json.dumps(sablona)).returncode, 0)
+    def _falesny_tesseract(self):
+        """Falešný tesseract v PATH a model v uživatelské složce: běh projde bez skutečného Tesseractu."""
+        bin_, td = os.path.join(self.tmp, "bin"), os.path.join(self.tmp, "td")
+        os.makedirs(bin_)
+        os.makedirs(td)
+        with open(os.path.join(bin_, "tesseract"), "w", encoding="utf-8") as f:
+            f.write(FAKE_TESSERACT % sys.executable)
+        os.chmod(os.path.join(bin_, "tesseract"), 0o755)
+        with open(os.path.join(td, "german_print.traineddata"), "w") as f:
+            f.write("model")
+        self.env = dict(os.environ, PATH=bin_ + os.pathsep + os.environ.get("PATH", ""))
+        self.assertEqual(self.ocr("nastav", "tessdata", td).returncode, 0)
         with open(self.path("dokumenty", "a.jpg"), "w") as f:
             f.write("sken")
 
+    @unittest.skipUnless(os.name == "posix", "falešný tesseract je skript se #!")
     def test_zamek_druhy_beh_odmitne(self):
-        self._prikaz()
+        self._falesny_tesseract()
         cil = self.path("pracovni", "ocr", "a")
         pripraven, konec = os.path.join(self.tmp, "pripraven"), os.path.join(self.tmp, "konec")
         with open(os.path.join(self.tmp, "drz.py"), "w", encoding="utf-8") as f:
@@ -947,15 +777,16 @@ class TestCli(unittest.TestCase):
             p = self.ocr("dokumenty/a.jpg", "--vystup", cil)
             self.assertEqual(p.returncode, 0, p.stderr)
             with open(os.path.join(cil, "a.txt"), encoding="utf-8") as f:
-                self.assertEqual(f.read(), "text p0001.jpg\n")
+                self.assertEqual(f.read(), "text a.jpg\n")
         finally:
             open(konec, "w").close()
             if a.poll() is None:
                 a.kill()
             a.wait(10)
 
+    @unittest.skipUnless(os.name == "posix", "falešný tesseract je skript se #!")
     def test_zamek_po_skonceni_volny(self):
-        self._prikaz()
+        self._falesny_tesseract()
         cil = self.path("pracovni", "ocr", "a")
         pripraven, konec = os.path.join(self.tmp, "pripraven"), os.path.join(self.tmp, "konec")
         with open(os.path.join(self.tmp, "drz.py"), "w", encoding="utf-8") as f:

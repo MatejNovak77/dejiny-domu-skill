@@ -230,35 +230,19 @@ U fraktury se zeptej jednou za projekt:
   `aͤ oͤ uͤ → ä ö ü` (i velká); text se čte a cituje běžnými slovy;
 - **ponechat** (věrný přepis, `ocr.py nastav stare_znaky ponechat`).
 Hledání (`ocr_hledej.py`) najde `ſ`, `ꝛ` i `aͤ` samo (výchozí rovnocennosti), takže ani při „ponechat“ se žádné
-pravidlo nepřidává. `jen_s` (jen `ſ → s`) mají výstupy z doby, kdy volba byla `dlouhe_s`; zastaralé `dlouhe_s` v
-nastavení nástroj převede (`s` → `jen_s`) a varuje. Volba platí pro nové texty; složka s hotovými stranami se dodělá
+pravidlo nepřidává. `jen_s` = jen `ſ → s`. Volba platí pro nové texty; složka s hotovými stranami se dodělá
 stejně, jak vznikla (není-li volba nastavená, převezme ji z manifestu), výslovně jiná volba se odmítne (manifest, níže).
 
 ## Nastavení `data/ocr.json`
 Všechna pole jsou volitelná; aktualizace skillu soubor nepřepíše. Zapisuj ho `ocr.py nastav <klíč> <hodnota>`
 (`vychozi` pole smaže), prohlédni `ocr.py nastaveni`.
 ```json
-{"model": "german_print", "stare_znaky": "zjednodusit", "davka": 100, "soubezne": 4, "dpi": 300, "tessdata": "~/.local/share/tessdata",
- "prikaz": ["/cesta/k/programu", "{slozka}", "--lang", "{model}", "--out", "{vystup}"]}
+{"model": "german_print", "stare_znaky": "zjednodusit", "soubezne": 4, "dpi": 300, "tessdata": "~/.local/share/tessdata"}
 ```
 - `model` (přebije ho `--model`), `stare_znaky` `zjednodusit`|`ponechat`|`jen_s`, `dpi` 72–1200 (převod PDF), `soubezne` 1–64 (procesů
-  Tesseractu najednou, výchozí polovina jader, nejvýš 4), `davka` 1–10000 (strany na jedno volání vlastního příkazu),
+  Tesseractu najednou, výchozí polovina jader, nejvýš 4),
   `tessdata` (uživatelská složka modelů; `~` se rozbalí, relativní cesta platí od kořene projektu).
 - Chybný soubor nástroj odmítne s řádkem nebo polem (exit 1); neznámá pole jen vypíše jako varování.
-
-## Vlastní příkaz
-Kdo má vlastní OCR program (třeba výpočetní cluster), nastaví `prikaz` – argv bez shellu. Nahrazují se `{slozka}`
-(dočasná složka se stranami `p0001.<přípona>`, `p0002…` – pořadí jmen = pořadí stran), `{vystup}` (prázdná dočasná
-složka) a `{model}`; všechny tři jsou povinné (manifest pak nese model, který program opravdu použil). Program zapíše
-do `{vystup}` **jeden** `.txt` (jméno libovolné), za **každou** stranou znak konce stránky `\f` (tak píše např.
-`ocr --no-pdf`); jiný počet `\f` nebo text za posledním je chyba dávky.
-- Návratový kód ≠ 0 nebo nesedící výstup: dávka se zahodí, hotové dávky zůstanou, exit 1.
-- Dodělává se stejně jako u vestavěného Tesseractu (i složka, kterou začal Tesseract) – hlídá se model, ne program.
-  Změníš-li program, ale ne model, spusť s `--znovu`.
-- Program může staré znaky převádět sám (např. `ſ → s` vždy), takže `stare_znaky ponechat` pak `ſ` nevrátí.
-- Vícestránkový TIFF před vlastním příkazem rozděl (`magick`, níže): program, který čte jen první snímek, zbytek
-  tiše vynechá a nástroj to nepozná (počet stran sedí).
-- Ctrl-C během příkazu: nástroj počká, až program skončí (další Ctrl-C ho ukončí hned).
 
 ## Výstup, manifest a dodělání
 - `pracovni/ocr/<dokument>/<strana>.txt` (UTF-8, LF): PDF dává `s0001.txt`…, obrázek své jméno (`a-001.jpg` →
@@ -276,7 +260,6 @@ do `{vystup}` **jeden** `.txt` (jméno libovolné), za **každou** stranou znak 
   dřívějšího PDF – a manifest, jiné soubory nechá, a udělá dokument celý znovu), nebo `--vystup` s novou složkou.
   `--znovu` ve složce se stranami bez manifestu nic nesmaže (složka nemusí být nástroje). Nové obrázky ve složce se
   jen připíšou; text odebraného nebo přejmenovaného obrázku ve složce zůstane – smaž ho ručně.
-- Špatná cesta ve vlastním příkazu (`prikaz`) je chyba dávky s hláškou, ne pád.
 - Do jedné složky zapisuje vždy jen jeden běh (`.ocr.lock`); druhý hned skončí „jiný běh OCR“. Tesseract a modely
   se kontrolují dřív, než výstupní složka vznikne.
 - Ctrl-C: běh skončí hned po právě rozpracovaných stranách, vypíše, kolik je hotovo, a další spuštění dodělá zbytek.
