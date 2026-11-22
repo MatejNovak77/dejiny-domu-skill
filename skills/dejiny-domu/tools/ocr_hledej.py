@@ -193,7 +193,8 @@ def hlaska_prenosu(volby):
     if prikazy is not None:   # jeden běh: všechny volby, jak platily se souborem (jinak by doplnilo nastavení projektu)
         sch = NASTAVENI_SEKCE["ocr_hledej"]
         cele = dict({k: d["vychozi"] for k, d in sch.items()}, **dict(prikazy))
-        out.append("  Jen pro jeden běh bez zápisu, se všemi volbami, jak platily s tímto souborem: "
+        out.append("  Jen pro jeden běh bez zápisu (na kopii tohoto souboru bez sekce „volby“, --pravidla <kopie>), "
+                   "se všemi volbami, jak platily s tímto souborem: "
                    + " ".join(f"--volba {k}={v}" for k, v in cele.items()))
     return "\n".join(out)
 
