@@ -23,6 +23,25 @@ class ElipsaTest(unittest.TestCase):
         self.assertFalse(modre((180, 180, 220, 220)))   # střed elipsy zůstal
         self.assertTrue(modre((300, 0, 600, 150)))      # popisek vpravo nahoře
 
+    def test_spocitej_sikmou_parcelu_bez_souseda(self):
+        dum = [(100, 300), (400, 150), (420, 190), (120, 340)]        # šikmá stodola
+        soused = [(100, 250), (380, 110), (150, 400), (450, 260)]    # stavení nad a pod ní
+        cx, cy, a, b, uhel, rezerva = elipsa.spocitej(dum, soused)
+        self.assertLess(uhel, -15)                                    # natočená podél stodoly
+        self.assertGreater(a, b)
+        self.assertGreaterEqual(rezerva, 1)
+        self.assertTrue(all(elipsa.vzdalenost(p, cx, cy, a, b, uhel) <= 1 for p in dum))
+
+    def test_vzdalenost_natocene_elipsy(self):
+        self.assertAlmostEqual(elipsa.vzdalenost((100, 150), 100, 100, 50, 20, 90), 1)   # dlouhá osa svisle
+        self.assertGreater(elipsa.vzdalenost((150, 100), 100, 100, 50, 20, 90), 1)
+
+    def test_silnejsi_cara(self):
+        modre = lambda im: sum(p[2] > 120 and p[0] < 60 for p in im.getdata())
+        tenka = elipsa.oznac(Image.new("RGBA", (600, 400), (128, 128, 128, 255)), 300, 200, 150, 80)
+        silna = elipsa.oznac(Image.new("RGBA", (600, 400), (128, 128, 128, 255)), 300, 200, 150, 80, cara=10)
+        self.assertGreater(modre(silna), 2 * modre(tenka))
+
 
 if __name__ == "__main__":
     unittest.main()
