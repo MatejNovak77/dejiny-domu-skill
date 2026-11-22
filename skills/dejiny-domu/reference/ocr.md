@@ -169,9 +169,8 @@ Musí platit všechno:
 
 Postup:
 1. Nabídni OCR Tesseractem. `python3 -I tools/ocr.py stav` (bez sítě) řekne, co chybí, a vypíše návod pro systém.
-   `brew` (macOS) a `winget` (Windows) spusť sám, ale jen po souhlasu. **`sudo`/`su`/`doas` nikdy, ani se souhlasem**
-   (hook projektu je zamítne): na Linuxu dej uživateli příkaz z `ocr.py stav`, ať ho spustí sám (v Claude Code
-   `! sudo apt install …`, jinak v terminálu), a počkej.
+   `brew` (macOS) a `winget` (Windows) spusť sám, ale jen po souhlasu. `sudo`/`su`/`doas` nikdy: na Linuxu dej
+   uživateli příkaz z `ocr.py stav`, ať ho spustí sám (v Claude Code `! sudo apt install …`, jinak v terminálu), a počkej.
 2. **Fraktura** (německý tisk 18.–20. stol., lomené písmo): nabídni `ocr.py stahni german_print` (3,5 MB, server
    UB Mannheim – ne GitHub, licence neuvedená; jen po souhlasu) a **zeptej se na staré znaky** (níže), pokud
    `ocr.py stav` u nich neukáže „nastaveno“. Volbu zapiš `ocr.py nastav …`; v projektu se už neptej. Velikost, server
@@ -251,8 +250,8 @@ Všechna pole jsou volitelná; aktualizace skillu soubor nepřepíše. Zapisuj h
 - Vícestránkový TIFF (Tesseract z něj vrátí víc stran) je chyba té strany; rozdělí ho
   `magick vstup.tif pracovni/<jméno>/s-%03d.tif` a vstupem je pak složka.
 - `ocr_manifest.json` (zapíše se před první stranou) hlídá, aby se v jedné složce nesmíchaly dva druhy výstupu:
-  porovnává zdroj (druh, jméno, u PDF počet stran), model, staré znaky a u PDF dpi. Verze Tesseractu, Poppleru nebo
-  šablonu příkazu jen zaznamená – aktualizace programů dodělání neblokuje.
+  porovnává zdroj (druh, jméno, u PDF počet stran), model, staré znaky a u PDF dpi. Verze Tesseractu a Poppleru
+  jen zaznamená – aktualizace programů dodělání neblokuje.
 - **Nehlídá** obsah souborů: vyměníš-li sken nebo PDF pod stejným jménem (a počtem stran) nebo soubor modelu pod
   stejným názvem, spusť s `--znovu`, jinak se nové strany přimíchají ke starým.
 - Opakované spuštění dodělá jen chybějící strany (hotová = existující `.txt`, i prázdný). Nesoulad s manifestem:

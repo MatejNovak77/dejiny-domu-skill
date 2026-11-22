@@ -98,7 +98,7 @@ def najdi(program, platform=None, env=None, which=shutil.which, existuje=os.path
 
 def navod(co, platform=None):
     """Návod na instalaci Tesseractu nebo Poppleru pro daný systém. brew/winget smí Claude spustit po souhlasu,
-    sudo nikdy (hook hlidac.py ho zamítne) – na Linuxu je to příkaz pro uživatele."""
+    sudo nikdy – na Linuxu je to příkaz pro uživatele."""
     platform = sys.platform if platform is None else platform
     if platform == "darwin":
         return {"tesseract": f"macOS {PO_SOUHLASU}: brew install tesseract   (Homebrew: https://brew.sh)",
