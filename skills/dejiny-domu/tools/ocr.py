@@ -1,5 +1,5 @@
 """OCR vlastních skenů Tesseractem: z PDF, obrázku nebo složky obrázků text po stranách do pracovni/ocr/<dokument>/.
-Postup, volba modelu, staré znaky (ſ, ꝛ, aͤ) a vlastní příkaz: reference/ocr.md.
+Postup, volba modelu a staré znaky (ſ, ꝛ, aͤ): reference/ocr.md.
 
 Použití (z kořene projektu):
   ocr.py <vstup>… [--model M] [--vystup SLOŽKA] [--strany A-B] [--znovu]
@@ -9,9 +9,10 @@ Použití (z kořene projektu):
       staré znaky ani dpi (jinak exit 1 s výpisem rozdílů). --znovu smaže hotové strany a udělá dokument celý znovu.
   ocr.py stav [--model M]          co chybí (Tesseract, Poppler, model) a návod pro tento systém; bez sítě
   ocr.py modely                    známé modely a kde jsou nainstalované
+  ocr.py nastaveni                 platné nastavení (data/ocr.json a výchozí hodnoty)
+  ocr.py nastav <klíč> <hodnota|vychozi>
+      klíče: model, stare_znaky (zjednodusit|ponechat|jen_s), soubezne, dpi, tessdata
   ocr.py stahni <model>…           stáhne známý model (jen po souhlasu uživatele; jen přes slusne.py)
-Volby (model, staré znaky, vlastní příkaz…) jsou sekce ocr v data/nastaveni.json: nastaveni.py ukaz ocr,
-nastaveni.py nastav ocr.<klíč> <hodnota|vychozi>.
 Exit: 0 vše hotovo, 1 selhání nebo nesoulad, 2 něco není nainstalované, 130 přerušeno (Ctrl-C; další běh dodělá).
 Samotné OCR nic nestahuje.
 """
@@ -21,7 +22,6 @@ for _s in (sys.stdout, sys.stderr):   # UTF-8 výstup i na Windows bez -X utf8 (
     if hasattr(_s, "reconfigure"):
         _s.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # -I nepřidá složku skriptu sama
-import nastaveni
 try:   # stahuje se jen přes slusne.py (limit, robots.txt, podmínky); bez něj stahování odmítne (fail-closed)
     import slusne
     slusne.instaluj()
@@ -31,8 +31,6 @@ except ImportError:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PRIPONY = (".jpg", ".jpeg", ".png", ".tif", ".tiff")
 MODEL_RE = re.compile(r"^[A-Za-z0-9_]+(\+[A-Za-z0-9_]+)*$")
-ZASTUPCE_RE = re.compile(r"\{([^{}]*)\}")
-ZASTUPCI = ("slozka", "vystup", "model")
 MANIFEST = "ocr_manifest.json"
 ZAMEK = ".ocr.lock"
 MIN_MODEL = 100_000   # menší stažený soubor není model (chybová stránka)
@@ -62,8 +60,10 @@ ZNAME = {   # model: (url, sha256, MB, popis)
     "pol": (f"{BEST}/pol.traineddata", "e80cc4cefbdface06e9223f43f089556b9dcf104020fbc0a200f6863c57d4405", 12.0,
             "polština"),
 }
+POLE = ("model", "stare_znaky", "soubezne", "dpi", "tessdata")
 # stare_znaky: zjednodusit = ſ → s, ꝛ → r, aͤ oͤ uͤ → ä ö ü (výchozí); ponechat = věrný přepis; jen_s = jen ſ → s
 STARE_ZNAKY = ("zjednodusit", "ponechat", "jen_s")
+ROZSAHY = {"soubezne": (1, 64), "dpi": (72, 1200)}
 
 
 class Chyba(Exception):
@@ -77,26 +77,6 @@ class Chyba(Exception):
 def spust(argv, **kw):
     """Jediné místo, kde nástroj spouští programy (testy ho nahrazují)."""
     return subprocess.run(argv, **kw)
-
-
-def spust_prikaz(argv):
-    """Vlastní příkaz uživatele. Po Ctrl-C počká, až příkaz sám skončí (terminál mu přerušení poslal taky; další
-    Ctrl-C ho ukončí hned), a teprve pak přerušení pustí dál – jinak by osiřelý proces četl smazanou dávku."""
-    try:
-        proc = subprocess.Popen(argv, cwd=ROOT)
-    except OSError as e:   # překlep v cestě, program mimo PATH (např. ~/.local/bin)
-        raise Chyba(f"vlastní příkaz {argv[0]} nejde spustit ({e.strerror or e}); oprav ho "
-                    "(nastaveni.py nastav ocr.prikaz '[…]').")
-    try:
-        return proc.wait()
-    except KeyboardInterrupt:
-        print("Přerušeno – čekám, až vlastní příkaz skončí (další Ctrl-C ho ukončí hned).", file=sys.stderr, flush=True)
-        try:
-            proc.wait()
-        except KeyboardInterrupt:
-            proc.kill()
-            proc.wait()
-        raise
 
 
 def vychozi_soubezne():
@@ -118,7 +98,7 @@ def najdi(program, platform=None, env=None, which=shutil.which, existuje=os.path
 
 def navod(co, platform=None):
     """Návod na instalaci Tesseractu nebo Poppleru pro daný systém. brew/winget smí Claude spustit po souhlasu,
-    sudo nikdy (hook hlidac.py ho zamítne) – na Linuxu je to příkaz pro uživatele."""
+    sudo nikdy – na Linuxu je to příkaz pro uživatele."""
     platform = sys.platform if platform is None else platform
     if platform == "darwin":
         return {"tesseract": f"macOS {PO_SOUHLASU}: brew install tesseract   (Homebrew: https://brew.sh)",
@@ -169,9 +149,10 @@ def rozbor_jazyku(text):
     return None, []
 
 
-def jazyky(tess, tessdata=None):
-    argv = [tess] + (["--tessdata-dir", tessdata] if tessdata else []) + ["--list-langs"]
-    return rozbor_jazyku(_vystup(spust(argv, capture_output=True)))
+def systemove_modely(tess):
+    """→ (systémová složka modelů|None, [modely, které Tesseract zná])."""
+    sdir, sjaz = rozbor_jazyku(_vystup(spust([tess, "--list-langs"], capture_output=True)))
+    return systemova_slozka(sdir), sjaz
 
 
 def systemova_slozka(slozka, env=None):
@@ -199,11 +180,11 @@ def rozloz_model(model):
     return model.split("+")
 
 
-def uzivatelska_slozka(nast=None, platform=None, env=None):
+def uzivatelska_slozka(nastaveni=None, platform=None, env=None):
     """Kam se modely stahují a odkud se berou ty, které systém nemá."""
     platform = sys.platform if platform is None else platform
     env = os.environ if env is None else env
-    t = (nast or {}).get("tessdata")
+    t = (nastaveni or {}).get("tessdata")
     if t:
         t = os.path.expanduser(t)
         return t if os.path.isabs(t) else os.path.normpath(os.path.join(ROOT, t))
@@ -243,12 +224,11 @@ def rada_modelu(model, uziv):
     return f"skill tento model nezná; soubor {model}.traineddata dej ručně do {uziv}"
 
 
-def priprav_modely(tess, model, nast, kopirovat=True):
+def priprav_modely(tess, model, nastaveni, kopirovat=True):
     """Najde (a pro běh zkopíruje) části modelu. Vrací tessdata_dir|None. Chybí → Chyba(kód 2)."""
     casti = rozloz_model(model)
-    sdir, sjaz = jazyky(tess)
-    sdir = systemova_slozka(sdir)
-    uziv = uzivatelska_slozka(nast)
+    sdir, sjaz = systemove_modely(tess)
+    uziv = uzivatelska_slozka(nastaveni)
     tdir, cesty, chybi, kopie = kde_modely(casti, (sdir, sjaz), uziv)
     if chybi:
         raise Chyba("Chybí model: " + "; ".join(f"{c} – {rada_modelu(c, uziv)}" for c in chybi), 2)
@@ -268,51 +248,67 @@ def priprav_modely(tess, model, nast, kopirovat=True):
 
 # --- nastavení ------------------------------------------------------------------------------------------------
 
-NASTAVENI_SEKCE = {
-    "ocr": {
-        "model": {"vychozi": "german_print", "text": True,
-                  "popis": "model Tesseractu, víc spoj +, např. german_print+ces; --model přebije"},
-        "stare_znaky": {"vychozi": None, "hodnoty": ["zjednodusit", "ponechat", "jen_s"],
-                        "popis": "ſ ꝛ aͤ: zjednodusit = s r ä, ponechat = věrně, jen_s = jen ſ → s"},
-        "prikaz": {"vychozi": None, "seznam": True, "nepovinne": True,
-                   "popis": "vlastní program místo Tesseractu se zástupci {slozka}, {vystup}, {model}"},
-        "davka": {"vychozi": 100, "cele": [1, 10000], "popis": "stran na jedno spuštění vlastního příkazu"},
-        "soubezne": {"vychozi": None, "cele": [1, 64], "nepovinne": True,
-                     "popis": "stran naráz; bez nastavení polovina jader, nejvýš 4"},
-        "dpi": {"vychozi": 300, "cele": [72, 1200], "popis": "rozlišení stran z PDF"},
-        "tessdata": {"vychozi": None, "text": True, "nepovinne": True,
-                     "popis": "složka stažených modelů; bez nastavení obvyklá uživatelská"},
-    },
-}
+def cesta_nastaveni():
+    return os.path.join(ROOT, "data", "ocr.json")
 
 
-def nacti_nastaveni():
-    """Sekce ocr z data/nastaveni.json; neplatná hodnota, neznámý klíč, model nebo prikaz bez zástupců → Chyba."""
+def nacti_nastaveni(cesta=None):
+    """data/ocr.json (utf-8-sig) → dict; chybí → {}. Chybný JSON nebo typ → Chyba (bez tracebacku)."""
+    cesta = cesta or cesta_nastaveni()
+    if not os.path.exists(cesta):
+        return {}
     try:
-        d = nastaveni.sekce("ocr")
-    except nastaveni.Chyba as e:
-        raise Chyba(str(e))
-    oprav = "– oprav: python3 -I tools/nastaveni.py nastav ocr.{} …, nebo nastav ocr.{} vychozi"
-    try:
-        rozloz_model(d["model"])
-    except Chyba as e:
-        raise Chyba(f"data/nastaveni.json: ocr.model: {e} {oprav.format('model', 'model')}")
-    if d["prikaz"]:
-        nalezene = [z for x in d["prikaz"] for z in ZASTUPCE_RE.findall(x)]
-        chyby = [f"neznámé {{{z}}}" for z in nalezene if z not in ZASTUPCI]
-        # {model} povinný: manifest pak nese model, který program skutečně použil
-        chyby += [f"chybí {{{z}}}" for z in ZASTUPCI if z not in nalezene]
-        if chyby:
-            raise Chyba(f"data/nastaveni.json: ocr.prikaz: {', '.join(chyby)} (povolené a povinné jsou {{slozka}}, "
-                        f"{{vystup}}, {{model}}) {oprav.format('prikaz', 'prikaz')}")
+        with open(cesta, encoding="utf-8-sig") as f:
+            d = json.load(f)
+    except json.JSONDecodeError as e:
+        raise Chyba(f"{cesta}: chybný JSON na řádku {e.lineno}, sloupec {e.colno} ({e.msg}). Oprav soubor, "
+                    "nebo ho smaž (platí výchozí hodnoty).")
+    except (OSError, UnicodeDecodeError) as e:
+        raise Chyba(f"{cesta}: nejde přečíst ({e}).")
+    chyby, varovani = over_nastaveni(d)
+    for v in varovani:
+        print(f"Varování: {cesta}: {v}", file=sys.stderr)
+    if chyby:
+        raise Chyba(f"{cesta}: " + "; ".join(chyby))
     return d
 
 
+def over_nastaveni(d):
+    """→ (chyby, varování). Všechna pole jsou volitelná; neznámá pole jen varují."""
+    if not isinstance(d, dict):
+        return ["kořen musí být objekt { … }"], []
+    chyby, varovani = [], []
+    for k in d:
+        if k not in POLE:
+            varovani.append(f"neznámé pole {k} (nástroj ho nepoužívá)")
+    if "model" in d:
+        try:
+            rozloz_model(d["model"])
+        except Chyba as e:
+            chyby.append(f"model: {e}")
+    if "stare_znaky" in d and d["stare_znaky"] not in STARE_ZNAKY:
+        chyby.append(f"stare_znaky: musí být {' | '.join(STARE_ZNAKY)}")
+    for k, (lo, hi) in ROZSAHY.items():
+        if k in d:
+            v = d[k]
+            if not isinstance(v, int) or isinstance(v, bool) or not lo <= v <= hi:
+                chyby.append(f"{k}: celé číslo {lo}–{hi}")
+    if "tessdata" in d and (not isinstance(d["tessdata"], str) or not d["tessdata"].strip()):
+        chyby.append("tessdata: cesta ke složce s modely (text)")
+    return chyby, varovani
+
+
 def platne(nast, model=None):
-    """Výsledné hodnoty: --model, pak nastavení (výchozí hodnoty jsou v NASTAVENI_SEKCE)."""
-    return {"model": model if model is not None else nast["model"],   # --model "" je chyba, ne výchozí
-            "stare_znaky": nast["stare_znaky"] or "zjednodusit", "prikaz": nast["prikaz"], "davka": nast["davka"],
-            "soubezne": nast["soubezne"] or vychozi_soubezne(), "dpi": nast["dpi"], "tessdata": nast["tessdata"]}
+    """Výsledné hodnoty: --model, pak soubor, pak výchozí."""
+    return {"model": model or nast.get("model") or "german_print", "stare_znaky": stare_znaky(nast) or "zjednodusit",
+            "soubezne": nast.get("soubezne", vychozi_soubezne()),
+            "dpi": nast.get("dpi", 300), "tessdata": nast.get("tessdata")}
+
+
+def stare_znaky(d):
+    """Výslovně nastavené staré znaky v nastavení nebo manifestu, jinak None."""
+    v = d.get("stare_znaky")
+    return v if isinstance(v, str) and v else None
 
 
 def varuj_model(model):
@@ -392,10 +388,7 @@ def strany(vstup):
             if k.lower() in kmeny:
                 raise Chyba(f"{vstup}: {kmeny[k.lower()]} a {f} by daly stejný soubor {k}.txt – přejmenuj jeden.")
             kmeny[k.lower()] = f
-        out = []
-        for f in obr:
-            out.append({"jmeno": os.path.splitext(f)[0], "obrazek": os.path.join(vstup, f)})
-        return "slozka", out, None
+        return "slozka", [{"jmeno": os.path.splitext(f)[0], "obrazek": os.path.join(vstup, f)} for f in obr], None
     if not os.path.isfile(vstup):
         raise Chyba(f"{vstup}: soubor ani složka neexistuje.")
     if vstup.lower().endswith(".pdf"):
@@ -513,27 +506,6 @@ def tesseract_strana(tess, obrazek, model, tessdata=None):
     return (r.stdout or b"").decode("utf-8", "replace")
 
 
-def prikaz_argv(sablona, slozka, vystup, model):
-    hodnoty = {"slozka": slozka, "vystup": vystup, "model": model}
-    argv = [ZASTUPCE_RE.sub(lambda m: hodnoty[m.group(1)], x) for x in sablona]
-    argv[0] = os.path.expanduser(argv[0])
-    return argv
-
-
-def vysledky_davky(vystup, jmena):
-    """Výstup vlastního příkazu → {strana: text}: ve {vystup} právě jeden .txt, za každou stranou \\f
-    (tak píše např. `ocr --no-pdf`); za posledním \\f jen bílé znaky."""
-    soubory = [f for f in os.listdir(vystup) if f.endswith(".txt")]
-    if len(soubory) != 1:
-        raise Chyba(f"vlastní příkaz: čekán jeden soubor .txt se všemi stranami, je jich {len(soubory)}.")
-    with open(os.path.join(vystup, soubory[0]), encoding="utf-8", errors="replace", newline="") as f:
-        kusy = f.read().split("\f")
-    if len(kusy) != len(jmena) + 1 or kusy[-1].strip():
-        raise Chyba(f"vlastní příkaz: {len(kusy) - 1} konců stran (\\f), čekáno {len(jmena)} – jiný počet stran "
-                    "(vícestránkový TIFF?), nebo text za posledním \\f.")
-    return dict(zip(jmena, kusy))
-
-
 # --- příkazy --------------------------------------------------------------------------------------------------
 
 def _tesseract():
@@ -558,17 +530,13 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None, znovu=False):
     dokument = os.path.splitext(os.path.basename(os.path.normpath(vstup)))[0] if druh != "slozka" \
         else os.path.basename(os.path.normpath(vstup))
     vystup = vystup or os.path.join(ROOT, "pracovni", "ocr", dokument)
-    sablona = p["prikaz"]
     # kontroly (Tesseract, modely) před zámkem: bez nich nevznikne prázdná výstupní složka
     model = p["model"]
     rozloz_model(model)
-    if sablona:
-        programy, tess, tdir = {"prikaz": sablona}, None, None
-    else:
-        varuj_model(model)
-        tess, verze = _tesseract()
-        tdir = priprav_modely(tess, model, nast)
-        programy = {"tesseract": verze}
+    varuj_model(model)
+    tess, verze = _tesseract()
+    tdir = priprav_modely(tess, model, nast)
+    programy = {"tesseract": verze}
     if druh == "pdf":
         programy["pdftoppm"] = verze_poppleru(pdftoppm)
     with zamek_slozky(vystup):
@@ -598,7 +566,7 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None, znovu=False):
         if txt and stary is None:
             raise Chyba(f"{vystup}: jsou tu strany bez {MANIFEST} – nelze zaručit původ. Smaž složku, nebo zvol --vystup.")
         sz = stary.get("stare_znaky") if stary and txt else None
-        if nast["stare_znaky"] is None and sz in STARE_ZNAKY and sz != p["stare_znaky"]:
+        if stare_znaky(nast) is None and sz in STARE_ZNAKY and sz != p["stare_znaky"]:
             # nenastavené výslovně: dodělat stejně jako hotové strany (žádné tiché povýšení starého výstupu)
             p["stare_znaky"] = sz
             print(f"staré znaky: {sz} podle hotových stran", file=sys.stderr)
@@ -616,8 +584,6 @@ def zpracuj(vstup, nast, model_arg=None, vystup=None, rozsah=None, znovu=False):
         if not todo:
             return 0
         try:
-            if sablona:
-                return _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup)
             return _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup)
         except KeyboardInterrupt:
             h = len({f[:-4] for f in os.listdir(vystup) if f.endswith(".txt")} & {s["jmeno"] for s in vyber})
@@ -657,38 +623,6 @@ def _tesseract_strany(todo, druh, vstup, pdftoppm, p, tess, model, tdir, vystup)
     return chyby
 
 
-def _davky_prikazu(todo, druh, vstup, pdftoppm, p, sablona, model, vystup):
-    for i in range(0, len(todo), p["davka"]):
-        davka = todo[i:i + p["davka"]]
-        slozka = tempfile.mkdtemp(prefix="ocr_davka_")
-        vyst = tempfile.mkdtemp(prefix="ocr_vystup_")
-        try:
-            # pořadová jména: program řadící abecedně i „přirozeně“ (1, 2, 10) vidí strany ve stejném pořadí jako my
-            sirka = max(4, len(str(len(davka))))
-            for k, s in enumerate(davka, 1):
-                cil = os.path.join(slozka, "p%0*d" % (sirka, k))
-                if druh == "pdf":
-                    vykresli(pdftoppm, vstup, s["cislo"], p["dpi"], cil)
-                else:
-                    shutil.copyfile(s["obrazek"], cil + os.path.splitext(s["obrazek"])[1])
-            argv = prikaz_argv(sablona, slozka, vyst, model)
-            print(f"  vlastní příkaz: dávka {i // p['davka'] + 1}, strany {davka[0]['jmeno']}–{davka[-1]['jmeno']}",
-                  flush=True)
-            rc = spust_prikaz(argv)
-            if rc != 0:
-                raise Chyba(f"vlastní příkaz skončil kódem {rc}; dávka zahozena, hotové dávky zůstaly.")
-            texty = vysledky_davky(vyst, [s["jmeno"] for s in davka])
-            for s in davka:
-                zapis_stranu(vystup, s["jmeno"], uprav_text(texty[s["jmeno"]], p["stare_znaky"]))
-        except Chyba as e:
-            print(f"CHYBA dávky {davka[0]['jmeno']}–{davka[-1]['jmeno']}: {e}", file=sys.stderr)
-            return 1
-        finally:
-            shutil.rmtree(slozka, ignore_errors=True)
-            shutil.rmtree(vyst, ignore_errors=True)
-    return 0
-
-
 def prikaz_stav(nast, model_arg=None):
     p = platne(nast, model_arg)
     chybi = False
@@ -718,8 +652,7 @@ def prikaz_stav(nast, model_arg=None):
     varuj_model(model)
     print(f"uživatelská složka modelů: {uziv}")
     if tess:
-        sdir, sjaz = jazyky(tess)
-        sdir = systemova_slozka(sdir)
+        sdir, sjaz = systemove_modely(tess)
         print(f"systémová složka modelů: {sdir or '?'} ({' '.join(sjaz) or 'žádné'})")
         tdir, cesty, chyb, kopie = kde_modely(casti, (sdir, sjaz), uziv)
         for c in casti:
@@ -733,9 +666,7 @@ def prikaz_stav(nast, model_arg=None):
             chybi = True
         else:
             print(f"složka modelů pro běh: {tdir or sdir} ({'--tessdata-dir' if tdir else 'systémová'})")
-    if p["prikaz"]:
-        print(f"vlastní příkaz: {json.dumps(p['prikaz'], ensure_ascii=False)}")
-    print(f"staré znaky: {p['stare_znaky']} " + ("(nastaveno v data/nastaveni.json)" if nast["stare_znaky"] else
+    print(f"staré znaky: {p['stare_znaky']} " + ("(nastaveno v data/ocr.json)" if stare_znaky(nast) else
                                                   "(výchozí, nenastaveno – u fraktury se zeptej uživatele)"))
     return 2 if chybi else 0
 
@@ -745,8 +676,7 @@ def prikaz_modely(nast):
     tess = najdi("tesseract")
     sdir, sjaz = (None, [])
     if tess:
-        sdir, sjaz = jazyky(tess)
-        sdir = systemova_slozka(sdir)
+        sdir, sjaz = systemove_modely(tess)
     print(f"systémová složka: {sdir or '?'}\nuživatelská složka: {uziv}")
     jine = set(sjaz) | {os.path.basename(f)[:-12] for f in glob.glob(os.path.join(uziv, "*.traineddata"))}
     for m, (_, _, mb, popis) in ZNAME.items():
@@ -755,6 +685,36 @@ def prikaz_modely(nast):
         print(f"{m:14} {mb:5.1f} MB  {'+'.join(kde) or '–':16} {popis}; {puvod(m)}")
     for m in sorted(jine - set(ZNAME)):
         print(f"{m:14}           nainstalovaný (skill ho nezná)")
+    return 0
+
+
+def prikaz_nastav(nast_cesta, klic, hodnota):
+    if klic not in POLE:
+        raise Chyba(f"Neznámý klíč {klic} (známé: {', '.join(POLE)}).")
+    d = {}
+    if os.path.exists(nast_cesta):
+        try:
+            with open(nast_cesta, encoding="utf-8-sig") as f:
+                d = json.load(f)
+        except (OSError, ValueError) as e:
+            raise Chyba(f"{nast_cesta}: nejde přečíst ({e}); oprav nebo smaž soubor.")
+        if not isinstance(d, dict):
+            raise Chyba(f"{nast_cesta}: kořen musí být objekt.")
+    if hodnota == "vychozi":
+        d.pop(klic, None)
+    elif klic in ROZSAHY:
+        try:
+            d[klic] = int(hodnota)
+        except ValueError:
+            raise Chyba(f"{klic}: celé číslo")
+    else:
+        d[klic] = hodnota
+    chyby, _ = over_nastaveni(d)
+    if chyby:
+        raise Chyba("; ".join(chyby) + " – nic se nezapsalo.")
+    os.makedirs(os.path.dirname(nast_cesta), exist_ok=True)
+    zapis_json(nast_cesta, d)
+    print(f"Zapsáno do data/ocr.json: {klic} = {json.dumps(d.get(klic, 'výchozí'), ensure_ascii=False)}")
     return 0
 
 
@@ -785,12 +745,20 @@ def main(argv):
         return 0
     try:
         prikaz = argv[0]
+        if prikaz == "nastav":
+            if len(argv) != 3:
+                raise Chyba("Použití: ocr.py nastav <klíč> <hodnota|vychozi>")
+            return prikaz_nastav(cesta_nastaveni(), argv[1], argv[2])
         nast = nacti_nastaveni()
         if prikaz == "stav":
             _, volby = _volby(argv[1:], ("--model",))
             return prikaz_stav(nast, volby.get("model"))
         if prikaz == "modely":
             return prikaz_modely(nast)
+        if prikaz == "nastaveni":
+            print(json.dumps({"soubor": cesta_nastaveni() if os.path.exists(cesta_nastaveni()) else None,
+                              "platne": platne(nast)}, ensure_ascii=False, indent=1))
+            return 0
         if prikaz == "stahni":
             if len(argv) < 2:
                 raise Chyba("Použití: ocr.py stahni <model>…")

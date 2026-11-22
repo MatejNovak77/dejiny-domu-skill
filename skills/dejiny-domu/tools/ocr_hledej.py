@@ -5,28 +5,25 @@ tvary písmen (e + U+030C = ě), měkké dělení U+00AD a česká sada pravopis
 v data/ocr_zameny.json (bez souboru = celé slovo i rozdělené přes řádek, s rovnocennostmi, českými koncovkami
 a genitivem -s/-es). Postup: reference/ocr.md.
 
-Volby hledání (dělení slov, vynechané první písmeno, tvary, rovnocennosti a sady pravopisu) jsou v nastavení
-projektu: python3 -I tools/nastaveni.py ukaz ocr_hledej / nastav ocr_hledej.<klíč> <hodnota|vychozi>.
-
 Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všech *.txt v pracovni/):
   ocr_hledej.py hledej <slovo>… [--tvary ceske|presne|volne] [--vypis souhrn|radky]
-                [--pravidla <json>] [--volba <klíč>=<hodnota>]… [-- <soubor|složka>…]
+                [--pravidla <json>] [-- <soubor|složka>…]
       → souhrn podle nalezeného tvaru: slovo, tvar, počet×, první tři místa (+ kolik dalších), ukázka (tabulátory);
         --vypis radky: řádek na nález (slovo, tvar, soubor:řádek, ukázka); počty a počet souborů na stderr
       hranice (mimo --tvary volne): za nálezem nesmí být malé písmeno, velké jen po malém (FischerDavid ano,
         FISCHERDAVID ne)
       --tvary ceske (výchozí): české koncovky a německý genitiv -s/-es (Zineckers, Krauses; ne Krauss),
         genitiv jen za slovem bez záměn a skupin projektu
-      --volba deleni_slova=ne: volba z nastavení jen pro tento běh (opakovatelná), nic nezapíše
-  ocr_hledej.py kandidati <slovo>… [--vzdalenost N] [--max 40] [--tvary …] [--pravidla <json>] [--volba …]
-                [-- …]
-      → slova blízká hledanému, která pravidla nenajdou, s počtem, ukázkou a návrhem pravidla nebo volby
-        (nastav ocr_hledej.… = argumenty nastaveni.py); nic nezapíše
+  ocr_hledej.py kandidati <slovo>… [--vzdalenost N] [--max 40] [--tvary …] [--pravidla <json>] [-- …]
+      → slova blízká hledanému, která pravidla nenajdou, s počtem, ukázkou a návrhem pravidla; nic nezapíše
   ocr_hledej.py pridej|odeber zamena <znak> <čtení>…
   ocr_hledej.py pridej|odeber skupina <dvě malá písmena> <čtení>…
   ocr_hledej.py pridej|odeber vyloucit <text> [--proc "důvod"]
+  ocr_hledej.py pridej|odeber volba deleni_slova|chybi_prvni_pismeno [ano|ne]   (výchozí ano | ne)
+  ocr_hledej.py pridej|odeber volba tvary ceske|presne|volne
+  ocr_hledej.py pridej|odeber rovnocennost <název>|vse
   ocr_hledej.py pravidla
-Pravidlo i volbu měň jen se souhlasem uživatele. Pravopisné varianty jmen (Zinecker / Zinnecker)
+Pravidlo, rovnocennost i volbu měň jen se souhlasem uživatele. Pravopisné varianty jmen (Zinecker / Zinnecker)
 hledej jako samostatná slova.
 """
 import functools, glob, json, os, re, sys, unicodedata
@@ -35,7 +32,6 @@ for _s in (sys.stdout, sys.stderr):   # UTF-8 výstup i na Windows bez -X utf8
     if hasattr(_s, "reconfigure"):
         _s.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # -I nepřidá složku skriptu sama (import zapis)
-import nastaveni   # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PRAVIDLA = os.path.join(ROOT, "data", "ocr_zameny.json")
@@ -50,7 +46,7 @@ KONCOVKY = ("a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův 
 NEMECKE = ("es", "s")   # německý genitiv (Zineckers, Krauses) jen za slovem bez záměn projektu; holé s ne po
                         # s ß ſ x z (Krauss je jiný pravopis)
 TVARY = ("ceske", "presne", "volne")
-SEKCE = ("poznamka", "zameny", "skupiny", "vyloucit")
+SEKCE = ("poznamka", "zameny", "skupiny", "vyloucit", "volby")
 VYCHOZI_VOLBY = {"deleni_slova": True, "chybi_prvni_pismeno": False}   # volby ano/ne
 MEMO = 200_000        # slov v paměti kandidátů
 SLOVO_RE = re.compile(r"[^\s.,;:!?\"'„“”‚‘’»«()\[\]{}<>/|*]+")
@@ -63,46 +59,32 @@ PREHLASKY = {"ä": "a", "ö": "o", "ü": "u", "Ä": "A", "Ö": "O", "Ü": "U"}
 ZE_ZAKLADU = {v: k for k, v in PREHLASKY.items()}
 STAZENI = {"ae": "ä", "Ae": "Ä", "AE": "Ä", "oe": "ö", "Oe": "Ö", "OE": "Ö", "ue": "ü", "Ue": "Ü", "UE": "Ü",
            "ss": OSTRE, "SS": OSTRE_VELKE}
-ROVNOCENNOSTI = ("dlouhe_s", "r_rotunda", "ostre_s", "prehlasky", "rozlozene", "mekke_deleni")
+ROVNOCENNOSTI = {
+    "dlouhe_s": "ſ = s",
+    "r_rotunda": "ꝛ = r",
+    "ostre_s": "ß = ss (i ſs, sſ, ſſ; ẞ = SS)",
+    "prehlasky": "ä ö ü = ae oe ue = aͤ oͤ uͤ (i velká)",
+    "rozlozene": "rozložené tvary písmen (e + U+030C = ě, a + U+0308 = ä)",
+    "mekke_deleni": "měkké dělení U+00AD jako znak dělení slova",
+}
 # Sady historického pravopisu: pravidla (ne normalizace), sloučí se s pravidly projektu. Prameny: reference/ocr.md.
 SADY_PRAVOPISU = {
     "cestina_1849": {   # bratrský pravopis do 1849: jen dnešní slovo → starý zápis (Václav → Wáclaw)
+        "popis": "čeština před 1849: v→w, j→g, í→j, ou→au, š→ss (jen dnešní slovo → starý zápis)",
         "zameny": {"v": ["w"], "V": ["W"], "j": ["g"], "J": ["G"], "í": ["j"], "Í": ["J"], "š": ["ss"],
                    "Š": ["Ss", "SS"]},
         "skupiny": {"ou": ["au"]},
     },
     "nemcina_1901": {   # pravopis před 1901/1902 a varianty 19. stol., obousměrně (Thal ↔ Tal, Carl ↔ Karl)
+        "popis": "němčina před 1901: th↔t, c↔k, c↔z, y↔i, ph↔f (obousměrně)",
         "zameny": {"t": ["th"], "T": ["Th", "TH"], "c": ["k", "z"], "C": ["K", "Z"], "k": ["c"], "K": ["C"],
                    "z": ["c"], "Z": ["C"], "y": ["i"], "Y": ["I"], "i": ["y"], "I": ["Y"], "f": ["ph"],
                    "F": ["Ph", "PH"]},
         "skupiny": {"th": ["t"], "ph": ["f"]},
     },
 }
-VSE = ROVNOCENNOSTI + tuple(SADY_PRAVOPISU)
+VSE = tuple(ROVNOCENNOSTI) + tuple(SADY_PRAVOPISU)
 VYCHOZI = frozenset(VSE) - {"nemcina_1901"}
-
-# Volby hledání v nastavení projektu (data/nastaveni.json, tools/nastaveni.py). Literál: nastaveni.py ho čte přes ast.
-# Výchozí hodnoty = VYCHOZI a dřívější výchozí chování (hlídá test).
-NASTAVENI_SEKCE = {"ocr_hledej": {
-    "deleni_slova": {"vychozi": "ano", "hodnoty": ["ano", "ne"],
-                     "popis": "slovo rozdělené znakem dělení na konci řádku (Gans-⏎bauden)"},
-    "chybi_prvni_pismeno": {"vychozi": "ne", "hodnoty": ["ano", "ne"],
-                            "popis": "OCR vynechalo první písmeno (u slov delších než 6 písmen)"},
-    "tvary": {"vychozi": "ceske", "hodnoty": ["ceske", "presne", "volne"],
-              "popis": "ceske = české koncovky a genitiv -s/-es, presne = jen celé slovo, volne = slovo kdekoli; "
-                       "--tvary přebije"},
-    "dlouhe_s": {"vychozi": "ano", "hodnoty": ["ano", "ne"], "popis": "ſ = s"},
-    "r_rotunda": {"vychozi": "ano", "hodnoty": ["ano", "ne"], "popis": "ꝛ = r"},
-    "ostre_s": {"vychozi": "ano", "hodnoty": ["ano", "ne"], "popis": "ß = ss (i ſs, sſ, ſſ; ẞ = SS)"},
-    "prehlasky": {"vychozi": "ano", "hodnoty": ["ano", "ne"], "popis": "ä ö ü = ae oe ue = aͤ oͤ uͤ (i velká)"},
-    "rozlozene": {"vychozi": "ano", "hodnoty": ["ano", "ne"],
-                  "popis": "rozložené tvary písmen (e + U+030C = ě, a + U+0308 = ä)"},
-    "mekke_deleni": {"vychozi": "ano", "hodnoty": ["ano", "ne"], "popis": "měkké dělení U+00AD jako znak dělení slova"},
-    "cestina_1849": {"vychozi": "ano", "hodnoty": ["ano", "ne"],
-                     "popis": "čeština před 1849: v→w, j→g, í→j, ou→au, š→ss (jen dnešní slovo → starý zápis)"},
-    "nemcina_1901": {"vychozi": "ne", "hodnoty": ["ano", "ne"],
-                     "popis": "němčina před 1901: th↔t, c↔k, c↔z, y↔i, ph↔f (obousměrně)"},
-}}
 
 
 # --- pravidla -------------------------------------------------------------------------------------------------
@@ -122,13 +104,13 @@ def chyby_pravidel(p):
     """Všechny chyby schématu pravidel najednou (prázdný seznam = v pořádku)."""
     if not isinstance(p, dict):
         return ["kořen musí být objekt { … }, ne " + type(p).__name__]
-    chyby = [hlaska_prenosu(p["volby"])] if "volby" in p else []
+    chyby = []
     for k in p:
-        if k not in SEKCE and k != "volby":
+        if k not in SEKCE:
             chyby.append(f"neznámá sekce „{k}“ (povolené: {', '.join(SEKCE)})")
     if "poznamka" in p and not isinstance(p["poznamka"], str):
         chyby.append("poznamka: musí být text")
-    for sekce in ("zameny", "skupiny", "vyloucit"):
+    for sekce in ("zameny", "skupiny", "vyloucit", "volby"):
         if sekce in p and not isinstance(p[sekce], dict):
             chyby.append(f"{sekce}: musí být objekt {{ … }}")
     if isinstance(p.get("zameny"), dict):
@@ -147,6 +129,28 @@ def chyby_pravidel(p):
                 chyby.append(f"vyloucit: text „{k}“ musí být neprázdný a bez mezer")
             if not isinstance(v, str):
                 chyby.append(f"vyloucit „{k}“: důvod musí být text")
+    if isinstance(p.get("volby"), dict):
+        for k, v in p["volby"].items():
+            if k in VYCHOZI_VOLBY:
+                if not isinstance(v, bool):
+                    chyby.append(f"volby {k}: musí být true nebo false (je {json.dumps(v, ensure_ascii=False)})")
+            elif k == "tvary":
+                if not (isinstance(v, str) and v in TVARY):
+                    chyby.append(f"volby tvary: musí být {' | '.join(TVARY)} (je {json.dumps(v, ensure_ascii=False)})")
+            elif k == "rovnocennosti":
+                if isinstance(v, dict):
+                    for n, b in v.items():
+                        if n not in VSE:
+                            chyby.append(f"volby rovnocennosti: neznámá položka „{n}“ (povolené: {', '.join(VSE)})")
+                        elif not isinstance(b, bool):
+                            chyby.append(f"volby rovnocennosti {n}: musí být true nebo false "
+                                         f"(je {json.dumps(b, ensure_ascii=False)})")
+                elif not isinstance(v, bool):
+                    chyby.append("volby rovnocennosti: musí být true, false nebo objekt {\"název\": true|false} "
+                                 f"(je {json.dumps(v, ensure_ascii=False)})")
+            else:
+                chyby.append(f"neznámá volba „{k}“ (povolené: "
+                             f"{', '.join((*VYCHOZI_VOLBY, 'tvary', 'rovnocennosti'))})")
     return chyby
 
 
@@ -155,71 +159,8 @@ def volba(pravidla, nazev):
     return (pravidla or {}).get("volby", {}).get(nazev, VYCHOZI_VOLBY[nazev])
 
 
-def prikazy_prenosu(volby):
-    """Dřívější sekce „volby“ souboru pravidel jako [(klíč, hodnota)] pro nastaveni.py; None = nejde přečíst."""
-    if not isinstance(volby, dict):
-        return None
-    an = lambda b: "ano" if b else "ne"
-    out = []
-    for k, v in volby.items():
-        if k in ("deleni_slova", "chybi_prvni_pismeno") and isinstance(v, bool):
-            out.append((k, an(v)))
-        elif k == "tvary" and v in TVARY:
-            out.append((k, v))
-        elif k == "rovnocennosti" and v is True:
-            pass
-        elif k == "rovnocennosti" and v is False:
-            out += [(n, "ne") for n in VSE]
-        elif k == "rovnocennosti" and isinstance(v, dict) and all(n in VSE and isinstance(b, bool)
-                                                                   for n, b in v.items()):
-            out += [(n, an(b)) for n, b in v.items()]
-        else:
-            return None
-    return out
-
-
-def hlaska_prenosu(volby):
-    """Chyba pro soubor pravidel s dřívější sekcí „volby“: přesné příkazy, jak je přenést do nastavení."""
-    out = ["volby hledání jsou teď v nastavení projektu (data/nastaveni.json). Se souhlasem uživatele je přenes "
-           "a sekci „volby“ z tohoto souboru smaž:"]
-    prikazy = prikazy_prenosu(volby)
-    if prikazy is None:
-        out.append(f"  sekce „volby“ = {json.dumps(volby, ensure_ascii=False)} – přenes ji ručně podle "
-                   "python3 -I tools/nastaveni.py ukaz ocr_hledej")
-    elif not prikazy:
-        out.append("  (nic k přenesení – sekce „volby“ odpovídá výchozím hodnotám)")
-    else:
-        out += [f"  python3 -I tools/nastaveni.py nastav ocr_hledej.{k} {v}" for k, v in prikazy]
-    if prikazy is not None:   # jeden běh: všechny volby, jak platily se souborem (jinak by doplnilo nastavení projektu)
-        sch = NASTAVENI_SEKCE["ocr_hledej"]
-        cele = dict({k: d["vychozi"] for k, d in sch.items()}, **dict(prikazy))
-        out.append("  Jen pro jeden běh bez zápisu (na kopii tohoto souboru bez sekce „volby“, --pravidla <kopie>), "
-                   "se všemi volbami, jak platily s tímto souborem: "
-                   + " ".join(f"--volba {k}={v}" for k, v in cele.items()))
-    return "\n".join(out)
-
-
-def volby_hledani(prepis=()):
-    """Volby hledání z nastavení projektu, přepsané --volba klíč=hodnota (jen pro tento běh), ve vnitřním tvaru
-    pravidla["volby"] pro Vzor/hledej/kandidati. Chyba nastavení nebo --volba ukončí program před hledáním."""
-    try:
-        s = nastaveni.sekce("ocr_hledej")
-    except nastaveni.Chyba as e:
-        sys.exit(f"CHYBA: {e}")
-    sch = NASTAVENI_SEKCE["ocr_hledej"]
-    for x in prepis:
-        k, _, v = x.partition("=")
-        if k not in sch:
-            sys.exit(f"--volba {x}: neznámá volba „{k}“ (známé: {', '.join(sch)})")
-        if v.lower() not in sch[k]["hodnoty"]:
-            sys.exit(f"--volba {x}: hodnota je {' | '.join(sch[k]['hodnoty'])}")
-        s[k] = v.lower()
-    return {"deleni_slova": s["deleni_slova"] == "ano", "chybi_prvni_pismeno": s["chybi_prvni_pismeno"] == "ano",
-            "tvary": s["tvary"], "rovnocennosti": {n: s[n] == "ano" for n in VSE}}
-
-
 def zapnute(pravidla):
-    """Zapnuté rovnocennosti a sady pravopisu podle vnitřní volby rovnocennosti (chybí = výchozí)."""
+    """Zapnuté rovnocennosti a sady pravopisu podle volby rovnocennosti (chybí = výchozí)."""
     v = (pravidla or {}).get("volby", {}).get("rovnocennosti", True)
     if v is True:
         return VYCHOZI
@@ -278,8 +219,7 @@ def _precti(cesta):
 
 
 def nacti_pravidla(cesta=PRAVIDLA):
-    """Pravidla projektu; chybějící soubor = {} (bez záměn). Bez voleb hledání z nastavení projektu – pro Vzor je
-    přidej jako p["volby"] = volby_hledani()."""
+    """Pravidla projektu; chybějící soubor = {} (bez záměn)."""
     p = _precti(cesta)
     return {} if p is None else p
 
@@ -602,8 +542,8 @@ def mez_vzdalenosti(slovo):
 
 
 def navrh(cil, tvar, pravidla=None):
-    """Pravidla, se kterými by hledání slova cil našlo tvar (texty jako argumenty `pridej`, volba jako argumenty
-    `nastaveni.py`); existující vynechá. Jen záměna, skupina a volba; jiný rozdíl (koncovka, předpona, mezera, víc znaků) návrh nemá. Velikost písmen
+    """Pravidla, se kterými by hledání slova cil našlo tvar (texty jako argumenty `pridej`); existující vynechá.
+    Jen záměna, skupina a volba; jiný rozdíl (koncovka, předpona, mezera, víc znaků) návrh nemá. Velikost písmen
     se nerozlišuje stejně jako při hledání."""
     p, cil = pravidla or {}, slovo_pravidel(cil)
     zameny, skupiny = p.get("zameny", {}), p.get("skupiny", {})
@@ -639,12 +579,12 @@ def navrh(cil, tvar, pravidla=None):
         R = "".join(r for _, r in ops[z:k])
         if not T and any(c in DELENI for c in R):
             if not volba(p, "deleni_slova"):
-                out.append("nastav ocr_hledej.deleni_slova ano")
+                out.append("volba deleni_slova")
         elif k == len(ops) and (not T or not R):
             pass               # koncovka: --tvary volne nebo samostatné slovo
         elif z == 0 and len(T) == 1 and not R:
             if not volba(p, "chybi_prvni_pismeno"):
-                out.append("nastav ocr_hledej.chybi_prvni_pismeno ano")
+                out.append("volba chybi_prvni_pismeno")
         elif z == 0 and not T:
             pass               # předpona: samostatné slovo
         else:
@@ -766,6 +706,19 @@ def _pokryto(druh, klic, cteni, zap):
     return None
 
 
+def _zapis_rovnocennosti(p, nove):
+    """Kanonický zápis: shoda s výchozími = klíč pryč, vše vypnuté = false, jinak jen odchylky od výchozích."""
+    volby = p.setdefault("volby", {})
+    if nove == VYCHOZI:
+        volby.pop("rovnocennosti", None)
+    elif not nove:
+        volby["rovnocennosti"] = False
+    else:
+        volby["rovnocennosti"] = {k: k in nove for k in VSE if (k in nove) != (k in VYCHOZI)}
+    if not volby:
+        del p["volby"]
+
+
 def _popis_zapnutych(zap):
     return ", ".join(k for k in VSE if k in zap) or "žádné"
 
@@ -773,15 +726,24 @@ def _popis_zapnutych(zap):
 def _zmena(akce, druh, args, proc):
     """Funkce změny pravidel pro příkaz pridej/odeber (chybné argumenty ukončí program)."""
     pridat = akce == "pridej"
-    if druh in ("volba", "rovnocennost"):
-        k = args[0] if args and args[0] in NASTAVENI_SEKCE["ocr_hledej"] else "<klíč>"
-        if not pridat:
-            v = "vychozi" if druh == "volba" else "ne"
-        else:
-            v = args[1] if len(args) == 2 else "<hodnota>" if k == "tvary" else "ano"
-        sys.exit(f"{akce} {druh}: volby hledání jsou teď v nastavení projektu – se souhlasem uživatele "
-                 f"python3 -I tools/nastaveni.py nastav ocr_hledej.{k} {v} (všechny volby: nastaveni.py ukaz "
-                 "ocr_hledej) – nic jsem nezměnil")
+    if druh == "rovnocennost":
+        if len(args) != 1:
+            sys.exit(f"{akce} rovnocennost <název>|vse (názvy: {', '.join(VSE)})")
+        nazev = args[0]
+        if nazev != "vse" and nazev not in VSE:
+            sys.exit(f"neznámá rovnocennost „{nazev}“ (povolené: {', '.join(VSE)}, vse) – nic jsem nezměnil")
+
+        def z(p):
+            pred = zapnute(p)
+            if nazev == "vse":
+                nove = VYCHOZI if pridat else frozenset()
+            else:
+                nove = pred | {nazev} if pridat else pred - {nazev}
+            if nove == pred:
+                return False, f"rovnocennost {nazev}: už tak je, nic jsem nezměnil (zapnuté: {_popis_zapnutych(pred)})"
+            _zapis_rovnocennosti(p, nove)
+            return True, f"{'zapnuto' if pridat else 'vypnuto'}: {nazev}; zapnuté rovnocennosti: {_popis_zapnutych(nove)}"
+        return z
     if druh in ("zamena", "skupina"):
         if len(args) < 2:
             sys.exit(f"{akce} {druh} <{'znak' if druh == 'zamena' else 'dvojice'}> <čtení>…")
@@ -794,7 +756,7 @@ def _zmena(akce, druh, args, proc):
                 if not nove:
                     return False, f"{druh} {klic}: {' '.join(cteni)} už tam je, nic jsem nezměnil"
                 s.setdefault(klic, []).extend(nove)
-                zap = zapnute({"volby": volby_hledani()})
+                zap = zapnute(p)
                 pokryte = [f"{r} (už pokryto výchozí rovnocenností {n}, uloženo pro případ vypnutí)"
                            for r in nove for n in [_pokryto(druh, klic, r, zap)] if n]
                 return True, f"přidáno: {druh} {klic} → {' '.join(nove)}" + "".join(f"\n  {x}" for x in pokryte)
@@ -831,7 +793,35 @@ def _zmena(akce, druh, args, proc):
                 del p["vyloucit"]
             return True, f"odebráno: vyloucit {text}"
         return z
-    sys.exit(f"{akce}: neznámý druh pravidla „{druh}“ (zamena, skupina, vyloucit)")
+    if druh == "volba":
+        if not args or len(args) > 2:
+            sys.exit(f"{akce} volba deleni_slova|chybi_prvni_pismeno [ano|ne] | {akce} volba tvary ceske|presne|volne")
+        nazev = args[0]
+        if not pridat:
+            def z(p):
+                s = p.get("volby", {})
+                if nazev not in s:
+                    return False, f"volba {nazev}: není nastavená, nic jsem nezměnil"
+                del s[nazev]
+                if not s:
+                    del p["volby"]
+                return True, f"odebráno: volba {nazev}"
+            return z
+        if nazev == "tvary":
+            hodnota = args[1] if len(args) == 2 else None
+        elif len(args) == 1 or args[1] in ("ano", "ne"):
+            hodnota = len(args) == 1 or args[1] == "ano"
+        else:
+            sys.exit(f"volba {nazev}: hodnota je ano nebo ne (je „{args[1]}“) – nic jsem nezměnil")
+
+        def z(p):
+            s = p.setdefault("volby", {})
+            if nazev in s and s[nazev] == hodnota:
+                return False, f"volba {nazev}: už tam je, nic jsem nezměnil"
+            s[nazev] = hodnota
+            return True, f"přidáno: volba {nazev} = {json.dumps(hodnota, ensure_ascii=False)}"
+        return z
+    sys.exit(f"{akce}: neznámý druh pravidla „{druh}“ (zamena, skupina, vyloucit, volba, rovnocennost)")
 
 
 # --- příkazová řádka --------------------------------------------------------------------------------------------
@@ -849,10 +839,7 @@ def _volby(argv, povolene):
                 sys.exit(f"Neznámá volba {a} (povolené: {', '.join(povolene) or 'žádné'})")
             if i + 1 >= len(argv):
                 sys.exit(f"Volba {a} potřebuje hodnotu")
-            if a == "--volba":   # opakovatelná
-                volby.setdefault("volba", []).append(argv[i + 1])
-            else:
-                volby[a[2:]] = argv[i + 1]
+            volby[a[2:]] = argv[i + 1]
             i += 2
         else:
             zbytek.append(a)
@@ -868,14 +855,14 @@ def _cesta(f):
 
 
 def _pravidla_cli(volby):
-    """Pravidla ze souboru + volby hledání z nastavení (a --volba) ve vnitřním tvaru p["volby"]."""
     cesta = volby.get("pravidla", PRAVIDLA)
     p = _precti(cesta)
-    if p is None and "pravidla" in volby:
-        sys.exit(f"Nenalezeno: {cesta}")
-    kde = f"pravidla: {_cesta(cesta)}" if p is not None else "pravidla: žádná – hledám celé slovo"
-    p = dict(p or {}, volby=volby_hledani(volby.get("volba", [])))
-    print(f"# {kde}; rovnocennosti: {_popis_zapnutych(zapnute(p))}", file=sys.stderr)
+    if p is None:
+        if "pravidla" in volby:
+            sys.exit(f"Nenalezeno: {cesta}")
+        print(f"# pravidla: žádná – hledám celé slovo; rovnocennosti: {_popis_zapnutych(VYCHOZI)}", file=sys.stderr)
+        return {}
+    print(f"# pravidla: {_cesta(cesta)}; rovnocennosti: {_popis_zapnutych(zapnute(p))}", file=sys.stderr)
     return p
 
 
@@ -892,8 +879,7 @@ def main(argv):
         sys.exit(__doc__)
     prikaz, argv = argv[0], argv[1:]
     if prikaz in ("hledej", "kandidati"):
-        povolene = ["--tvary", "--pravidla", "--volba"] + (["--vzdalenost", "--max"] if prikaz == "kandidati"
-                                                            else ["--vypis"])
+        povolene = ["--tvary", "--pravidla"] + (["--vzdalenost", "--max"] if prikaz == "kandidati" else ["--vypis"])
         slova, volby, cesty = _volby(argv, povolene)
         if not slova:
             sys.exit(__doc__)
@@ -949,19 +935,16 @@ def main(argv):
         return
     if prikaz == "pravidla":
         p = _precti(PRAVIDLA)
-        v = volby_hledani()
         if p is None:
-            deleni = " i rozdělené přes řádek" if v["deleni_slova"] else ""
-            print(f"Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo{deleni}, s českými koncovkami a genitivem -s/-es.")
+            print("Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo i rozdělené přes řádek, s českými koncovkami a genitivem -s/-es.")
         else:
             print(json.dumps(p, ensure_ascii=False, indent=1))
-        zap = zapnute({"volby": v})
-        print(f"Volby: deleni_slova={'ano' if v['deleni_slova'] else 'ne'}, "
-              f"chybi_prvni_pismeno={'ano' if v['chybi_prvni_pismeno'] else 'ne'}, tvary={v['tvary']} "
-              "(nastaveni.py ukaz ocr_hledej)")
+        print("Volby: " + ", ".join(f"{k}={'ano' if volba(p, k) else 'ne'}" for k in VYCHOZI_VOLBY))
+        zap = zapnute(p)
         print(f"Zapnuté rovnocennosti: {_popis_zapnutych(zap)}")
         for k in VSE:
-            print(f"  {'+' if k in zap else '-'} {k}: {NASTAVENI_SEKCE['ocr_hledej'][k]['popis']}")
+            popis = ROVNOCENNOSTI.get(k) or SADY_PRAVOPISU[k]["popis"]
+            print(f"  {'+' if k in zap else '-'} {k}: {popis}")
         return
     sys.exit(f"Neznámý příkaz „{prikaz}“\n\n{__doc__}")
 
