@@ -183,8 +183,7 @@ Postup:
 2. **Fraktura** (německý tisk 18.–20. stol., lomené písmo): nabídni `ocr.py stahni german_print` (3,5 MB, server
    UB Mannheim – ne GitHub, licence neuvedená; jen po souhlasu) a **zeptej se na staré znaky** (níže), pokud
    `ocr.py stav` u nich neukáže „nastaveno“. Volbu zapiš `nastaveni.py nastav ocr.stare_znaky …`; v projektu se už
-   neptej. Velikost, server
-   a licenci ber z tabulky „Volba modelu“ nebo z `ocr.py modely`, ne z paměti.
+   neptej. Velikost, server a licenci ber z tabulky „Volba modelu“ nebo z `ocr.py modely`, ne z paměti.
 3. Čeština ve fraktuře (švabach, tisky před ~1850): model `german_print+ces`. Čeština antikvou: `ces`.
 4. `ocr.py <vstup>`; texty jsou `lit`, dokud nález neověříš ve skenu.
 
