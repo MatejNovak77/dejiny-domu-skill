@@ -12,7 +12,8 @@ Sekce si deklaruje každý nástroj sám literálem na nejvyšší úrovni soubo
   NASTAVENI_SEKCE = {"<sekce>": {"<klíč>": {"vychozi": …, "hodnoty": [...] | "cele": [min, max] | "text": True,
                                             "popis": "…"}}}
 „text“ = neprázdný text bez mezer na okrajích.
-„vychozi“: None = nenastaveno, zeptej se uživatele. nastaveni.py je najde v tools/*.py bez importu (ast).
+„vychozi“: None = nenastaveno, zeptej se uživatele; s „"nepovinne": True“ se neptej (nástroj si poradí sám,
+třeba spočte hodnotu podle stroje). nastaveni.py je najde v tools/*.py bez importu (ast).
 Z Pythonu: import nastaveni; nastaveni.sekce("<sekce>") → {klíč: hodnota}; výjimka nastaveni.Chyba.
 Neznámá sekce (z novější verze skillu) jen varuje a zápis ji zachová; neznámý klíč známé sekce (překlep) je
 chyba – nástroj by jinak potichu běžel s výchozí hodnotou.
@@ -62,6 +63,8 @@ def _deklarace(soubor, sekce):
                 raise Chyba(f"{k} – „cele“ musí být [min, max] (celá čísla)")
             if druhy[0] == "text" and h is not True:
                 raise Chyba(f"{k} – „text“ musí být True")
+            if "nepovinne" in popis and (popis["nepovinne"] is not True or popis["vychozi"] is not None):
+                raise Chyba(f"{k} – „nepovinne“ smí být jen True a jen s „vychozi“: None")
             if popis["vychozi"] is not None and not _platna(popis, popis["vychozi"]):
                 raise Chyba(f"{k} – výchozí hodnota {popis['vychozi']!r} není povolená")
 
@@ -256,7 +259,9 @@ def ukaz(jen=None):
                 continue
             popis = klice[k]
             info = f"{_povoleno(popis)} – {popis['popis']}"
-            if v is None:
+            if v is None and popis.get("nepovinne"):
+                print(f"{nazev}.{k} nenastaveno   ({info})")
+            elif v is None:
                 print(f"→ ZEPTEJ_SE {nazev}.{k}   (nenastaveno; {info})")
                 zeptat = True
             else:

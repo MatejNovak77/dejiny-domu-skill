@@ -29,6 +29,14 @@ NASTAVENI_SEKCE = {
 }
 '''
 
+DRUHY = '''NASTAVENI_SEKCE = {
+    "rozsirene": {
+        "slozka": {"vychozi": None, "text": True, "nepovinne": True, "popis": "nástroj si poradí sám"},
+        "otazka": {"vychozi": None, "hodnoty": ["a", "b"], "popis": "na tohle se zeptej"},
+    },
+}
+'''
+
 
 class TestNastaveni(Projekt):
     def setUp(self):
@@ -244,6 +252,31 @@ class TestNastaveni(Projekt):
             self.assertEqual(p.returncode, 1, text)
             self.assertIn("vadny.py", p.stderr, text)
             self.assertIn(hlaska, p.stderr, text)
+
+    def test_nepovinna_bez_dotazu(self):
+        with open(self.path("tools", "druhy.py"), "w", encoding="utf-8") as f:
+            f.write(DRUHY)
+        p = self.nast("ukaz", "rozsirene")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("rozsirene.slozka nenastaveno   (neprázdný text – nástroj si poradí sám)", p.stdout)
+        self.assertNotIn("ZEPTEJ_SE rozsirene.slozka", p.stdout)
+        self.assertIn("→ ZEPTEJ_SE rozsirene.otazka", p.stdout)   # dotaz se nevypnul všem
+        p = self.volej("print(nastaveni.sekce('rozsirene'))")
+        self.assertEqual(p.stdout.strip(), "{'slozka': None, 'otazka': None}", p.stderr)
+        self.assertEqual(self.nast("nastav", "rozsirene.slozka", "/x").returncode, 0)
+        self.assertIn("rozsirene.slozka = /x   (nastaveno;", self.nast("ukaz", "rozsirene").stdout)
+        self.assertEqual(self.nast("nastav", "rozsirene.slozka", "vychozi").returncode, 0)
+        self.assertIn("rozsirene.slozka nenastaveno", self.nast("ukaz", "rozsirene").stdout)
+        vadna = self.path("tools", "vadny.py")
+        for text in ('NASTAVENI_SEKCE = {"x": {"k": {"vychozi": "a", "text": True, "nepovinne": True, '
+                     '"popis": "p"}}}\n',
+                     'NASTAVENI_SEKCE = {"x": {"k": {"vychozi": None, "text": True, "nepovinne": False, '
+                     '"popis": "p"}}}\n'):
+            with open(vadna, "w", encoding="utf-8") as f:
+                f.write(text)
+            p = self.nast("ukaz")
+            self.assertEqual(p.returncode, 1, text)
+            self.assertIn("nepovinne", p.stderr, text)
 
     def test_soubeh_dvou_zapisu(self):
         for _ in range(5):
