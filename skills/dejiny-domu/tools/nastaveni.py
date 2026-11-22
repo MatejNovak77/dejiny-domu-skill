@@ -9,9 +9,10 @@ Použití (z kořene projektu):
 Příklad: nastaveni.py nastav <sekce>.<klíč> <hodnota>
 
 Sekce si deklaruje každý nástroj sám literálem na nejvyšší úrovni souboru:
-  NASTAVENI_SEKCE = {"<sekce>": {"<klíč>": {"vychozi": …, "hodnoty": [...] | "cele": [min, max] | "text": True,
-                                            "popis": "…"}}}
-„text“ = neprázdný text bez mezer na okrajích.
+  NASTAVENI_SEKCE = {"<sekce>": {"<klíč>": {"vychozi": …, "hodnoty": [...] | "cele": [min, max] | "text": True
+                                            | "seznam": True, "popis": "…"}}}
+„text“ = neprázdný text bez mezer na okrajích; „seznam“ = neprázdný seznam neprázdných textů (na příkazové řádce
+jako JSON: nastav <sekce>.<klíč> '["a", "b"]').
 „vychozi“: None = nenastaveno, zeptej se uživatele; s „"nepovinne": True“ se neptej (nástroj si poradí sám,
 třeba spočte hodnotu podle stroje). nastaveni.py je najde v tools/*.py bez importu (ast).
 Z Pythonu: import nastaveni; nastaveni.sekce("<sekce>") → {klíč: hodnota}; výjimka nastaveni.Chyba.
@@ -51,9 +52,9 @@ def _deklarace(soubor, sekce):
             k = f"{kde}: {nazev}.{klic}"
             if not isinstance(klic, str) or not klic or "." in klic or not isinstance(popis, dict):
                 raise Chyba(f"{k} – klíč musí být jméno bez tečky s popisem ve slovníku")
-            druhy = [d for d in ("hodnoty", "cele", "text") if d in popis]
+            druhy = [d for d in ("hodnoty", "cele", "text", "seznam") if d in popis]
             if len(druhy) != 1 or "vychozi" not in popis or not isinstance(popis.get("popis"), str):
-                raise Chyba(f"{k} – potřebuje „vychozi“, „popis“ a právě jedno z „hodnoty“, „cele“, „text“")
+                raise Chyba(f"{k} – potřebuje „vychozi“, „popis“ a právě jedno z „hodnoty“, „cele“, „text“, „seznam“")
             h = popis[druhy[0]]
             if druhy[0] == "hodnoty" and not (isinstance(h, list) and h
                                               and all(isinstance(x, str) and x == x.lower() for x in h)):
@@ -61,8 +62,8 @@ def _deklarace(soubor, sekce):
             if druhy[0] == "cele" and not (isinstance(h, list) and len(h) == 2
                                            and all(type(x) is int for x in h) and h[0] <= h[1]):
                 raise Chyba(f"{k} – „cele“ musí být [min, max] (celá čísla)")
-            if druhy[0] == "text" and h is not True:
-                raise Chyba(f"{k} – „text“ musí být True")
+            if druhy[0] in ("text", "seznam") and h is not True:
+                raise Chyba(f"{k} – „{druhy[0]}“ musí být True")
             if "nepovinne" in popis and (popis["nepovinne"] is not True or popis["vychozi"] is not None):
                 raise Chyba(f"{k} – „nepovinne“ smí být jen True a jen s „vychozi“: None")
             if popis["vychozi"] is not None and not _platna(popis, popis["vychozi"]):
@@ -105,6 +106,8 @@ def _platna(popis, v):
         return isinstance(v, str) and v in popis["hodnoty"]
     if "cele" in popis:
         return type(v) is int and popis["cele"][0] <= v <= popis["cele"][1]
+    if "seznam" in popis:
+        return isinstance(v, list) and len(v) > 0 and all(isinstance(x, str) and x for x in v)
     return isinstance(v, str) and v.strip() != ""
 
 
@@ -113,6 +116,8 @@ def _povoleno(popis):
         return ", ".join(popis["hodnoty"])
     if "cele" in popis:
         return f"celé číslo {popis['cele'][0]}–{popis['cele'][1]}"
+    if "seznam" in popis:
+        return 'JSON seznam neprázdných textů, např. ["a", "b"]'
     return "neprázdný text"
 
 
@@ -188,6 +193,13 @@ def _prevod(klic, popis, text):
         except ValueError:
             v = None
         if v is not None and _platna(popis, v):
+            return v
+    elif "seznam" in popis:
+        try:
+            v = json.loads(text)
+        except ValueError:
+            v = None
+        if _platna(popis, v):
             return v
     elif text.strip():
         return text.strip()

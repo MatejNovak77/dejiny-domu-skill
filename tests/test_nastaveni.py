@@ -32,6 +32,7 @@ NASTAVENI_SEKCE = {
 DRUHY = '''NASTAVENI_SEKCE = {
     "rozsirene": {
         "slozka": {"vychozi": None, "text": True, "nepovinne": True, "popis": "nástroj si poradí sám"},
+        "argv": {"vychozi": None, "seznam": True, "nepovinne": True, "popis": "program a jeho argumenty"},
         "otazka": {"vychozi": None, "hodnoty": ["a", "b"], "popis": "na tohle se zeptej"},
     },
 }
@@ -262,7 +263,7 @@ class TestNastaveni(Projekt):
         self.assertNotIn("ZEPTEJ_SE rozsirene.slozka", p.stdout)
         self.assertIn("→ ZEPTEJ_SE rozsirene.otazka", p.stdout)   # dotaz se nevypnul všem
         p = self.volej("print(nastaveni.sekce('rozsirene'))")
-        self.assertEqual(p.stdout.strip(), "{'slozka': None, 'otazka': None}", p.stderr)
+        self.assertEqual(p.stdout.strip(), "{'slozka': None, 'argv': None, 'otazka': None}", p.stderr)
         self.assertEqual(self.nast("nastav", "rozsirene.slozka", "/x").returncode, 0)
         self.assertIn("rozsirene.slozka = /x   (nastaveno;", self.nast("ukaz", "rozsirene").stdout)
         self.assertEqual(self.nast("nastav", "rozsirene.slozka", "vychozi").returncode, 0)
@@ -277,6 +278,32 @@ class TestNastaveni(Projekt):
             p = self.nast("ukaz")
             self.assertEqual(p.returncode, 1, text)
             self.assertIn("nepovinne", p.stderr, text)
+
+    def test_seznam(self):
+        with open(self.path("tools", "druhy.py"), "w", encoding="utf-8") as f:
+            f.write(DRUHY)
+        p = self.nast("nastav", "rozsirene.argv", '["ocr", "{x}"]')
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(json.loads(self.bajty()), {"verze": 1, "rozsirene": {"argv": ["ocr", "{x}"]}})
+        self.assertIn('rozsirene.argv = ["ocr", "{x}"]   (nastaveno;', self.nast("ukaz", "rozsirene").stdout)
+        p = self.volej("print(nastaveni.sekce('rozsirene')['argv'])")
+        self.assertEqual(p.stdout.strip(), "['ocr', '{x}']", p.stderr)
+        puvodni = self.bajty()
+        for spatne in ('ocr {x}', '[]', '[""]', '["a", 3]', '"a"', '{"a": 1}'):
+            p = self.nast("nastav", "rozsirene.argv", spatne)
+            self.assertEqual(p.returncode, 1, spatne)
+            self.assertIn("nic jsem nezměnil", p.stderr, spatne)
+            self.assertEqual(self.bajty(), puvodni, spatne)
+        self.assertEqual(self.nast("nastav", "rozsirene.argv", '["a"]').returncode, 0)   # hranice: jeden prvek
+        self.uloz('{"verze": 1, "rozsirene": {"argv": "ocr"}}')
+        p = self.volej("nastaveni.sekce('rozsirene')")
+        self.assertNotEqual(p.returncode, 0)
+        self.assertIn("rozsirene.argv", p.stderr)
+        with open(self.path("tools", "vadny.py"), "w", encoding="utf-8") as f:
+            f.write('NASTAVENI_SEKCE = {"x": {"k": {"vychozi": None, "seznam": 1, "popis": "p"}}}\n')
+        p = self.nast("ukaz")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("„seznam“ musí být True", p.stderr)
 
     def test_soubeh_dvou_zapisu(self):
         for _ in range(5):
