@@ -37,8 +37,8 @@ class TestVzor(Zaklad):
     def test_03_tvary(self):
         for t in ("Zineckera", "Zineckerové", "Zineckerů", "Zineckerovy", "Zineckerem", "Zineckerová"):
             self.assertEqual(tvary("Zinecker", t), [t])
-        for t in ("Zineckerin", "Zineckers"):
-            self.nenajde("Zinecker", t)
+        self.nenajde("Zinecker", "Zineckerin")
+        self.assertEqual(tvary("Zinecker", "Zineckers"), ["Zineckers"])   # německý genitiv (test 67)
         for t in ("Friesland", "Friesen", "Friesl"):
             self.nenajde("Fries", t)
         self.assertEqual(tvary("Fries", "Friese"), ["Friese"])   # známý zbytek českých koncovek
@@ -173,7 +173,7 @@ class TestVzor(Zaklad):
         """Za nálezem smí být velké písmeno po malém (OCR slepilo jméno s dalším slovem), ne malé a ne velké po
         velkém (slovo celé verzálkami: FRIESEN, FISCHERDAVID). Výhled je v regexu: kratší konec se zkusí znovu."""
         for slovo, text, cekam in (("Fischer", "FischerDavid", "Fischer"),
-                                   ("Zinecker", "ZineckerS Fuchsbergbaude", "Zinecker"),
+                                   ("Zinecker", "ZineckerS Fuchsbergbaude", "ZineckerS"),   # S = genitiv
                                    ("Zinecker", "ZineckerAdolf", "Zinecker"), ("Zinecker", "ZineckeraAdolf", "Zineckera"),
                                    ("Zinecker", "ZineckerEDUARD", "Zinecker"),   # konec E po velkém ne → zpět na r
                                    ("Zinecker", "ZineckerŠimon", "Zinecker"), ("Bönisch", "BönischÜ", "Bönisch"),
@@ -189,6 +189,20 @@ class TestVzor(Zaklad):
                 self.nenajde(slovo, text, tv=tv)
         self.assertEqual(tvary("Gansbauden", "Gans-\nbaudenHof", DELENI), ["Gans-\nbauden"])   # výhled přes řádek
         self.assertEqual(tvary("Kraus", "KrausDi", None, "volne"), ["Kraus"])
+
+    def test_67_nemecky_genitiv(self):
+        """České tvary (výchozí) berou i německý genitiv -s/-es; holé -s ne po s ß x z (Krauss, Friess jsou jiný
+        pravopis jména, ne genitiv), presne ani jedno."""
+        for slovo, text in (("Zinecker", "Zineckers"), ("Renner", "Renners"), ("Krause", "Krauses"),
+                            ("Kraus", "Krauses"), ("Fries", "Frieses"), ("Frieß", "Frießes"), ("Adolf", "ADOLFS"),
+                            ("Bönisch", "Boenischs")):
+            with self.subTest(text=text):
+                self.assertEqual(tvary(slovo, text), [text])
+                self.nenajde(slovo, text, tv="presne")
+        for slovo, text in (("Kraus", "Krauss"), ("Fries", "Friess"), ("Fries", "FRIESS"), ("Frieß", "Frießs"),
+                            ("Zinecker", "Zineckerss"), ("Zinecker", "Zineckerses"), ("Zinecker", "Zineckerovas")):
+            with self.subTest(text=text):
+                self.nenajde(slovo, text)
 
 VYP = {"volby": {"rovnocennosti": False}}
 
