@@ -213,6 +213,9 @@ class TestVzor(Zaklad):
                 self.nenajde(slovo, neni, z)
         for slovo, text in (("Kraus", "Krauses"), ("Adolf", "Adolfs"), ("Fischer", "Fiſchers"), ("Hackel", "HACKELS")):
             self.najde(slovo, text, z)
+        chybi = {"volby": {"chybi_prvni_pismeno": True, "deleni_slova": True}}
+        for slovo, text in (("Buchberger", "UCHBERGERS"), ("Zinecker", "Zine-\nckers")):   # korpus HB: UCHBERGERS GASTHAUS
+            self.assertEqual(tvary(slovo, text, chybi), [text])
 
 VYP = {"volby": {"rovnocennosti": False}}
 

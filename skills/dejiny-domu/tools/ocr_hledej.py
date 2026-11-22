@@ -12,7 +12,7 @@ Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všec
       hranice (mimo --tvary volne): za nálezem nesmí být malé písmeno, velké jen po malém (FischerDavid ano,
         FISCHERDAVID ne)
       --tvary ceske (výchozí): české koncovky a německý genitiv -s/-es (Zineckers, Krauses; ne Krauss),
-        genitiv jen za slovem bez záměn projektu
+        genitiv jen za slovem bez záměn a skupin projektu
   ocr_hledej.py kandidati <slovo>… [--vzdalenost N] [--max 40] [--tvary …] [--pravidla <json>] [-- …]
       → slova blízká hledanému, která pravidla nenajdou, s počtem, ukázkou a návrhem pravidla; nic nezapíše
   ocr_hledej.py pridej|odeber zamena <znak> <čtení>…
@@ -400,7 +400,10 @@ class Vzor:
         if self.tvary == "ceske":
             # genitiv jen za slovem čteným s rovnocennostmi, ne přes záměny projektu (Kraus + záměny ≠ „Kreuzes“)
             nem = [(len(k), re.escape(k)) for k in NEMECKE if k != "s" or slovo[-1].lower() not in "sßſxz"]
-            cele = _slovo_re(slovo, *_uprav_pravidla(*_sloucena({}, zap), zap), zap, self.znaky_deleni)[0][0]
+            Rc, zc = _slovo_re(slovo, *_uprav_pravidla(*_sloucena({}, zap), zap), zap, self.znaky_deleni)
+            cele = Rc[0]
+            if volby.get("chybi_prvni_pismeno") and len(slovo) > 6:   # i bez prvního písmene (UCHBERGERS)
+                cele = f"(?:{cele}|{_cteni_re(slovo[1:3].lower(), zap)[1]}{Rc[zc[3]]})"
             jadro = f"(?:{cele}{_nebo(nem)}|{jadro})"
         m = _tr(MALA)
         za = ((f"(?-i:(?!{m}|(?<!{m}){_tr(VELKA)}))" if self.tvary != "volne" else "")
