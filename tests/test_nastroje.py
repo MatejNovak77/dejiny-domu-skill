@@ -1309,6 +1309,7 @@ class TestOcrHledej(Projekt):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertNotIn("Müller", p.stdout)
         p = self.nastroj("ocr_hledej.py", "pravidla")
+        self.assertIn("deleni_slova=ne, chybi_prvni_pismeno=ne, tvary=ceske", p.stdout)
         self.assertIn("- prehlasky", p.stdout)
         self.assertIn("+ dlouhe_s", p.stdout)
         p = self.nastroj("nastaveni.py", "ukaz", "ocr_hledej")
@@ -1326,7 +1327,9 @@ class TestOcrHledej(Projekt):
     def test_stare_prikazy_volby_odkazou_na_nastaveni(self):
         for args, cekam in ((("pridej", "volba", "deleni_slova"), "nastav ocr_hledej.deleni_slova ano"),
                             (("pridej", "volba", "tvary", "presne"), "nastav ocr_hledej.tvary presne"),
+                            (("pridej", "volba", "tvary"), "nastav ocr_hledej.tvary <hodnota>"),
                             (("odeber", "volba", "deleni_slova"), "nastav ocr_hledej.deleni_slova vychozi"),
+                            (("odeber", "volba", "tvary", "presne"), "nastav ocr_hledej.tvary vychozi"),
                             (("odeber", "rovnocennost", "prehlasky"), "nastav ocr_hledej.prehlasky ne"),
                             (("odeber", "rovnocennost", "vse"), "nastav ocr_hledej.<klíč> ne")):
             with self.subTest(args=args):
@@ -1351,7 +1354,7 @@ class TestOcrHledej(Projekt):
                 self.assertEqual(p.stdout, "")
                 self.assertIn("python3 -I tools/nastaveni.py nastav ocr_hledej.deleni_slova ano", p.stderr)
                 self.assertIn("python3 -I tools/nastaveni.py nastav ocr_hledej.chybi_prvni_pismeno ano", p.stderr)
-                self.assertIn("--volba deleni_slova=ano --volba chybi_prvni_pismeno=ano", p.stderr)
+                self.assertIn("--volba deleni_slova=ano --volba chybi_prvni_pismeno=ano --volba tvary=ceske", p.stderr)
                 self.assertEqual(self.bajty(), pred)
         p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
         for radek in p.stderr.splitlines():   # přenos přesně podle hlášky
@@ -1388,8 +1391,8 @@ class TestOcrHledej(Projekt):
         self.assertEqual(self.data("ocr_zameny"), {"zameny": {"d": ["b"]}})   # vnitřní volby se nezapíšou
 
     def test_kandidati_navrhne_nastaveni(self):
-        self.ocr_txt("aus Gans-\nbauden x\n")
-        p = self.nastroj("ocr_hledej.py", "kandidati", "Gansbauden")
+        self.ocr_txt("aus Lhote-\ncky Hof\n")
+        p = self.nastroj("ocr_hledej.py", "kandidati", "Lhotecky")
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn("\tnastav ocr_hledej.deleni_slova ano\t", p.stdout)
         self.assertFalse(os.path.exists(self.path("data", "nastaveni.json")))

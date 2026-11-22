@@ -12,7 +12,7 @@ a složky. Soubory se čtou po řádcích (i stovky MB), kódování UTF-8 (jina
 ## Příkazy
 ```
 python3 -I tools/ocr_hledej.py hledej Gansbauden Zinecker [--tvary ceske|presne|volne] [-- složka/ soubor.txt]
-python3 -I tools/ocr_hledej.py hledej Gansbauden --volba deleni_slova=ano   # volba jen pro tento běh, nic nezapíše
+python3 -I tools/ocr_hledej.py hledej Lniště --volba deleni_slova=ano   # volba jen pro tento běh, nic nezapíše
 python3 -I tools/ocr_hledej.py hledej Zinecker --vypis radky   # řádek na každý nález místo souhrnu
 python3 -I tools/ocr_hledej.py kandidati Gansbauden [--vzdalenost N] [--max 40] [-- …]
 python3 -I tools/ocr_hledej.py pridej zamena s f &        # odeber … totéž obráceně

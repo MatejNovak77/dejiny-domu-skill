@@ -183,7 +183,11 @@ def hlaska_prenosu(volby):
         out.append("  (nic k přenesení – sekce „volby“ odpovídá výchozím hodnotám)")
     else:
         out += [f"  python3 -I tools/nastaveni.py nastav ocr_hledej.{k} {v}" for k, v in prikazy]
-        out.append("  Jen pro jeden běh bez zápisu: " + " ".join(f"--volba {k}={v}" for k, v in prikazy))
+    if prikazy is not None:   # jeden běh: všechny volby, jak platily se souborem (jinak by doplnilo nastavení projektu)
+        sch = NASTAVENI_SEKCE["ocr_hledej"]
+        cele = dict({k: d["vychozi"] for k, d in sch.items()}, **dict(prikazy))
+        out.append("  Jen pro jeden běh bez zápisu, se všemi volbami, jak platily s tímto souborem: "
+                   + " ".join(f"--volba {k}={v}" for k, v in cele.items()))
     return "\n".join(out)
 
 
@@ -266,7 +270,8 @@ def _precti(cesta):
 
 
 def nacti_pravidla(cesta=PRAVIDLA):
-    """Pravidla projektu; chybějící soubor = {} (bez záměn)."""
+    """Pravidla projektu; chybějící soubor = {} (bez záměn). Bez voleb hledání z nastavení projektu – pro Vzor je
+    přidej jako p["volby"] = volby_hledani()."""
     p = _precti(cesta)
     return {} if p is None else p
 
@@ -762,7 +767,10 @@ def _zmena(akce, druh, args, proc):
     pridat = akce == "pridej"
     if druh in ("volba", "rovnocennost"):
         k = args[0] if args and args[0] in NASTAVENI_SEKCE["ocr_hledej"] else "<klíč>"
-        v = args[1] if len(args) == 2 else "ano" if pridat else "vychozi" if druh == "volba" else "ne"
+        if not pridat:
+            v = "vychozi" if druh == "volba" else "ne"
+        else:
+            v = args[1] if len(args) == 2 else "<hodnota>" if k == "tvary" else "ano"
         sys.exit(f"{akce} {druh}: volby hledání jsou teď v nastavení projektu – se souhlasem uživatele "
                  f"python3 -I tools/nastaveni.py nastav ocr_hledej.{k} {v} (všechny volby: nastaveni.py ukaz "
                  "ocr_hledej) – nic jsem nezměnil")
@@ -857,8 +865,8 @@ def _pravidla_cli(volby):
     p = _precti(cesta)
     if p is None and "pravidla" in volby:
         sys.exit(f"Nenalezeno: {cesta}")
+    kde = f"pravidla: {_cesta(cesta)}" if p is not None else "pravidla: žádná – hledám celé slovo"
     p = dict(p or {}, volby=volby_hledani(volby.get("volba", [])))
-    kde = f"pravidla: {_cesta(cesta)}" if len(p) > 1 else "pravidla: žádná – hledám celé slovo"
     print(f"# {kde}; rovnocennosti: {_popis_zapnutych(zapnute(p))}", file=sys.stderr)
     return p
 
@@ -937,8 +945,11 @@ def main(argv):
             print("Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo s českými koncovkami a genitivem -s/-es.")
         else:
             print(json.dumps(p, ensure_ascii=False, indent=1))
-        zap = zapnute({"volby": volby_hledani()})
-        print(f"Zapnuté rovnocennosti (nastaveni.py ukaz ocr_hledej): {_popis_zapnutych(zap)}")
+        v = volby_hledani()
+        zap = zapnute({"volby": v})
+        print(f"Volby hledání (nastaveni.py ukaz ocr_hledej): deleni_slova={'ano' if v['deleni_slova'] else 'ne'}, "
+              f"chybi_prvni_pismeno={'ano' if v['chybi_prvni_pismeno'] else 'ne'}, tvary={v['tvary']}")
+        print(f"Zapnuté rovnocennosti: {_popis_zapnutych(zap)}")
         for k in VSE:
             print(f"  {'+' if k in zap else '-'} {k}: {NASTAVENI_SEKCE['ocr_hledej'][k]['popis']}")
         return

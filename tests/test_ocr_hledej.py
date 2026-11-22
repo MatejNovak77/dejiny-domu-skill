@@ -395,7 +395,12 @@ class TestRovnocennosti(Zaklad):
         h = oh.hlaska_prenosu({"deleni_slova": True, "chybi_prvni_pismeno": True})
         self.assertIn("python3 -I tools/nastaveni.py nastav ocr_hledej.deleni_slova ano\n", h)
         self.assertIn("python3 -I tools/nastaveni.py nastav ocr_hledej.chybi_prvni_pismeno ano\n", h)
-        self.assertIn("--volba deleni_slova=ano --volba chybi_prvni_pismeno=ano", h)
+        self.assertIn("--volba deleni_slova=ano --volba chybi_prvni_pismeno=ano --volba tvary=ceske", h)
+        jeden = oh.hlaska_prenosu({"rovnocennosti": {"nemcina_1901": True}}).splitlines()[-1]
+        self.assertEqual(jeden.count("--volba "), 11)   # i volby, které soubor neměl (jinak by doplnil projekt)
+        self.assertIn("--volba deleni_slova=ne", jeden)
+        self.assertIn("--volba nemcina_1901=ano", jeden)
+        self.assertIn("--volba prehlasky=ano", jeden)
         self.assertIn("nic k přenesení", oh.hlaska_prenosu({"rovnocennosti": True}))
 
     def test_52_deklarace_sedi(self):
