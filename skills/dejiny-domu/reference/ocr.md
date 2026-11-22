@@ -29,7 +29,7 @@ a počet výskytů každého slova; hledané slovo, které je existující cesta
 `--vzdalenost N` (jinak by kandidátů bylo moc).
 
 ## Formát `data/ocr_zameny.json`
-Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s výchozími rovnocennostmi a českými koncovkami.
+Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s výchozími rovnocennostmi, českými koncovkami a genitivem `-s`/`-es`.
 ```json
 {"poznamka": "fraktura, Tesseract",
  "zameny":   {"s": ["f", "&"], "G": ["S", "B"], "m": ["rn"]},
@@ -49,7 +49,7 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
   `Straße` i `STRASSE`). Neplatí, když je text v hledaném slově.
 - `volby.deleni_slova`: slovo rozdělené znakem `- ⸗ = ¬` (i přes konec řádku; nález se hlásí na prvním řádku, tvar s ⏎).
 - `volby.chybi_prvni_pismeno`: OCR vynechalo první písmeno (jen slova delší než 6; další dvě písmena musí sedět –
-  rovnocennosti ano, ö = oe, záměny projektu ne; zbytek slova se čte s pravidly): `5153.uchberger`, `12.önisch`.
+  rovnocennosti ano, ö = oe, záměny a skupiny projektu ne; zbytek slova se čte s pravidly): `5153.uchberger`, `12.önisch`.
 - `volby.tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými
   ův ova ovo ovu ovy ovic`) a německý genitiv `-s`/`-es` (Zineckers, Krauses; holé `-s` ne po s ß x z – Krauss je
   jiný pravopis): Zineckera, Zineckerové, „Friesovy boudy“. **Známý zbytek:** -e/-i/-a pustí i německé tvary
