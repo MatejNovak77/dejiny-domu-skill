@@ -50,6 +50,7 @@ výměnek čp. 30 a statek čp. 1 v Lništi (obec Slavče, okres České Budějo
   dost kreditů; tarif Pro stačí na vyzkoušení. Skill funguje i v **Codexu** od OpenAI (instalace variantou B),
   vyzkoušený je hlavně v Claude Code.
 - Programy **Python 3, Node.js, ImageMagick a git**. Claude zkontroluje, co chybí, a pomůže s instalací.
+- Volitelně **Tesseract** a **Poppler**, pokud chcete převést na text vlastní skeny tištěných knih (OCR).
 - Volitelně účet na [Netlify](https://www.netlify.com) (zdarma), pokud chcete web zveřejnit.
 - Volitelně osobní klíč [Europeany](https://pro.europeana.eu/page/get-api) (zdarma) na staré obrázky obce
   z evropských sbírek. Klíč zůstane uložený u vás a posílá se jen Europeaně. Claude vám řekne, kde ho získat.

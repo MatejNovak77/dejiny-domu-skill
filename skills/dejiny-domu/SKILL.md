@@ -61,7 +61,10 @@ Data se točí kolem **čísla popisného** a jeho držitelů a obyvatel v čase
 Cíl: vytěžit všechno, co uživatel má, než sáhneš do archivů.
 - **Materiály od uživatele** (složka s PDF, mapami, odkazy, poznámkami) zkopíruj do `dokumenty/` (velké soubory přes
   ~20 MB dej do `.gitignore`). Přečti je celé. Z knih (PDF) najdi strany o obci a domě (hledej i německý název
-  a staré tvary). U naskenovaných PDF bez textu stránky převeď na obrázky a přečti je sám.
+  a staré tvary). U naskenovaných PDF bez textu stránky převeď na obrázky a přečti je sám. Delší tisk (víc než
+  ~10 stran, nebo hledání jmen napříč stranami) → nabídni OCR Tesseractem (`reference/ocr.md` → Kdy nabídnout).
+  Fraktura → model `german_print` (3,5 MB, server UB Mannheim – ne GitHub, licence neuvedená; stažení jen po
+  souhlasu) a otázka na staré znaky, pokud `ocr.py stav` neukáže „nastaveno“.
   Odkazy z poznámek otevři a vytěž. Odkazy na snímky z archivů jsou zlato – rovnou podle nich stahuj (kde to `reference/podminky.md` dovoluje).
 - **Ptej se postupně:** kdo dům vlastní a od kdy, od koho ho koupil, co vyprávěli předchozí majitelé a sousedé, staré
   fotky, kupní smlouvy, stavební plány, kdy byly přestavby, jestli dům někdy vyhořel, jaké má jméno po domácku („U Nováků“).
@@ -305,6 +308,7 @@ Vždy **projektovou kopii** `tools/`, nikdy `SKILL_DIR/tools/` (zapisovala by do
 | `ortofota.py serie <místo> [polomer] [--zapsat skupina]` | letecké snímky domu po letech 1998–2023 (ČÚZK, CC BY) a starší či chybějící ročníky krajů (jen ke čtení), stejný výřez (rovnou do `mapy.json`) |
 | `ipr_praha.py serie <místo> [polomer] [--zapsat skupina]` | Praha: staré plány 1791–1944 a letecké snímky 1938–2002 se stejným výřezem (rovnou do `mapy.json`) |
 | `dnnt.py hledej / kontext / ocr / adresa` | tisk 20. století (adresáře, Stavitelské listy, noviny): úryvky z neveřejných stran, OCR veřejných (i veřejných jen v jiné knihovně), hledání adresy. Neveřejné (DNNT) čte uživatel sám podle čtecího listu |
+| `ocr.py <vstup> / stav / stahni / nastav` | OCR vlastních skenů tisku (PDF, obrázek, složka obrázků) Tesseractem do `pracovni/ocr/` po stranách, dodělá chybějící; model (fraktura `german_print`), staré znaky (ſ, ꝛ, aͤ) a vlastní příkaz v `data/ocr.json`; model stahuje jen po souhlasu (`reference/ocr.md`) |
 | `ocr_hledej.py hledej / kandidati / pridej / odeber / pravidla` | jména v OCR textech `pracovni/` i zkomolená podle `data/ocr_zameny.json`; kandidáti s návrhem pravidla (`reference/ocr.md`) |
 | `zapis.py <soubor> <klíč> <vstup.json> [--sloucit \| --prepsat]` | přidá / změní položku v `zaznamy`, `svazky`, `prepisy`, `mapy`, `web` (pole nastavení webu)… beze změny formátu; náhradu, která by smazala pole, odmítne |
 | `zapis.py denik "<zdroj>" "<rozsah>" "<hledáno>" "<výsledek>" "<citace>"` | řádek deníku `research_log.md` s číslem a datem (pod zámkem, souběžné session) |
