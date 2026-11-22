@@ -24,8 +24,11 @@ class TestSkillMd(unittest.TestCase):
     def test_pomocnici_rukopisy_opus(self):
         """Pravidlo: pomocníci u rukopisů na Opusu, s odkazem na referenci (bez přesného znění)."""
         text = SKILL.read_text(encoding="utf-8")
-        self.assertIn("opus", text.lower())
-        self.assertIn("reference/pomocnici.md", text)
+        zacatek = text.index("### Pomocníci")
+        sekce = text[zacatek:text.index("\n#", zacatek + 1)]   # rejstřík nahoře pravidlo nenahradí
+        for co in ("opus", "sonnet"):
+            self.assertIn(co, sekce.lower())
+        self.assertIn("reference/pomocnici.md", sekce)
         self.assertTrue((SKILL.parent / "reference" / "pomocnici.md").is_file())
 
 
