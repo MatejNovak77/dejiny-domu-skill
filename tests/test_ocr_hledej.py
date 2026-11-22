@@ -404,6 +404,7 @@ class TestRovnocennosti(Zaklad):
         self.assertIn("--volba deleni_slova=ano", jeden)   # výchozí dělení (bez souboru i bez klíče)
         self.assertIn("--volba nemcina_1901=ano", jeden)
         self.assertIn("--volba prehlasky=ano", jeden)
+        self.assertIn("na kopii tohoto souboru bez sekce „volby“, --pravidla <kopie>", jeden)   # s původním selže
         self.assertIn("nic k přenesení", oh.hlaska_prenosu({"rovnocennosti": True}))
 
     def test_52_deklarace_sedi(self):

@@ -1357,6 +1357,20 @@ class TestOcrHledej(Projekt):
                 self.assertIn("--volba deleni_slova=ano --volba chybi_prvni_pismeno=ano --volba tvary=ceske", p.stderr)
                 self.assertEqual(self.bajty(), pred)
         p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
+        jeden = p.stderr.splitlines()[-1]   # rada pro jeden běh: s tímto souborem selže, s kopií bez „volby“ projde
+        self.assertIn("--pravidla <kopie>", jeden)
+        volby = jeden.split(": ", 1)[1].split()
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", *volby)
+        self.assertNotEqual(p.returncode, 0)
+        kopie = self.path("pracovni", "pravidla_kopie.json")
+        with open(kopie, "w", encoding="utf-8") as f:
+            f.write('{"zameny": {"s": ["f"]}}\n')
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", "--pravidla", kopie, *volby)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("# Lhotecky: 1 výskytů", p.stderr)
+        self.assertEqual(self.bajty(), pred)
+        self.assertFalse(os.path.exists(self.path("data", "nastaveni.json")))
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
         for radek in p.stderr.splitlines():   # přenos přesně podle hlášky
             if radek.strip().startswith("python3 -I tools/nastaveni.py nastav"):
                 self.nast(*radek.split()[3:])
