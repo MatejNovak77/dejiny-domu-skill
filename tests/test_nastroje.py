@@ -1292,35 +1292,138 @@ class TestOcrHledej(Projekt):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn("Gansbauden\tGansbauben\t1×\tpracovni/ocr.txt:1", p.stdout.replace(os.sep, "/"))
 
-    def test_rovnocennost_pridej_odeber(self):
-        p = self.nastroj("ocr_hledej.py", "odeber", "rovnocennost", "prehlasky")
+    def nast(self, *args):
+        p = self.nastroj("nastaveni.py", *args)
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertEqual(self.data("ocr_zameny"), {"volby": {"rovnocennosti": {"prehlasky": False}}})
+
+    def ocr_txt(self, text):
+        with open(self.path("pracovni", "ocr.txt"), "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_rovnocennosti_v_nastaveni(self):
+        self.ocr_txt("Johann Müller aus Lhota\n")
+        p = self.nastroj("ocr_hledej.py", "hledej", "Mueller")
+        self.assertIn("Mueller\tMüller\t1×", p.stdout)
+        self.nast("nastav", "ocr_hledej.prehlasky", "ne")
+        p = self.nastroj("ocr_hledej.py", "hledej", "Mueller")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertNotIn("Müller", p.stdout)
         p = self.nastroj("ocr_hledej.py", "pravidla")
         self.assertIn("- prehlasky", p.stdout)
         self.assertIn("+ dlouhe_s", p.stdout)
-        p = self.nastroj("ocr_hledej.py", "pridej", "rovnocennost", "prehlasky")
-        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertEqual(self.data("ocr_zameny"), {})
-        p = self.nastroj("ocr_hledej.py", "odeber", "rovnocennost", "vse")
-        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertEqual(self.data("ocr_zameny"), {"volby": {"rovnocennosti": False}})
-        with open(self.path("pracovni", "ocr.txt"), "w", encoding="utf-8") as f:
-            f.write("x\n")
-        p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
+        p = self.nastroj("nastaveni.py", "ukaz", "ocr_hledej")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(len([r for r in p.stdout.splitlines() if r.startswith("ocr_hledej.")]), 11)
+        self.assertIn("ocr_hledej.prehlasky = ne   (nastaveno;", p.stdout)
+        self.assertIn("ocr_hledej.deleni_slova = ne   (výchozí;", p.stdout)
+        self.assertNotIn("ZEPTEJ_SE", p.stdout)
+        for n in ("dlouhe_s", "r_rotunda", "ostre_s", "rozlozene", "mekke_deleni", "cestina_1849"):
+            self.nast("nastav", f"ocr_hledej.{n}", "ne")
+        p = self.nastroj("ocr_hledej.py", "hledej", "Mueller")
         self.assertIn("rovnocennosti: žádné", p.stderr)
+        self.assertFalse(os.path.exists(self.pravidla()))
+
+    def test_stare_prikazy_volby_odkazou_na_nastaveni(self):
+        for args, cekam in ((("pridej", "volba", "deleni_slova"), "nastav ocr_hledej.deleni_slova ano"),
+                            (("pridej", "volba", "tvary", "presne"), "nastav ocr_hledej.tvary presne"),
+                            (("odeber", "volba", "deleni_slova"), "nastav ocr_hledej.deleni_slova vychozi"),
+                            (("odeber", "rovnocennost", "prehlasky"), "nastav ocr_hledej.prehlasky ne"),
+                            (("odeber", "rovnocennost", "vse"), "nastav ocr_hledej.<klíč> ne")):
+            with self.subTest(args=args):
+                p = self.nastroj("ocr_hledej.py", *args)
+                self.assertNotEqual(p.returncode, 0)
+                self.assertIn(cekam, p.stderr)
+                self.assertNotIn("Traceback", p.stderr)
+                self.assertFalse(os.path.exists(self.pravidla()))
+                self.assertFalse(os.path.exists(self.path("data", "nastaveni.json")))
+
+    def test_zbyle_volby_chyba(self):
+        """Soubor pravidel s dřívější sekcí „volby“: nic se nehledá ani nezapíše, hláška dá přesné příkazy."""
+        self.ocr_txt("aus Lhote-\ncky Hof\n")
+        with open(self.pravidla(), "w", encoding="utf-8") as f:
+            f.write('{"zameny": {"s": ["f"]}, "volby": {"deleni_slova": true, "chybi_prvni_pismeno": true}}\n')
         pred = self.bajty()
-        p = self.nastroj("ocr_hledej.py", "pridej", "rovnocennost", "nesmysl")
+        for args in (("hledej", "Lhotecky"), ("kandidati", "Lhotecky"), ("pravidla",), ("pridej", "zamena", "d", "b"),
+                     ("hledej", "Lhotecky", "--pravidla", "data/ocr_zameny.json")):
+            with self.subTest(args=args):
+                p = self.nastroj("ocr_hledej.py", *args)
+                self.assertNotEqual(p.returncode, 0)
+                self.assertEqual(p.stdout, "")
+                self.assertIn("python3 -I tools/nastaveni.py nastav ocr_hledej.deleni_slova ano", p.stderr)
+                self.assertIn("python3 -I tools/nastaveni.py nastav ocr_hledej.chybi_prvni_pismeno ano", p.stderr)
+                self.assertIn("--volba deleni_slova=ano --volba chybi_prvni_pismeno=ano", p.stderr)
+                self.assertEqual(self.bajty(), pred)
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
+        for radek in p.stderr.splitlines():   # přenos přesně podle hlášky
+            if radek.strip().startswith("python3 -I tools/nastaveni.py nastav"):
+                self.nast(*radek.split()[3:])
+        self.assertEqual(self.data("nastaveni"), {"verze": 1, "ocr_hledej": {"deleni_slova": "ano",
+                                                                             "chybi_prvni_pismeno": "ano"}})
+        with open(self.pravidla(), "w", encoding="utf-8") as f:
+            f.write('{"zameny": {"s": ["f"]}}\n')
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("# Lhotecky: 1 výskytů", p.stderr)
+
+    def test_volba_jen_pro_beh(self):
+        self.ocr_txt("aus Lhote-\ncky Hof\n")
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
+        self.assertIn("# Lhotecky: 0 výskytů", p.stderr)
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", "--volba", "deleni_slova=ano")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("# Lhotecky: 1 výskytů", p.stderr)
+        self.assertFalse(os.path.exists(self.path("data", "nastaveni.json")))
+        for spatne in ("nesmysl=ano", "deleni_slova=snad", "deleni_slova"):
+            with self.subTest(volba=spatne):
+                p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", "--volba", spatne)
+                self.assertNotEqual(p.returncode, 0)
+                self.assertEqual(p.stdout, "")
+                self.assertIn("--volba", p.stderr)
+        self.nast("nastav", "ocr_hledej.deleni_slova", "ano")   # z nastavení bez --volba, --volba ho přebije
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
+        self.assertIn("# Lhotecky: 1 výskytů", p.stderr)
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", "--volba", "deleni_slova=ne")
+        self.assertIn("# Lhotecky: 0 výskytů", p.stderr)
+        self.nastroj("ocr_hledej.py", "pridej", "zamena", "d", "b")
+        self.assertEqual(self.data("ocr_zameny"), {"zameny": {"d": ["b"]}})   # vnitřní volby se nezapíšou
+
+    def test_kandidati_navrhne_nastaveni(self):
+        self.ocr_txt("aus Gans-\nbauden x\n")
+        p = self.nastroj("ocr_hledej.py", "kandidati", "Gansbauden")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("\tnastav ocr_hledej.deleni_slova ano\t", p.stdout)
+        self.assertFalse(os.path.exists(self.path("data", "nastaveni.json")))
+
+    def test_neplatne_nastaveni_chyba_pred_hledanim(self):
+        self.ocr_txt("Lhotecky\n")
+        for text in ('{"ocr_hledej": {"tvary": "x"}}', '{"ocr_hledej": {"deleni": "ano"}}',
+                     '{"ocr_hledej": {"deleni_slova": true}}'):
+            with self.subTest(text=text):
+                with open(self.path("data", "nastaveni.json"), "w", encoding="utf-8") as f:
+                    f.write(text)
+                p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
+                self.assertNotEqual(p.returncode, 0)
+                self.assertEqual(p.stdout, "")
+                self.assertIn("ocr_hledej.", p.stderr)
+                self.assertNotIn("Traceback", p.stderr)
+
+    def test_nastav_ze_skillu_odmitne(self):
+        p = subprocess.run([sys.executable, "-I", os.path.join(SKILL, "tools", "nastaveni.py"), "nastav",
+                            "ocr_hledej.tvary", "presne"], capture_output=True, text=True, encoding="utf-8")
         self.assertNotEqual(p.returncode, 0)
-        self.assertNotIn("Traceback", p.stderr)
-        self.assertEqual(self.bajty(), pred)
+        self.assertIn("není složka projektu", p.stdout + p.stderr)
+        self.assertFalse(os.path.exists(os.path.join(SKILL, "data")))
 
     def test_pridej_zamena_pokryta_rovnocennosti(self):
         p = self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("už pokryto výchozí rovnocenností dlouhe_s, uloženo pro případ vypnutí", p.stdout)
         self.assertEqual(self.data("ocr_zameny"), {"zameny": {"s": ["ſ"]}})
-        self.nastroj("ocr_hledej.py", "odeber", "rovnocennost", "dlouhe_s")
+        self.nast("nastav", "ocr_hledej.dlouhe_s", "ne")
+        self.nastroj("ocr_hledej.py", "odeber", "zamena", "s", "ſ")
+        p = self.nastroj("ocr_hledej.py", "pridej", "zamena", "s", "ſ")
+        self.assertIn("přidáno", p.stdout)
+        self.assertNotIn("už pokryto", p.stdout)   # pokrytí podle nastavení projektu
         with open(self.path("pracovni", "ocr.txt"), "w", encoding="utf-8") as f:
             f.write("Wenzel aus Ganſbauden\n")
         p = self.nastroj("ocr_hledej.py", "hledej", "Gansbauden")
@@ -1388,13 +1491,10 @@ class TestOcrHledej(Projekt):
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertEqual(self.bajty(), pred)
 
-    def test_vyloucit_a_volby(self):
-        for args in (("vyloucit", "hald", "--proc", "Gänshalde: b→h"), ("volba", "deleni_slova"),
-                     ("volba", "tvary", "presne")):
-            p = self.nastroj("ocr_hledej.py", "pridej", *args)
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertEqual(self.data("ocr_zameny"), {"vyloucit": {"hald": "Gänshalde: b→h"},
-                                                   "volby": {"deleni_slova": True, "tvary": "presne"}})
+    def test_vyloucit(self):
+        p = self.nastroj("ocr_hledej.py", "pridej", "vyloucit", "hald", "--proc", "Gänshalde: b→h")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(self.data("ocr_zameny"), {"vyloucit": {"hald": "Gänshalde: b→h"}})
         p = self.nastroj("ocr_hledej.py", "pravidla")
         self.assertIn("Gänshalde", p.stdout)
 
