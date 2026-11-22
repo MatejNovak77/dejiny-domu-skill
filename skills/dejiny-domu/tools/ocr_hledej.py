@@ -322,7 +322,8 @@ def _cteni_re(text, zap):
 
 def _slovo_re(slovo, zameny, skupiny, zap, deleni):
     """Regex slova bez okrajů: písmena, záměny, přímá čtení celého znaku a skupiny jako hrany mezi pozicemi;
-    R[i] = zbytek slova od pozice i (s volitelným znakem dělení a ≤ 250 bílými znaky před ní)."""
+    R[i] = zbytek slova od pozice i (s volitelným znakem dělení a ≤ 250 bílými znaky před ní); zac = index první
+    pozice každého znaku slova."""
     P, zac, zaklad = _pozice(slovo, zap)
     n, hrany = len(P), [{} for _ in P]   # hrany[i][cíl] = [(délka, regex)]
     for i, L in enumerate(P):
@@ -343,7 +344,7 @@ def _slovo_re(slovo, zameny, skupiny, zap, deleni):
     for i in range(n - 1, -1, -1):
         alts = [(max(d for d, _ in a) + R[c][0], _nebo(a) + R[c][1]) for c, a in hrany[i].items()]
         R[i] = (max(d for d, _ in alts), (H if i else "") + _nebo(alts))
-    return [r for _, r in R], zaklad
+    return [r for _, r in R], zac
 
 
 @functools.cache
@@ -384,11 +385,12 @@ class Vzor:
             raise ValueError(f"tvary: {self.tvary} (povolené: {', '.join(TVARY)})")
         self.znaky_deleni = (DELENI if volby.get("deleni_slova", False) else "") + \
             (MEKKE if "mekke_deleni" in zap else "")
-        R, zaklad = _slovo_re(slovo, zameny, skupiny, zap, self.znaky_deleni)
+        R, zac = _slovo_re(slovo, zameny, skupiny, zap, self.znaky_deleni)
         jadro = R[0]
-        if (volby.get("chybi_prvni_pismeno") and len(slovo) > 6 and not any(_pulky(c, zap) for c in slovo[:3])
-                and not any(zaklad[i:i + len(k)] == k for i in range(3) for k in skupiny)):
-            jadro = f"(?:{jadro}|{re.escape(slovo[1:3].lower())}{R[3]})"   # OCR vynechalo první písmeno
+        if volby.get("chybi_prvni_pismeno") and len(slovo) > 6:
+            # OCR vynechalo první písmeno: další dvě písmena jen s rovnocennostmi (ö = oe, ß = ss), bez záměn
+            # projektu (jinak Bönisch najde „Erich“), zbytek od pozice čtvrtého znaku (přehláska = dvě pozice)
+            jadro = f"(?:{jadro}|{_cteni_re(slovo[1:3].lower(), zap)[1]}{R[zac[3]]})"
         konec = _nebo((len(k), re.escape(k)) for k in KONCOVKY) + "?" if self.tvary == "ceske" else ""
         m = _tr(MALA)
         za = ((f"(?-i:(?!{m}|(?<!{m}){_tr(VELKA)}))" if self.tvary != "volne" else "")

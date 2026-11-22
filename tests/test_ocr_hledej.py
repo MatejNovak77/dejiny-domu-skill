@@ -84,8 +84,19 @@ class TestVzor(Zaklad):
         self.nenajde("Gansbauden", "ausbeuten", p)
         self.najde("Abcdefg", "bcdefg", p)
         self.nenajde("Abcdef", "bcdef", p)
-        self.nenajde("Pausbacke", "ausbacke", {"skupiny": {"au": ["ml"]}, "volby": {"chybi_prvni_pismeno": True}})
+        chybi = {"volby": {"chybi_prvni_pismeno": True}}
+        self.najde("Pausbacke", "ausbacke", dict(chybi, skupiny={"au": ["ml"]}))   # skupina na 1–2 volbu nevypne
         self.nenajde("Gansbauden", "ansbauden", {"zameny": p["zameny"]})
+        # přehláska, ß a skupina v prvních třech písmenech volbu nevypnou (zbytek od pozice čtvrtého znaku)
+        for slovo, text in (("Buchberger", "5153.uchberger"), ("Bönisch", "12.önisch"), ("Bönisch", "12.oenisch"),
+                            ("Gänsebauden", "K.änsebauden"), ("Gänsebauden", "aensebauden"),
+                            ("Straßenbau", "traßenbau"), ("Straßenbau", "trassenbau")):
+            self.najde(slovo, text, chybi)
+        # druhé a třetí písmeno bez záměn projektu (graf od pozice 1 by našel šum pomocného slova „önisch“)
+        z = dict(chybi, zameny={"ö": ["e"], "n": ["r", "u"], "ä": ["a"]})
+        self.najde("Bönisch", "Berisch", z)          # záměny platí v celém slově dál
+        self.nenajde("Bönisch", "Erich", z)
+        self.nenajde("Gänsebauden", "K.ausebauden", z)
 
     def test_11_vylouceni(self):
         p = {"zameny": {"b": ["h"], "u": ["l"]}}
@@ -318,8 +329,8 @@ class TestRovnocennosti(Zaklad):
             self.nenajde("Gans", "Gansstraße", s_volbou(dict(p, vyloucit={"STRASSE": ""}), tvary="volne"))
         chybi = {"volby": {"chybi_prvni_pismeno": True}}
         self.najde("Mullerhaus", "ullerhaus", chybi)
-        self.nenajde("Müllerhaus", "üllerhaus", chybi)   # přehláska na 0–2 vypne zkratku prvního písmene
-        self.nenajde("Müllerhaus", "ülllerhaus", chybi)  # (zkratka by jinak četla znaky slova proti půlkám pozic)
+        self.najde("Müllerhaus", "üllerhaus", chybi)     # přehláska na 1–2: zbytek od pozice čtvrtého znaku
+        self.nenajde("Müllerhaus", "ülllerhaus", chybi)  # (ne od indexu znaku – ten by mířil do půlek přehlásky)
 
     def test_48_konec_slova(self):
         self.nenajde("Fries", "Frieß", tv="volne")
