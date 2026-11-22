@@ -37,8 +37,8 @@ class TestVzor(Zaklad):
     def test_03_tvary(self):
         for t in ("Zineckera", "Zineckerové", "Zineckerů", "Zineckerovy", "Zineckerem", "Zineckerová"):
             self.assertEqual(tvary("Zinecker", t), [t])
-        for t in ("Zineckerin", "Zineckers"):
-            self.nenajde("Zinecker", t)
+        self.nenajde("Zinecker", "Zineckerin")
+        self.assertEqual(tvary("Zinecker", "Zineckers"), ["Zineckers"])   # německý genitiv (test 67)
         for t in ("Friesland", "Friesen", "Friesl"):
             self.nenajde("Fries", t)
         self.assertEqual(tvary("Fries", "Friese"), ["Friese"])   # známý zbytek českých koncovek
@@ -84,8 +84,19 @@ class TestVzor(Zaklad):
         self.nenajde("Gansbauden", "ausbeuten", p)
         self.najde("Abcdefg", "bcdefg", p)
         self.nenajde("Abcdef", "bcdef", p)
-        self.nenajde("Pausbacke", "ausbacke", {"skupiny": {"au": ["ml"]}, "volby": {"chybi_prvni_pismeno": True}})
+        chybi = {"volby": {"chybi_prvni_pismeno": True}}
+        self.najde("Pausbacke", "ausbacke", dict(chybi, skupiny={"au": ["ml"]}))   # skupina na 1–2 volbu nevypne
         self.nenajde("Gansbauden", "ansbauden", {"zameny": p["zameny"]})
+        # přehláska, ß a skupina v prvních třech písmenech volbu nevypnou (zbytek od pozice čtvrtého znaku)
+        for slovo, text in (("Buchberger", "5153.uchberger"), ("Bönisch", "12.önisch"), ("Bönisch", "12.oenisch"),
+                            ("Gänsebauden", "K.änsebauden"), ("Gänsebauden", "aensebauden"),
+                            ("Straßenbau", "traßenbau"), ("Straßenbau", "trassenbau")):
+            self.najde(slovo, text, chybi)
+        # druhé a třetí písmeno bez záměn projektu (graf od pozice 1 by našel šum pomocného slova „önisch“)
+        z = dict(chybi, zameny={"ö": ["e"], "n": ["r", "u"], "ä": ["a"]})
+        self.najde("Bönisch", "Berisch", z)          # záměny platí v celém slově dál
+        self.nenajde("Bönisch", "Erich", z)
+        self.nenajde("Gänsebauden", "K.ausebauden", z)
 
     def test_11_vylouceni(self):
         p = {"zameny": {"b": ["h"], "u": ["l"]}}
@@ -162,7 +173,7 @@ class TestVzor(Zaklad):
         """Za nálezem smí být velké písmeno po malém (OCR slepilo jméno s dalším slovem), ne malé a ne velké po
         velkém (slovo celé verzálkami: FRIESEN, FISCHERDAVID). Výhled je v regexu: kratší konec se zkusí znovu."""
         for slovo, text, cekam in (("Fischer", "FischerDavid", "Fischer"),
-                                   ("Zinecker", "ZineckerS Fuchsbergbaude", "Zinecker"),
+                                   ("Zinecker", "ZineckerS Fuchsbergbaude", "ZineckerS"),   # S = genitiv
                                    ("Zinecker", "ZineckerAdolf", "Zinecker"), ("Zinecker", "ZineckeraAdolf", "Zineckera"),
                                    ("Zinecker", "ZineckerEDUARD", "Zinecker"),   # konec E po velkém ne → zpět na r
                                    ("Zinecker", "ZineckerŠimon", "Zinecker"), ("Bönisch", "BönischÜ", "Bönisch"),
@@ -178,6 +189,33 @@ class TestVzor(Zaklad):
                 self.nenajde(slovo, text, tv=tv)
         self.assertEqual(tvary("Gansbauden", "Gans-\nbaudenHof", DELENI), ["Gans-\nbauden"])   # výhled přes řádek
         self.assertEqual(tvary("Kraus", "KrausDi", None, "volne"), ["Kraus"])
+
+    def test_67_nemecky_genitiv(self):
+        """České tvary (výchozí) berou i německý genitiv -s/-es; holé -s ne po s ß x z (Krauss, Friess jsou jiný
+        pravopis jména, ne genitiv), presne ani jedno."""
+        for slovo, text in (("Zinecker", "Zineckers"), ("Renner", "Renners"), ("Krause", "Krauses"),
+                            ("Kraus", "Krauses"), ("Fries", "Frieses"), ("Frieß", "Frießes"), ("Adolf", "ADOLFS"),
+                            ("Bönisch", "Boenischs")):
+            with self.subTest(text=text):
+                self.assertEqual(tvary(slovo, text), [text])
+                self.nenajde(slovo, text, tv="presne")
+        for slovo, text in (("Kraus", "Krauss"), ("Fries", "Friess"), ("Fries", "FRIESS"), ("Frieß", "Frießs"),
+                            ("Zinecker", "Zineckerss"), ("Zinecker", "Zineckerses"), ("Zinecker", "Zineckerovas")):
+            with self.subTest(text=text):
+                self.nenajde(slovo, text)
+        self.nenajde("Frieſ", "Frieſs", VYP)   # bez rovnocenností zůstane ſ ve slově – strážce ho bere jako s
+        # genitiv jen za slovem s rovnocennostmi, ne přes záměny projektu (šum Kreuzes, Kranzes v korpusu HB)
+        z = {"zameny": {"a": ["e"], "s": ["z"], "d": ["b"]}}
+        for slovo, je, neni in (("Kraus", "Kreuz", "Kreuzes"), ("Krause", "Kreuze", "Kreuzes"),
+                                ("Adolf", "Abolf", "Abolfs")):
+            with self.subTest(slovo=slovo):
+                self.najde(slovo, je, z)
+                self.nenajde(slovo, neni, z)
+        for slovo, text in (("Kraus", "Krauses"), ("Adolf", "Adolfs"), ("Fischer", "Fiſchers"), ("Hackel", "HACKELS")):
+            self.najde(slovo, text, z)
+        chybi = {"volby": {"chybi_prvni_pismeno": True, "deleni_slova": True}}
+        for slovo, text in (("Buchberger", "UCHBERGERS"), ("Zinecker", "Zine-\nckers")):   # korpus HB: UCHBERGERS GASTHAUS
+            self.assertEqual(tvary(slovo, text, chybi), [text])
 
 VYP = {"volby": {"rovnocennosti": False}}
 
@@ -318,8 +356,8 @@ class TestRovnocennosti(Zaklad):
             self.nenajde("Gans", "Gansstraße", s_volbou(dict(p, vyloucit={"STRASSE": ""}), tvary="volne"))
         chybi = {"volby": {"chybi_prvni_pismeno": True}}
         self.najde("Mullerhaus", "ullerhaus", chybi)
-        self.nenajde("Müllerhaus", "üllerhaus", chybi)   # přehláska na 0–2 vypne zkratku prvního písmene
-        self.nenajde("Müllerhaus", "ülllerhaus", chybi)  # (zkratka by jinak četla znaky slova proti půlkám pozic)
+        self.najde("Müllerhaus", "üllerhaus", chybi)     # přehláska na 1–2: zbytek od pozice čtvrtého znaku
+        self.nenajde("Müllerhaus", "ülllerhaus", chybi)  # (ne od indexu znaku – ten by mířil do půlek přehlásky)
 
     def test_48_konec_slova(self):
         self.nenajde("Fries", "Frieß", tv="volne")

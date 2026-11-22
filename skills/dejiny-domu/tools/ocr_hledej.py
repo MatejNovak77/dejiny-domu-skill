@@ -2,7 +2,7 @@
 Výchozí rovnocennosti platí i bez souboru pravidel: ſ = s, ꝛ = r, ß = ss, ä ö ü = ae oe ue = aͤ oͤ uͤ, rozložené
 tvary písmen (e + U+030C = ě), měkké dělení U+00AD a česká sada pravopisu před 1849 (Wáclaw, Gilemnice). Jsou to
 čtení hledaného slova – prohledávaný text se nemění. Záměny písmen z OCR jsou pravidla projektu
-v data/ocr_zameny.json (bez souboru = celé slovo s rovnocennostmi a českými koncovkami). Postup: reference/ocr.md.
+v data/ocr_zameny.json (bez souboru = celé slovo s rovnocennostmi, českými koncovkami a genitivem -s/-es). Postup: reference/ocr.md.
 
 Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všech *.txt v pracovni/):
   ocr_hledej.py hledej <slovo>… [--tvary ceske|presne|volne] [--vypis souhrn|radky]
@@ -11,6 +11,8 @@ Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všec
         --vypis radky: řádek na nález (slovo, tvar, soubor:řádek, ukázka); počty a počet souborů na stderr
       hranice (mimo --tvary volne): za nálezem nesmí být malé písmeno, velké jen po malém (FischerDavid ano,
         FISCHERDAVID ne)
+      --tvary ceske (výchozí): české koncovky a německý genitiv -s/-es (Zineckers, Krauses; ne Krauss),
+        genitiv jen za slovem bez záměn a skupin projektu
   ocr_hledej.py kandidati <slovo>… [--vzdalenost N] [--max 40] [--tvary …] [--pravidla <json>] [-- …]
       → slova blízká hledanému, která pravidla nenajdou, s počtem, ukázkou a návrhem pravidla; nic nezapíše
   ocr_hledej.py pridej|odeber zamena <znak> <čtení>…
@@ -40,6 +42,8 @@ VELKA = frozenset(c for c in _LATIN if c.isupper())      # velké za slovem jen 
 DELENI = "-⸗=¬"                                          # znaky dělení slova („Gans-bauden“, „Gans⸗ bauden“)
 MEZER_PO_DELENI = 250                                    # nejvíc bílých znaků po znaku dělení (i přes konec řádku)
 KONCOVKY = ("a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův ova ovo ovu ovy ovic").split()
+NEMECKE = ("es", "s")   # německý genitiv (Zineckers, Krauses) jen za slovem bez záměn projektu; holé s ne po
+                        # s ß ſ x z (Krauss je jiný pravopis)
 TVARY = ("ceske", "presne", "volne")
 SEKCE = ("poznamka", "zameny", "skupiny", "vyloucit", "volby")
 VOLBY_BOOL = ("deleni_slova", "chybi_prvni_pismeno")
@@ -322,7 +326,8 @@ def _cteni_re(text, zap):
 
 def _slovo_re(slovo, zameny, skupiny, zap, deleni):
     """Regex slova bez okrajů: písmena, záměny, přímá čtení celého znaku a skupiny jako hrany mezi pozicemi;
-    R[i] = zbytek slova od pozice i (s volitelným znakem dělení a ≤ 250 bílými znaky před ní)."""
+    R[i] = zbytek slova od pozice i (s volitelným znakem dělení a ≤ 250 bílými znaky před ní); zac = index první
+    pozice každého znaku slova."""
     P, zac, zaklad = _pozice(slovo, zap)
     n, hrany = len(P), [{} for _ in P]   # hrany[i][cíl] = [(délka, regex)]
     for i, L in enumerate(P):
@@ -343,7 +348,7 @@ def _slovo_re(slovo, zameny, skupiny, zap, deleni):
     for i in range(n - 1, -1, -1):
         alts = [(max(d for d, _ in a) + R[c][0], _nebo(a) + R[c][1]) for c, a in hrany[i].items()]
         R[i] = (max(d for d, _ in alts), (H if i else "") + _nebo(alts))
-    return [r for _, r in R], zaklad
+    return [r for _, r in R], zac
 
 
 @functools.cache
@@ -384,16 +389,26 @@ class Vzor:
             raise ValueError(f"tvary: {self.tvary} (povolené: {', '.join(TVARY)})")
         self.znaky_deleni = (DELENI if volby.get("deleni_slova", False) else "") + \
             (MEKKE if "mekke_deleni" in zap else "")
-        R, zaklad = _slovo_re(slovo, zameny, skupiny, zap, self.znaky_deleni)
+        R, zac = _slovo_re(slovo, zameny, skupiny, zap, self.znaky_deleni)
         jadro = R[0]
-        if (volby.get("chybi_prvni_pismeno") and len(slovo) > 6 and not any(_pulky(c, zap) for c in slovo[:3])
-                and not any(zaklad[i:i + len(k)] == k for i in range(3) for k in skupiny)):
-            jadro = f"(?:{jadro}|{re.escape(slovo[1:3].lower())}{R[3]})"   # OCR vynechalo první písmeno
+        if volby.get("chybi_prvni_pismeno") and len(slovo) > 6:
+            # OCR vynechalo první písmeno: další dvě písmena jen s rovnocennostmi (ö = oe, ß = ss), bez záměn
+            # projektu (jinak Bönisch najde „Erich“), zbytek od pozice čtvrtého znaku (přehláska = dvě pozice)
+            jadro = f"(?:{jadro}|{_cteni_re(slovo[1:3].lower(), zap)[1]}{R[zac[3]]})"
         konec = _nebo((len(k), re.escape(k)) for k in KONCOVKY) + "?" if self.tvary == "ceske" else ""
+        jadro += konec
+        if self.tvary == "ceske":
+            # genitiv jen za slovem čteným s rovnocennostmi, ne přes záměny projektu (Kraus + záměny ≠ „Kreuzes“)
+            nem = [(len(k), re.escape(k)) for k in NEMECKE if k != "s" or slovo[-1].lower() not in "sßſxz"]
+            Rc, zc = _slovo_re(slovo, *_uprav_pravidla(*_sloucena({}, zap), zap), zap, self.znaky_deleni)
+            cele = Rc[0]
+            if volby.get("chybi_prvni_pismeno") and len(slovo) > 6:   # i bez prvního písmene (UCHBERGERS)
+                cele = f"(?:{cele}|{_cteni_re(slovo[1:3].lower(), zap)[1]}{Rc[zc[3]]})"
+            jadro = f"(?:{cele}{_nebo(nem)}|{jadro})"
         m = _tr(MALA)
         za = ((f"(?-i:(?!{m}|(?<!{m}){_tr(VELKA)}))" if self.tvary != "volne" else "")
               + (f"(?![{_znaky_m()}])" if zap else ""))
-        self._re = re.compile(f"(?<![{re.escape(PISMENA)}\\-]){jadro}{konec}{za}", re.IGNORECASE)
+        self._re = re.compile(f"(?<![{re.escape(PISMENA)}\\-]){jadro}{za}", re.IGNORECASE)
         # výjimka, kterou vzor výjimek najde v hledaném slově, neplatí (Strasse s výjimkou Straße)
         vyl = [t for t in p.get("vyloucit", {}) if not _vyjimky_re([t], zap).search(puvodni.casefold())]
         self._vyloucit = _vyjimky_re(vyl, zap) if vyl else None
@@ -915,7 +930,7 @@ def main(argv):
     if prikaz == "pravidla":
         p = _precti(PRAVIDLA)
         if p is None:
-            print("Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo s českými koncovkami.")
+            print("Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo s českými koncovkami a genitivem -s/-es.")
         else:
             print(json.dumps(p, ensure_ascii=False, indent=1))
         zap = zapnute(p)

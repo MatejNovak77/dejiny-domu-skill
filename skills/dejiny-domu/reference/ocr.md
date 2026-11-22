@@ -29,7 +29,7 @@ a počet výskytů každého slova; hledané slovo, které je existující cesta
 `--vzdalenost N` (jinak by kandidátů bylo moc).
 
 ## Formát `data/ocr_zameny.json`
-Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s výchozími rovnocennostmi a českými koncovkami.
+Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s výchozími rovnocennostmi, českými koncovkami a genitivem `-s`/`-es`.
 ```json
 {"poznamka": "fraktura, Tesseract",
  "zameny":   {"s": ["f", "&"], "G": ["S", "B"], "m": ["rn"]},
@@ -48,15 +48,19 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
   shody záměn. Bez ohledu na velikost písmen a s rovnocennostmi (`Müllerova` vyloučí i `Muellerova`, `MÜLLEROVA`;
   `Straße` i `STRASSE`). Neplatí, když je text v hledaném slově.
 - `volby.deleni_slova`: slovo rozdělené znakem `- ⸗ = ¬` (i přes konec řádku; nález se hlásí na prvním řádku, tvar s ⏎).
-- `volby.chybi_prvni_pismeno`: OCR vynechalo první písmeno (jen slova delší než 6, další dvě písmena musí sedět).
-- `volby.tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými
-  ův ova ovo ovu ovy ovic`): Zineckera, Zineckerové, „Friesovy boudy“. **Známý zbytek:** -e/-i/-a pustí i německé tvary
-  („Friese“). `presne` = jen celé slovo (i slepené s dalším, viz níže), `volne` = cokoli za slovem (Friesen, Friesland).
+- `volby.chybi_prvni_pismeno`: OCR vynechalo první písmeno (jen slova delší než 6; další dvě písmena musí sedět –
+  rovnocennosti ano, ö = oe, záměny a skupiny projektu ne; zbytek slova se čte s pravidly): `5153.uchberger`, `12.önisch`.
+- `volby.tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův
+  ova ovo ovu ovy ovic`) a německý genitiv `-s`/`-es` (Zineckers, Krauses; jen za slovem s rovnocennostmi, i bez
+  prvního písmene, ne přes záměny a skupiny projektu – jinak by Kraus našel „Kreuzes“; holé `-s` ne po s ß ſ x z –
+  Krauss je jiný pravopis): Zineckera, Zineckerové, „Friesovy boudy“. **Známý zbytek:** -e/-i/-a pustí i německé tvary
+  („Friese“). `presne` = jen celé slovo (i slepené s dalším, viz níže), `volne` = cokoli za slovem (Friesen,
+  Friesland).
 - `volby.rovnocennosti`: `true` (výchozí, klíč chybí) | `false` (žádné; `ſ` = `s` platí vždy) | objekt jen
   s odchylkami od výchozích (`{"prehlasky": false, "nemcina_1901": true}`). Mění se příkazem `pridej|odeber rovnocennost`.
 Před slovem nesmí být písmeno ani `-` (číslice smí: „22Gansbauden“). Za slovem nesmí být kombinující znak (`Mu`
 nenajde začátek rozloženého `Mü`), mimo `volne` ani malé písmeno (Fischer nenajde Fischerei). Velké písmeno smí,
-když nález končí malým: OCR slepí jméno s dalším slovem (`FischerDavid`, `ZineckerS Fuchsbergbaude`). Slovo celé
+když nález končí malým: OCR slepí jméno s dalším slovem (`FischerDavid`, `ZineckerAdolf`). Slovo celé
 verzálkami slepené s dalším (`FISCHERDAVID`) se nenajde, protože by se našla i jiná slova (FRIES v FRIESEN) – na jedno
 hledání `--tvary volne`. Chybný soubor nástroj odmítne s číslem řádku.
 
@@ -89,7 +93,7 @@ Sloupec návrhu v `kandidati` obsahuje jen pravidla, která jde přidat tak, jak
 - `volba deleni_slova` – slovo rozdělené znakem dělení → `pridej volba deleni_slova`;
 - `volba chybi_prvni_pismeno` – OCR vynechalo první písmeno → `pridej volba chybi_prvni_pismeno`.
 
-Prázdný sloupec = rozdíl, na který pravidlo není: jiná koncovka (Zineckers) → `--tvary volne` nebo tvar hledej jako
+Prázdný sloupec = rozdíl, na který pravidlo není: jiná koncovka (Zineckerin) → `--tvary volne` nebo tvar hledej jako
 samostatné slovo; něco před slovem (InZinecker), jiný pravopis, mezera ve slově nebo víc změn najednou → samostatné
 slovo (a ověř ho ve skenu). Rozdíl jen ve velikosti písmen mezi kandidáty není – najde ho už `hledej`.
 
