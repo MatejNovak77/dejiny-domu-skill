@@ -72,9 +72,6 @@ class FalesnySpust:
                 if os.path.basename(a[0]) == "tesseract" and a[-1] != "--list-langs" and a[1:] != ["--version"]]
 
 
-Z = {"s": "jen_s", "ponechat": "ponechat"}   # dřívější dlouhe_s → stare_znaky
-
-
 class Zaklad(unittest.TestCase):
     """Dočasný kořen projektu (ocr.ROOT), systémová a uživatelská složka modelů, falešné programy."""
 
@@ -85,10 +82,12 @@ class Zaklad(unittest.TestCase):
         for d in (self.sysdir, self.uziv, os.path.join(self.tmp, "data"), os.path.join(self.tmp, "dokumenty")):
             os.makedirs(d)
         self.model(self.uziv, "german_print")
+        self.soubor_nastaveni = os.path.join(self.tmp, "data", "nastaveni.json")
         self.nastav({"tessdata": self.uziv})
         self.fake = FalesnySpust(self.sysdir)
         self.programy = {"tesseract": "/x/tesseract", "pdftoppm": "/x/pdftoppm", "pdfinfo": "/x/pdfinfo"}
         for p in (mock.patch.object(ocr, "ROOT", self.tmp), mock.patch.object(ocr, "spust", self.fake),
+                  mock.patch.object(ocr.nastaveni, "SOUBOR", self.soubor_nastaveni),
                   mock.patch.object(ocr, "spust_prikaz", lambda argv: self.fake(argv).returncode),
                   mock.patch.object(ocr, "najdi", lambda program: self.programy.get(program))):
             p.start()
@@ -102,8 +101,9 @@ class Zaklad(unittest.TestCase):
             f.write(obsah or f"model {jmeno}")
 
     def nastav(self, d):
-        with open(os.path.join(self.tmp, "data", "ocr.json"), "w", encoding="utf-8") as f:
-            json.dump(d, f)
+        """Sekce ocr v data/nastaveni.json (jako ji zapíše nastaveni.py)."""
+        with open(self.soubor_nastaveni, "w", encoding="utf-8") as f:
+            json.dump({"verze": 1, "ocr": d}, f)
 
     def pdf(self, n=3, jmeno="kniha.pdf", verze="v1"):
         p = os.path.join(self.tmp, "dokumenty", jmeno)
@@ -138,13 +138,12 @@ class Zaklad(unittest.TestCase):
 
 class TestModel(Zaklad):
     def test_model_priorita(self):
-        self.assertEqual(ocr.platne({})["model"], "german_print")
-        self.assertEqual(ocr.platne({"model": "ces"})["model"], "ces")
-        self.assertEqual(ocr.platne({"model": "ces"}, "deu")["model"], "deu")
-        self.nastav({"tessdata": self.uziv, "model": "ces"})
         self.model(self.uziv, "ces")
         self.model(self.uziv, "deu")
         p = self.pdf(1)
+        self.assertEqual(self.spust(p, "--vystup", self.vystup("k0"))[0], 0)   # bez nastavení
+        self.assertEqual(self.manifest("k0")["model"], "german_print")
+        self.nastav({"tessdata": self.uziv, "model": "ces"})
         self.assertEqual(self.spust(p)[0], 0)
         self.assertEqual(self.manifest("kniha")["model"], "ces")
         self.assertEqual(self.spust(p, "--model", "deu", "--vystup", self.vystup("k2"))[0], 0)
@@ -154,11 +153,24 @@ class TestModel(Zaklad):
         for m in ("", "../x", "a b", "a++b", "german_print+", 5):
             with self.assertRaises(ocr.Chyba):
                 ocr.rozloz_model(m)
-            self.assertTrue(ocr.over_nastaveni({"model": m})[0], m)
         self.assertEqual(ocr.rozloz_model("german_print+ces"), ["german_print", "ces"])
         rc, _, err = self.spust(self.pdf(1), "--model", "../x")
         self.assertEqual(rc, 1)
         self.assertIn("Neplatný název modelu", err)
+        self.nastav({"tessdata": self.uziv, "model": "a b"})
+        rc, _, err = self.spust(self.pdf(1))
+        self.assertEqual(rc, 1)
+        self.assertIn("ocr.model", err)
+        self.assertEqual(self.fake.tesseract_obrazky(), [])
+
+    def test_model_prazdny_cli(self):
+        """--model "" je chyba před OCR, ne tichý návrat k modelu z nastavení."""
+        for argv in ((self.pdf(1), "--model", ""), ("stav", "--model", "")):
+            rc, _, err = self.spust(*argv)
+            self.assertEqual(rc, 1, argv)
+            self.assertIn("Neplatný název modelu", err, argv)
+        self.assertEqual(self.fake.tesseract_obrazky(), [])
+        self.assertFalse(os.path.exists(self.vystup("kniha")))
 
     def test_deu_latf_varuje(self):
         self.model(self.uziv, "deu_latf")
@@ -169,76 +181,67 @@ class TestModel(Zaklad):
 
 
 class TestNastaveni(Zaklad):
-    def test_nastaveni_chybi(self):
-        self.assertEqual(ocr.nacti_nastaveni(os.path.join(self.tmp, "neni.json")), {})
-
-    def test_nastaveni_bom(self):
-        p = os.path.join(self.tmp, "bom.json")
-        with open(p, "wb") as f:
-            f.write(b"\xef\xbb\xbf" + json.dumps({"model": "ces"}).encode())
-        self.assertEqual(ocr.nacti_nastaveni(p), {"model": "ces"})
+    def test_deklarace_sedi(self):
+        """Sekce ocr v NASTAVENI_SEKCE = dřívější pole, rozsahy a výchozí hodnoty."""
+        sekce = ocr.NASTAVENI_SEKCE["ocr"]
+        self.assertEqual(list(sekce), ["model", "stare_znaky", "prikaz", "davka", "soubezne", "dpi", "tessdata"])
+        self.assertEqual({k: v["cele"] for k, v in sekce.items() if "cele" in v},
+                         {"davka": [1, 10000], "soubezne": [1, 64], "dpi": [72, 1200]})
+        self.assertEqual(tuple(sekce["stare_znaky"]["hodnoty"]), ocr.STARE_ZNAKY)
+        self.assertEqual({k for k, v in sekce.items() if v.get("nepovinne")}, {"prikaz", "soubezne", "tessdata"})
+        os.remove(self.soubor_nastaveni)
+        self.assertEqual(ocr.platne(ocr.nacti_nastaveni()),
+                         {"model": "german_print", "stare_znaky": "zjednodusit", "prikaz": None, "davka": 100,
+                          "soubezne": ocr.vychozi_soubezne(), "dpi": 300, "tessdata": None})
 
     def test_nastaveni_typy(self):
-        spatne = [{"prikaz": "ocr {slozka} {vystup}"}, {"prikaz": []}, {"prikaz": ["ocr", "{vystup}", "{model}"]},
-                  {"prikaz": ["ocr", "{slozka}", "{model}"]}, {"prikaz": ["ocr", "{slozka}", "{vystup}"]},
-                  {"prikaz": ["ocr", "{slozka}", "{vystup}", "{model}", "{neznamy}"]},
-                  {"davka": 0}, {"davka": "10"}, {"davka": True}, {"dpi": 50}, {"soubezne": 0}, {"dlouhe_s": "x"},
-                  {"stare_znaky": "x"}, {"stare_znaky": "s"}, {"dlouhe_s": "s", "stare_znaky": "ponechat"},
-                  {"tessdata": 3}, []]
-        for d in spatne:
-            self.assertTrue(ocr.over_nastaveni(d)[0], d)
         dobre = {"model": "german_print+ces", "stare_znaky": "ponechat", "prikaz": ["~/ocr", "{slozka}", "--out={vystup}",
-                 "-l", "{model}"], "davka": 10000, "soubezne": 64, "dpi": 72,
-                 "tessdata": "~/td"}
-        self.assertEqual(ocr.over_nastaveni(dobre), ([], []))
+                 "-l", "{model}"], "davka": 10000, "soubezne": 64, "dpi": 72, "tessdata": "~/td"}
+        self.nastav(dobre)
+        self.assertEqual(ocr.nacti_nastaveni(), dobre)
+        self.nastav({"davka": 1, "soubezne": 1, "dpi": 1200})
+        self.assertEqual(ocr.platne(ocr.nacti_nastaveni())["dpi"], 1200)
 
-    def test_o2_dlouhe_s_zastarale(self):
-        for d, cekam in (({"dlouhe_s": "s"}, "jen_s"), ({"dlouhe_s": "ponechat"}, "ponechat"), ({}, "zjednodusit"),
-                         ({"stare_znaky": "jen_s"}, "jen_s")):
-            chyby, varovani = ocr.over_nastaveni(d)
-            self.assertEqual(chyby, [], d)
-            self.assertEqual(any("dlouhe_s je zastaralé" in v for v in varovani), "dlouhe_s" in d)
-            self.assertEqual(ocr.platne(d)["stare_znaky"], cekam)
-        chyby, _ = ocr.over_nastaveni({"dlouhe_s": "s", "stare_znaky": "ponechat"})
-        self.assertTrue(any("odporují" in c for c in chyby))
-        self.assertEqual(ocr.over_nastaveni({"dlouhe_s": "s", "stare_znaky": "jen_s"})[0], [])
-        p = os.path.join(self.tmp, "data", "ocr.json")
-        with open(p, "w", encoding="utf-8") as f:
-            f.write('{"model": "ces", "dlouhe_s": "ponechat"}')
-        with contextlib.redirect_stdout(io.StringIO()):
-            ocr.prikaz_nastav(p, "dlouhe_s", "s")
-        self.assertEqual(json.loads(cti_soubor(p)), {"model": "ces", "stare_znaky": "jen_s"})
-        with open(p, "w", encoding="utf-8") as f:
-            f.write('{"dlouhe_s": "ponechat"}')
-        with contextlib.redirect_stdout(io.StringIO()):
-            ocr.prikaz_nastav(p, "stare_znaky", "zjednodusit")
-        self.assertEqual(json.loads(cti_soubor(p)), {"stare_znaky": "zjednodusit"})
+    def test_neplatne_nastaveni_pred_ocr(self):
+        """Každá vadná volba skončí chybou dřív, než se spustí Tesseract nebo vznikne výstupní složka."""
+        prikaz = ["ocr", "{slozka}", "{vystup}", "{model}"]
+        spatne = [({"dlouhe_s": "s"}, "ocr.dlouhe_s"), ({"modl": "ces"}, "ocr.modl"),
+                  ({"dpi": 71}, "ocr.dpi"), ({"dpi": 1201}, "ocr.dpi"), ({"soubezne": 0}, "ocr.soubezne"),
+                  ({"soubezne": 65}, "ocr.soubezne"), ({"davka": 0}, "ocr.davka"), ({"davka": 10001}, "ocr.davka"),
+                  ({"davka": "10"}, "ocr.davka"), ({"davka": True}, "ocr.davka"),
+                  ({"prikaz": prikaz[:1] + prikaz[2:]}, "{slozka}"), ({"prikaz": prikaz[:2] + prikaz[3:]}, "{vystup}"),
+                  ({"prikaz": prikaz[:3]}, "{model}"), ({"prikaz": prikaz + ["{neznamy}"]}, "{neznamy}"),
+                  ({"prikaz": "ocr {slozka} {vystup} {model}"}, "ocr.prikaz"), ({"prikaz": []}, "ocr.prikaz"),
+                  ({"prikaz": [""]}, "ocr.prikaz"), ({"prikaz": ["ocr", 3]}, "ocr.prikaz"),
+                  ({"model": "german print"}, "ocr.model"), ({"model": "german_print+"}, "ocr.model"),
+                  ({"model": "+ces"}, "ocr.model"), ({"model": "../x"}, "ocr.model"), ({"model": ""}, "ocr.model"),
+                  ({"stare_znaky": "s"}, "ocr.stare_znaky"), ({"stare_znaky": "x"}, "ocr.stare_znaky"),
+                  ({"tessdata": 3}, "ocr.tessdata"), ({"tessdata": ""}, "ocr.tessdata"),
+                  ({"tessdata": "  "}, "ocr.tessdata")]
+        pdf = self.pdf(1)
+        for d, hlaska in spatne:
+            with self.subTest(d=d):
+                self.nastav(dict({"tessdata": self.uziv}, **d))
+                rc, _, err = self.spust(pdf)
+                self.assertEqual(rc, 1)
+                self.assertIn(hlaska, err)
+                self.assertEqual(self.fake.tesseract_obrazky(), [])
+                self.assertFalse(os.path.exists(self.vystup("kniha")))
+                self.assertEqual(self.spust("stav")[0], 1)
 
-    def test_nastaveni_nezname_pole_varuje(self):
-        chyby, varovani = ocr.over_nastaveni({"model": "ces", "barva": "modra"})
-        self.assertEqual(chyby, [])
-        self.assertTrue(any("barva" in v for v in varovani))
+    def test_soubezne_z_nastaveni(self):
+        """soubezne z nastavení dojde až k ThreadPoolExecutor (text stran ho neprozradí)."""
+        workers, puvodni = [], ocr.concurrent.futures.ThreadPoolExecutor
 
-    def test_nastav_zachova_ostatni(self):
-        p = os.path.join(self.tmp, "data", "ocr.json")
-        with open(p, "w", encoding="utf-8") as f:
-            f.write('{"model": "ces", "x_vlastni": 1, "dpi": 200}')
-        with contextlib.redirect_stdout(io.StringIO()):
-            ocr.prikaz_nastav(p, "davka", "5")
-            self.assertEqual(json.loads(cti_soubor(p)), {"model": "ces", "x_vlastni": 1, "dpi": 200,
-                                                                     "davka": 5})
-            ocr.prikaz_nastav(p, "dpi", "vychozi")
-            ocr.prikaz_nastav(p, "prikaz", '["ocr", "{slozka}", "{vystup}", "{model}"]')
-        d = json.loads(cti_soubor(p))
-        self.assertEqual(d, {"model": "ces", "x_vlastni": 1, "davka": 5,
-                             "prikaz": ["ocr", "{slozka}", "{vystup}", "{model}"]})
-        pred = cti_soubor(p, "rb")
-        self.assertTrue(pred.endswith(b"\n") and b"\r" not in pred)
-        for k, v in (("davka", "0"), ("dpi", "abc"), ("dlouhe_s", "x"), ("stare_znaky", "s"), ("prikaz", '["ocr"]'),
-                     ("neznamy", "1")):
-            with self.assertRaises(ocr.Chyba):
-                ocr.prikaz_nastav(p, k, v)
-        self.assertEqual(cti_soubor(p, "rb"), pred)
+        def zachyt(max_workers=None, **kw):
+            workers.append(max_workers)
+            return puvodni(max_workers=max_workers, **kw)
+        with mock.patch.object(ocr, "vychozi_soubezne", lambda: 1), \
+                mock.patch.object(ocr.concurrent.futures, "ThreadPoolExecutor", zachyt):
+            self.assertEqual(self.spust(self.pdf(3), "--vystup", self.vystup("a"))[0], 0)
+            self.nastav({"tessdata": self.uziv, "soubezne": 3})
+            self.assertEqual(self.spust(self.pdf(3), "--vystup", self.vystup("b"))[0], 0)
+        self.assertEqual(workers, [1, 3])
 
 
 class TestDetekce(Zaklad):
@@ -284,10 +287,7 @@ class TestDetekce(Zaklad):
         self.assertIn("staré znaky: zjednodusit (výchozí, nenastaveno – u fraktury se zeptej uživatele)", out)
         self.nastav({"tessdata": self.uziv, "stare_znaky": "ponechat"})
         rc, out, _ = self.spust("stav")
-        self.assertIn("staré znaky: ponechat (nastaveno v data/ocr.json)", out)
-        self.nastav({"tessdata": self.uziv, "dlouhe_s": "s"})   # zastaralé pole se počítá jako nastavené
-        rc, out, _ = self.spust("stav")
-        self.assertIn("staré znaky: jen_s (nastaveno v data/ocr.json)", out)
+        self.assertIn("staré znaky: ponechat (nastaveno v data/nastaveni.json)", out)
 
     def test_chybi_tesseract_exit2(self):
         del self.programy["tesseract"]
@@ -870,32 +870,50 @@ class TestCli(unittest.TestCase):
         return subprocess.run([sys.executable, "-I", "-X", "utf8", self.path("tools", "ocr.py"), *args], cwd=self.root,
                               capture_output=True, text=True, encoding="utf-8", timeout=timeout)
 
+    def nastav(self, klic, hodnota):
+        return subprocess.run([sys.executable, "-I", "-X", "utf8", self.path("tools", "nastaveni.py"), "nastav",
+                               f"ocr.{klic}", hodnota], cwd=self.root, capture_output=True, text=True,
+                              encoding="utf-8")
+
     def test_nastaveni_poskozene(self):
-        with open(self.path("data", "ocr.json"), "w", encoding="utf-8") as f:
-            f.write('{\n "model": ,\n}\n')
+        with open(self.path("data", "nastaveni.json"), "w", encoding="utf-8") as f:
+            f.write('{\n "ocr": ,\n}\n')
         p = self.ocr("stav")
         self.assertEqual(p.returncode, 1)
-        self.assertIn("ocr.json", p.stderr)
-        self.assertIn("řádku 2", p.stderr)
+        self.assertIn("nastaveni.json", p.stderr)
         self.assertNotIn("Traceback", p.stderr + p.stdout)
-        with open(self.path("data", "ocr.json"), "w", encoding="utf-8") as f:
-            f.write('{"davka": "10"}')
+        with open(self.path("data", "nastaveni.json"), "w", encoding="utf-8") as f:
+            f.write('{"ocr": {"davka": "10"}}')
         p = self.ocr("stav")
         self.assertEqual(p.returncode, 1)
-        self.assertIn("davka", p.stderr)
+        self.assertIn("ocr.davka", p.stderr)
         self.assertNotIn("Traceback", p.stderr + p.stdout)
 
+    def test_ukaz_ocr(self):
+        p = subprocess.run([sys.executable, "-I", "-X", "utf8", self.path("tools", "nastaveni.py"), "ukaz", "ocr"],
+                           cwd=self.root, capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        radky = [r for r in p.stdout.splitlines() if r.startswith(("ocr.", "→ ZEPTEJ_SE ocr."))]
+        self.assertEqual(len(radky), 7, p.stdout)
+        self.assertEqual([r for r in radky if "ZEPTEJ_SE" in r], [r for r in radky
+                                                                  if r.startswith("→ ZEPTEJ_SE ocr.stare_znaky ")])
+        self.assertEqual(sum("ZEPTEJ_SE" in r for r in radky), 1)
+        for k in ("prikaz", "soubezne", "tessdata"):
+            self.assertIn(f"ocr.{k} nenastaveno", p.stdout)
+        self.assertIn("ocr.model = german_print", p.stdout)
+
     def test_nastaveni_prezije_aktualizaci(self):
-        self.assertEqual(self.ocr("nastav", "stare_znaky", "ponechat").returncode, 0)
-        self.assertEqual(self.ocr("nastav", "model", "german_print+ces").returncode, 0)
-        with open(self.path("data", "ocr.json"), "rb") as f:
+        self.assertEqual(self.nastav("stare_znaky", "ponechat").returncode, 0)
+        self.assertEqual(self.nastav("model", "german_print+ces").returncode, 0)
+        with open(self.path("data", "nastaveni.json"), "rb") as f:
             pred = f.read()
         for _ in range(2):
             subprocess.run([sys.executable, "-I", os.path.join(SKILL, "tools", "novy_projekt.py"), self.root,
                             "--bez-webu"], capture_output=True, check=True)
-        with open(self.path("data", "ocr.json"), "rb") as f:
+        with open(self.path("data", "nastaveni.json"), "rb") as f:
             self.assertEqual(f.read(), pred)
-        self.assertEqual(json.loads(pred), {"stare_znaky": "ponechat", "model": "german_print+ces"})
+        self.assertEqual(json.loads(pred)["ocr"], {"stare_znaky": "ponechat", "model": "german_print+ces"})
+        self.assertIn("staré znaky: ponechat (nastaveno v data/nastaveni.json)", self.ocr("stav").stdout)
 
     def test_cli_I_pouziva_slusne(self):
         p = self.ocr("stav")
@@ -905,7 +923,7 @@ class TestCli(unittest.TestCase):
     def test_cli_bez_slusne(self):
         os.remove(self.path("tools", "slusne.py"))
         td = os.path.join(self.tmp, "td")
-        self.assertEqual(self.ocr("nastav", "tessdata", td).returncode, 0)
+        self.assertEqual(self.nastav("tessdata", td).returncode, 0)
         p = self.ocr("stav")
         self.assertIn("stahovani: vypnuto", p.stdout)
         p = self.ocr("stahni", "german_print")
@@ -918,7 +936,7 @@ class TestCli(unittest.TestCase):
         with open(self.path("pracovni", "fake_ocr.py"), "w", encoding="utf-8") as f:
             f.write(FAKE_OCR)
         sablona = [sys.executable, "-I", self.path("pracovni", "fake_ocr.py"), "{slozka}", "{vystup}", "{model}"]
-        self.assertEqual(self.ocr("nastav", "prikaz", json.dumps(sablona)).returncode, 0)
+        self.assertEqual(self.nastav("prikaz", json.dumps(sablona)).returncode, 0)
         with open(self.path("dokumenty", "a.jpg"), "w") as f:
             f.write("sken")
 
