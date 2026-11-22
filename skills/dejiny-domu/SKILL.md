@@ -262,7 +262,7 @@ Obecně a stručně, bez osobních údajů. Nic sám neposílej.
 | `data/zajimavosti.md`, `data/pribeh.md`, `data/web.json`, `data/dokumenty.json`, `data/mista.json` | texty a nastavení webu, fotky, body na mapě |
 | `vyrezy/`, `zdroje/` | výřezy zápisů, map a dokumentů (web / plné rozlišení), název = klíč + `.jpg` |
 | `data/ocr_zameny.json` | záměny písmen v OCR textech projektu (`ocr_hledej.py`, zapisuje jen `pridej` po souhlasu) |
-| `data/nastaveni.json` | volby nástrojů po sekcích (např. `ocr_hledej`; zapisuje jen `nastaveni.py nastav` po souhlasu) |
+| `data/nastaveni.json` | volby nástrojů po sekcích (např. `ocr_hledej`, `ocr`; zapisuje jen `nastaveni.py nastav` po souhlasu) |
 | `dokumenty/`, `pracovni/` | originály od uživatele; pracovní soubory (nejdou na web) |
 | `tools/`, `web/` | nástroje (kopie ze skillu), web (Astro; data do něj jen přes `npm run data`) |
 
@@ -317,7 +317,7 @@ Vždy **projektovou kopii** `tools/`, nikdy `SKILL_DIR/tools/` (zapisovala by do
 | `ortofota.py serie <místo> [polomer] [--zapsat skupina]` | letecké snímky domu po letech 1998–2023 (ČÚZK, CC BY) a starší či chybějící ročníky krajů (jen ke čtení), stejný výřez (rovnou do `mapy.json`) |
 | `ipr_praha.py serie <místo> [polomer] [--zapsat skupina]` | Praha: staré plány 1791–1944 a letecké snímky 1938–2002 se stejným výřezem (rovnou do `mapy.json`) |
 | `dnnt.py hledej / kontext / ocr / adresa` | tisk 20. století (adresáře, Stavitelské listy, noviny): úryvky z neveřejných stran, OCR veřejných (i veřejných jen v jiné knihovně), hledání adresy. Neveřejné (DNNT) čte uživatel sám podle čtecího listu |
-| `ocr.py <vstup> / stav / stahni / nastav` | OCR vlastních skenů tisku (PDF, obrázek, složka obrázků) Tesseractem do `pracovni/ocr/` po stranách, dodělá chybějící; model (fraktura `german_print`), staré znaky (ſ, ꝛ, aͤ) a vlastní příkaz v `data/ocr.json`; model stahuje jen po souhlasu (`reference/ocr.md`) |
+| `ocr.py <vstup> / stav / stahni / modely` | OCR vlastních skenů tisku (PDF, obrázek, složka obrázků) Tesseractem do `pracovni/ocr/` po stranách, dodělá chybějící; model (fraktura `german_print`), staré znaky (ſ, ꝛ, aͤ) a vlastní příkaz v `data/nastaveni.json` (sekce `ocr`); model stahuje jen po souhlasu (`reference/ocr.md`) |
 | `ocr_hledej.py hledej / kandidati / pridej / odeber / pravidla` | jména v OCR textech `pracovni/` i zkomolená podle `data/ocr_zameny.json`; kandidáti s návrhem pravidla nebo volby (`reference/ocr.md`) |
 | `nastaveni.py ukaz [sekce] / nastav <sekce.klíč> <hodnota\|vychozi>` | volby nástrojů v `data/nastaveni.json` (výchozí hodnota, popis); zapisovat jen po souhlasu |
 | `zapis.py <soubor> <klíč> <vstup.json> [--sloucit \| --prepsat]` | přidá / změní položku v `zaznamy`, `svazky`, `prepisy`, `mapy`, `web` (pole nastavení webu)… beze změny formátu; náhradu, která by smazala pole, odmítne |

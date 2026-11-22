@@ -182,7 +182,8 @@ Postup:
    `! sudo apt install …`, jinak v terminálu), a počkej.
 2. **Fraktura** (německý tisk 18.–20. stol., lomené písmo): nabídni `ocr.py stahni german_print` (3,5 MB, server
    UB Mannheim – ne GitHub, licence neuvedená; jen po souhlasu) a **zeptej se na staré znaky** (níže), pokud
-   `ocr.py stav` u nich neukáže „nastaveno“. Volbu zapiš `ocr.py nastav …`; v projektu se už neptej. Velikost, server
+   `ocr.py stav` u nich neukáže „nastaveno“. Volbu zapiš `nastaveni.py nastav ocr.stare_znaky …`; v projektu se už
+   neptej. Velikost, server
    a licenci ber z tabulky „Volba modelu“ nebo z `ocr.py modely`, ne z paměti.
 3. Čeština ve fraktuře (švabach, tisky před ~1850): model `german_print+ces`. Čeština antikvou: `ces`.
 4. `ocr.py <vstup>`; texty jsou `lit`, dokud nález neověříš ve skenu.
@@ -202,7 +203,7 @@ pro ruční stažení.
 
 Potřeba je Tesseract ≥ 4. Systémové modely jsou ve složce, kterou vypíše `tesseract --list-langs` (Debian/Ubuntu
 `/usr/share/tesseract-ocr/5/tessdata`, u Tesseractu 4 `…/4.00/tessdata`; Homebrew `/opt/homebrew/share/tessdata`).
-`TESSDATA_PREFIX` ukazuje na **rodiče** složky `tessdata`, kdežto `--tessdata-dir` (a pole `tessdata` níže) na složku,
+`TESSDATA_PREFIX` ukazuje na **rodiče** složky `tessdata`, kdežto `--tessdata-dir` (a volba `ocr.tessdata` níže) na složku,
 ve které `*.traineddata` přímo leží.
 
 ## Volba modelu
@@ -225,37 +226,42 @@ Měření (Tesseract 5.5.4, 19. 11. 2026): jednotlivé řádky (GT4HistOCR, 19. 
 Model se stahuje jen po souhlasu uživatele: `ocr.py stahni german_print` (jen přes `slusne.py`; sha256 je v nástroji
 připnutý, nesedí-li, nic se nenainstaluje). `ocr.py modely` vypíše známé modely a kde jsou.
 
-**Kde se modely hledají:** systémová složka (z `tesseract --list-langs`) a uživatelská (`tessdata` z nastavení, jinak
+**Kde se modely hledají:** systémová složka (z `tesseract --list-langs`) a uživatelská (`ocr.tessdata` z nastavení, jinak
 `$XDG_DATA_HOME/tessdata` nebo `~/.local/share/tessdata`, na Windows `%LOCALAPPDATA%\tessdata`).
-1. Jsou-li v systémové složce všechny části modelu, běží se bez `--tessdata-dir` (nastavené `tessdata` systém nepřebije).
+1. Jsou-li v systémové složce všechny části modelu, běží se bez `--tessdata-dir` (nastavené `ocr.tessdata` systém nepřebije).
 2. Jinak `--tessdata-dir <uživatelská>`; části, které jsou jen v systémové složce, se tam před během zkopírují.
 3. Co není ani v jedné, je exit 2 s návodem. `ocr.py stav` vypíše, kterou složku běh použije.
 
 ## Staré znaky (ſ, ꝛ, aͤ)
 Fraktura má dlouhé s (`Fiſchzuchtanſtalt`), r rotundu (`ꝛc.`) a přehlásky se znaménkem e nad písmenem (`Muͤller`).
 U fraktury se zeptej jednou za projekt:
-- **zjednodušit** (výchozí, `ocr.py nastav stare_znaky zjednodusit`): do textu se zapíše `ſ → s`, `ꝛ → r`,
+- **zjednodušit** (výchozí, `nastaveni.py nastav ocr.stare_znaky zjednodusit`): do textu se zapíše `ſ → s`, `ꝛ → r`,
   `aͤ oͤ uͤ → ä ö ü` (i velká); text se čte a cituje běžnými slovy;
-- **ponechat** (věrný přepis, `ocr.py nastav stare_znaky ponechat`).
+- **ponechat** (věrný přepis, `nastaveni.py nastav ocr.stare_znaky ponechat`).
 Hledání (`ocr_hledej.py`) najde `ſ`, `ꝛ` i `aͤ` samo (výchozí rovnocennosti), takže ani při „ponechat“ se žádné
-pravidlo nepřidává. `jen_s` (jen `ſ → s`) mají výstupy z doby, kdy volba byla `dlouhe_s`; zastaralé `dlouhe_s` v
-nastavení nástroj převede (`s` → `jen_s`) a varuje. Volba platí pro nové texty; složka s hotovými stranami se dodělá
+pravidlo nepřidává. `jen_s` = jen `ſ → s`. Volba platí pro nové texty; složka s hotovými stranami se dodělá
 stejně, jak vznikla (není-li volba nastavená, převezme ji z manifestu), výslovně jiná volba se odmítne (manifest, níže).
 
-## Nastavení `data/ocr.json`
-Všechna pole jsou volitelná; aktualizace skillu soubor nepřepíše. Zapisuj ho `ocr.py nastav <klíč> <hodnota>`
-(`vychozi` pole smaže), prohlédni `ocr.py nastaveni`.
+## Nastavení (sekce `ocr` v `data/nastaveni.json`)
+Volby OCR jsou v nastavení projektu; aktualizace skillu soubor nepřepíše. Vypíše je
+`python3 -I tools/nastaveni.py ukaz ocr`, zapíše se souhlasem uživatele `nastaveni.py nastav ocr.<klíč> <hodnota>`
+(`vychozi` volbu smaže). Na staré znaky se ptej (`→ ZEPTEJ_SE ocr.stare_znaky`); `prikaz`, `soubezne` a `tessdata`
+jsou „nenastaveno“ a ptát se na ně nemusíš.
 ```json
-{"model": "german_print", "stare_znaky": "zjednodusit", "davka": 100, "soubezne": 4, "dpi": 300, "tessdata": "~/.local/share/tessdata",
- "prikaz": ["/cesta/k/programu", "{slozka}", "--lang", "{model}", "--out", "{vystup}"]}
+{"verze": 1, "ocr": {"model": "german_print", "stare_znaky": "zjednodusit", "davka": 100, "soubezne": 4, "dpi": 300,
+ "tessdata": "~/.local/share/tessdata", "prikaz": ["/cesta/k/programu", "{slozka}", "--lang", "{model}", "--out", "{vystup}"]}}
 ```
 - `model` (přebije ho `--model`), `stare_znaky` `zjednodusit`|`ponechat`|`jen_s`, `dpi` 72–1200 (převod PDF), `soubezne` 1–64 (procesů
   Tesseractu najednou, výchozí polovina jader, nejvýš 4), `davka` 1–10000 (strany na jedno volání vlastního příkazu),
   `tessdata` (uživatelská složka modelů; `~` se rozbalí, relativní cesta platí od kořene projektu).
-- Chybný soubor nástroj odmítne s řádkem nebo polem (exit 1); neznámá pole jen vypíše jako varování.
+- `prikaz` se zapisuje jako JSON seznam v apostrofech: `nastaveni.py nastav ocr.prikaz '["/cesta/k/programu",
+  "{slozka}", "--out", "{vystup}", "-l", "{model}"]'`. Model a zástupce v příkazu kontroluje až `ocr.py` – po zápisu
+  spusť `ocr.py stav`.
+- Neplatná hodnota, neznámý klíč (překlep), neplatný model nebo `prikaz` bez zástupce: `ocr.py` skončí chybou (exit 1)
+  dřív, než začne OCR – výchozí hodnotu potichu nepoužije.
 
 ## Vlastní příkaz
-Kdo má vlastní OCR program (třeba výpočetní cluster), nastaví `prikaz` – argv bez shellu. Nahrazují se `{slozka}`
+Kdo má vlastní OCR program (třeba výpočetní cluster), nastaví `ocr.prikaz` – argv bez shellu. Nahrazují se `{slozka}`
 (dočasná složka se stranami `p0001.<přípona>`, `p0002…` – pořadí jmen = pořadí stran), `{vystup}` (prázdná dočasná
 složka) a `{model}`; všechny tři jsou povinné (manifest pak nese model, který program opravdu použil). Program zapíše
 do `{vystup}` **jeden** `.txt` (jméno libovolné), za **každou** stranou znak konce stránky `\f` (tak píše např.
