@@ -149,9 +149,10 @@ def rozbor_jazyku(text):
     return None, []
 
 
-def jazyky(tess, tessdata=None):
-    argv = [tess] + (["--tessdata-dir", tessdata] if tessdata else []) + ["--list-langs"]
-    return rozbor_jazyku(_vystup(spust(argv, capture_output=True)))
+def systemove_modely(tess):
+    """→ (systémová složka modelů|None, [modely, které Tesseract zná])."""
+    sdir, sjaz = rozbor_jazyku(_vystup(spust([tess, "--list-langs"], capture_output=True)))
+    return systemova_slozka(sdir), sjaz
 
 
 def systemova_slozka(slozka, env=None):
@@ -226,8 +227,7 @@ def rada_modelu(model, uziv):
 def priprav_modely(tess, model, nastaveni, kopirovat=True):
     """Najde (a pro běh zkopíruje) části modelu. Vrací tessdata_dir|None. Chybí → Chyba(kód 2)."""
     casti = rozloz_model(model)
-    sdir, sjaz = jazyky(tess)
-    sdir = systemova_slozka(sdir)
+    sdir, sjaz = systemove_modely(tess)
     uziv = uzivatelska_slozka(nastaveni)
     tdir, cesty, chybi, kopie = kde_modely(casti, (sdir, sjaz), uziv)
     if chybi:
@@ -388,10 +388,7 @@ def strany(vstup):
             if k.lower() in kmeny:
                 raise Chyba(f"{vstup}: {kmeny[k.lower()]} a {f} by daly stejný soubor {k}.txt – přejmenuj jeden.")
             kmeny[k.lower()] = f
-        out = []
-        for f in obr:
-            out.append({"jmeno": os.path.splitext(f)[0], "obrazek": os.path.join(vstup, f)})
-        return "slozka", out, None
+        return "slozka", [{"jmeno": os.path.splitext(f)[0], "obrazek": os.path.join(vstup, f)} for f in obr], None
     if not os.path.isfile(vstup):
         raise Chyba(f"{vstup}: soubor ani složka neexistuje.")
     if vstup.lower().endswith(".pdf"):
@@ -655,8 +652,7 @@ def prikaz_stav(nast, model_arg=None):
     varuj_model(model)
     print(f"uživatelská složka modelů: {uziv}")
     if tess:
-        sdir, sjaz = jazyky(tess)
-        sdir = systemova_slozka(sdir)
+        sdir, sjaz = systemove_modely(tess)
         print(f"systémová složka modelů: {sdir or '?'} ({' '.join(sjaz) or 'žádné'})")
         tdir, cesty, chyb, kopie = kde_modely(casti, (sdir, sjaz), uziv)
         for c in casti:
@@ -680,8 +676,7 @@ def prikaz_modely(nast):
     tess = najdi("tesseract")
     sdir, sjaz = (None, [])
     if tess:
-        sdir, sjaz = jazyky(tess)
-        sdir = systemova_slozka(sdir)
+        sdir, sjaz = systemove_modely(tess)
     print(f"systémová složka: {sdir or '?'}\nuživatelská složka: {uziv}")
     jine = set(sjaz) | {os.path.basename(f)[:-12] for f in glob.glob(os.path.join(uziv, "*.traineddata"))}
     for m, (_, _, mb, popis) in ZNAME.items():
