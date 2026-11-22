@@ -143,13 +143,15 @@ Pravidla kvality:
 OCR staré sazby komolí jména („Gansbauden“ → „Sansbauben“). V textech hledej `tools/ocr_hledej.py hledej <jméno>`;
 stejné znaky jinak zapsané (ſ, ß/ss, ü/ue, rozložené ě) i jinou velikost písmen najde samo; vypíše souhrn podle
 nalezeného tvaru, všechny řádky dá `--vypis radky`. `ocr_hledej.py kandidati <jméno>` najde blízká
-slova, která pravidla minula, a navrhne pravidlo do `data/ocr_zameny.json`. `hledej` i `kandidati` jen čtou – spusť je
+slova, která pravidla minula, a navrhne pravidlo do `data/ocr_zameny.json` nebo volbu hledání (`nastav ocr_hledej.…`). `hledej` i `kandidati` jen čtou – spusť je
 sám, když přibyly OCR texty, když hledání čekaného jména vrátí méně než 3 nálezy, nebo když najdeš zkomoleninu, kterou
-nástroj minul. Zápis (`pridej`/`odeber` pravidla, sady pravopisu `nemcina_1901`) jen po souhlasu uživatele;
+nástroj minul. Zápis (`pridej`/`odeber` pravidla; volby a sady pravopisu přes `nastaveni.py nastav ocr_hledej.…`)
+jen po souhlasu uživatele;
 nabídni ho nejvýš jednou za konverzaci na slovo, nikdy po každém hledání. **Počet zmínek nikdy nesčítej sám**
 (ani z `hledej` + `kandidati`): návrhy z `kandidati` zapiš nástrojem Write do `pracovni/navrh_zamen.json` (pravidla
-projektu + navržená), spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json` a číslo z řádku `# <jméno>: N výskytů`
-řekni i zapiš do deníku. Ukaž tabulku nálezů a tabulku navržených pravidel (`pridej …`). Postup: `reference/ocr.md`.
+projektu + navržená), spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json` (navrženou volbu přidej jako
+`--volba <klíč>=ano`) a číslo z řádku `# <jméno>: N výskytů`
+řekni i zapiš do deníku. Ukaž tabulku nálezů a tabulku navržených pravidel (`pridej …`, `nastav …`). Postup: `reference/ocr.md`.
 
 ### Webové aplikace bez API – prohlížeč
 Když portál nemá nástroj ani čitelné API (mapové aplikace, prohlížeče snímků, nahlizenidokn, chartae-antiquae),
@@ -260,6 +262,7 @@ Obecně a stručně, bez osobních údajů. Nic sám neposílej.
 | `data/zajimavosti.md`, `data/pribeh.md`, `data/web.json`, `data/dokumenty.json`, `data/mista.json` | texty a nastavení webu, fotky, body na mapě |
 | `vyrezy/`, `zdroje/` | výřezy zápisů, map a dokumentů (web / plné rozlišení), název = klíč + `.jpg` |
 | `data/ocr_zameny.json` | záměny písmen v OCR textech projektu (`ocr_hledej.py`, zapisuje jen `pridej` po souhlasu) |
+| `data/nastaveni.json` | volby nástrojů po sekcích (např. `ocr_hledej`; zapisuje jen `nastaveni.py nastav` po souhlasu) |
 | `dokumenty/`, `pracovni/` | originály od uživatele; pracovní soubory (nejdou na web) |
 | `tools/`, `web/` | nástroje (kopie ze skillu), web (Astro; data do něj jen přes `npm run data`) |
 
@@ -315,7 +318,8 @@ Vždy **projektovou kopii** `tools/`, nikdy `SKILL_DIR/tools/` (zapisovala by do
 | `ipr_praha.py serie <místo> [polomer] [--zapsat skupina]` | Praha: staré plány 1791–1944 a letecké snímky 1938–2002 se stejným výřezem (rovnou do `mapy.json`) |
 | `dnnt.py hledej / kontext / ocr / adresa` | tisk 20. století (adresáře, Stavitelské listy, noviny): úryvky z neveřejných stran, OCR veřejných (i veřejných jen v jiné knihovně), hledání adresy. Neveřejné (DNNT) čte uživatel sám podle čtecího listu |
 | `ocr.py <vstup> / stav / stahni / nastav` | OCR vlastních skenů tisku (PDF, obrázek, složka obrázků) Tesseractem do `pracovni/ocr/` po stranách, dodělá chybějící; model (fraktura `german_print`), staré znaky (ſ, ꝛ, aͤ) a vlastní příkaz v `data/ocr.json`; model stahuje jen po souhlasu (`reference/ocr.md`) |
-| `ocr_hledej.py hledej / kandidati / pridej / odeber / pravidla` | jména v OCR textech `pracovni/` i zkomolená podle `data/ocr_zameny.json`; kandidáti s návrhem pravidla (`reference/ocr.md`) |
+| `ocr_hledej.py hledej / kandidati / pridej / odeber / pravidla` | jména v OCR textech `pracovni/` i zkomolená podle `data/ocr_zameny.json`; kandidáti s návrhem pravidla nebo volby (`reference/ocr.md`) |
+| `nastaveni.py ukaz [sekce] / nastav <sekce.klíč> <hodnota\|vychozi>` | volby nástrojů v `data/nastaveni.json` (výchozí hodnota, popis); zapisovat jen po souhlasu |
 | `zapis.py <soubor> <klíč> <vstup.json> [--sloucit \| --prepsat]` | přidá / změní položku v `zaznamy`, `svazky`, `prepisy`, `mapy`, `web` (pole nastavení webu)… beze změny formátu; náhradu, která by smazala pole, odmítne |
 | `zapis.py denik "<zdroj>" "<rozsah>" "<hledáno>" "<výsledek>" "<citace>"` | řádek deníku `research_log.md` s číslem a datem (pod zámkem, souběžné session) |
 | `kontrola.py` | kontrola dat, soukromí, kdy psát příběh |
