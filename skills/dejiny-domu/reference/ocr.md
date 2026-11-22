@@ -50,10 +50,12 @@ Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s vý
 - `volby.deleni_slova`: slovo rozdělené znakem `- ⸗ = ¬` (i přes konec řádku; nález se hlásí na prvním řádku, tvar s ⏎).
 - `volby.chybi_prvni_pismeno`: OCR vynechalo první písmeno (jen slova delší než 6; další dvě písmena musí sedět –
   rovnocennosti ano, ö = oe, záměny a skupiny projektu ne; zbytek slova se čte s pravidly): `5153.uchberger`, `12.önisch`.
-- `volby.tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými
-  ův ova ovo ovu ovy ovic`) a německý genitiv `-s`/`-es` (Zineckers, Krauses; jen za slovem s rovnocennostmi, ne přes
-  záměny projektu – jinak by Kraus našel „Kreuzes“; holé `-s` ne po s ß ſ x z – Krauss je jiný pravopis):
-  Zineckera, Zineckerové, „Friesovy boudy“. **Známý zbytek:** -e/-i/-a pustí i německé tvary („Friese“). `presne` = jen celé slovo (i slepené s dalším, viz níže), `volne` = cokoli za slovem (Friesen, Friesland).
+- `volby.tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův
+  ova ovo ovu ovy ovic`) a německý genitiv `-s`/`-es` (Zineckers, Krauses; jen za slovem s rovnocennostmi, i bez
+  prvního písmene, ne přes záměny a skupiny projektu – jinak by Kraus našel „Kreuzes“; holé `-s` ne po s ß ſ x z –
+  Krauss je jiný pravopis): Zineckera, Zineckerové, „Friesovy boudy“. **Známý zbytek:** -e/-i/-a pustí i německé tvary
+  („Friese“). `presne` = jen celé slovo (i slepené s dalším, viz níže), `volne` = cokoli za slovem (Friesen,
+  Friesland).
 - `volby.rovnocennosti`: `true` (výchozí, klíč chybí) | `false` (žádné; `ſ` = `s` platí vždy) | objekt jen
   s odchylkami od výchozích (`{"prehlasky": false, "nemcina_1901": true}`). Mění se příkazem `pridej|odeber rovnocennost`.
 Před slovem nesmí být písmeno ani `-` (číslice smí: „22Gansbauden“). Za slovem nesmí být kombinující znak (`Mu`
