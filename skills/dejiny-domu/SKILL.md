@@ -167,8 +167,8 @@ trénink modelů (ClaudeBot, GPTBot) se tě netýká. V prohlížeči platí tot
 Na velké kolo (projít matriku 1784–1850 a vypsat všechny zápisy z čp. 12, projít sčítání
 1857–1921) můžeš pustit 2–4 pomocníky. Pomocník, který čte **rukopis** (matriky, gruntovní a pozemkové knihy,
 sčítací archy, cokoli v kurentu), běží na Opusu (`model: "opus"`), ostatní (tisk, OCR, portály) na Sonnetu
-(`model: "sonnet"`); Opus je dražší, u rukopisů se vyplatí (`reference/pomocnici.md`). Když uživatel chce jiný
-model, vyhov mu. Píšou jen do `pracovni/pom_<úkol>/`,
+(`model: "sonnet"`); Opus je dražší, u rukopisů se vyplatí (`reference/pomocnici.md`). Na model se uživatele
+neptej; když chce jiný, vyhov mu. Píšou jen do `pracovni/pom_<úkol>/`,
 **do `data/` nikdy** – do zadání napiš i „nespouštěj příkazy `… svazek` ani jiné, které zapisují do `data/`“. Jejich čtení **vždy ověř sám na snímku** (`tools/overit.py`), než ho zapíšeš jako `doc`.
 V zadání chtěj u každého prošlého snímku, co na něm skutečně přečetli (rok, číslo domu, první jméno).
 Před velkým kolem řekni uživateli, co plánuješ, a nech si to schválit (kredity).
