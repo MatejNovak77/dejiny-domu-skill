@@ -1309,14 +1309,14 @@ class TestOcrHledej(Projekt):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertNotIn("Müller", p.stdout)
         p = self.nastroj("ocr_hledej.py", "pravidla")
-        self.assertIn("deleni_slova=ne, chybi_prvni_pismeno=ne, tvary=ceske", p.stdout)
+        self.assertIn("Volby: deleni_slova=ano, chybi_prvni_pismeno=ne", p.stdout)   # výchozí, i bez zápisu
         self.assertIn("- prehlasky", p.stdout)
         self.assertIn("+ dlouhe_s", p.stdout)
         p = self.nastroj("nastaveni.py", "ukaz", "ocr_hledej")
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(len([r for r in p.stdout.splitlines() if r.startswith("ocr_hledej.")]), 11)
         self.assertIn("ocr_hledej.prehlasky = ne   (nastaveno;", p.stdout)
-        self.assertIn("ocr_hledej.deleni_slova = ne   (výchozí;", p.stdout)
+        self.assertIn("ocr_hledej.deleni_slova = ano   (výchozí;", p.stdout)
         self.assertNotIn("ZEPTEJ_SE", p.stdout)
         for n in ("dlouhe_s", "r_rotunda", "ostre_s", "rozlozene", "mekke_deleni", "cestina_1849"):
             self.nast("nastav", f"ocr_hledej.{n}", "ne")
@@ -1371,10 +1371,10 @@ class TestOcrHledej(Projekt):
     def test_volba_jen_pro_beh(self):
         self.ocr_txt("aus Lhote-\ncky Hof\n")
         p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
-        self.assertIn("# Lhotecky: 0 výskytů", p.stderr)
-        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", "--volba", "deleni_slova=ano")
+        self.assertIn("# Lhotecky: 1 výskytů", p.stderr)   # dělení slova je výchozí
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", "--volba", "deleni_slova=ne")
         self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertIn("# Lhotecky: 1 výskytů", p.stderr)
+        self.assertIn("# Lhotecky: 0 výskytů", p.stderr)
         self.assertFalse(os.path.exists(self.path("data", "nastaveni.json")))
         for spatne in ("nesmysl=ano", "deleni_slova=snad", "deleni_slova"):
             with self.subTest(volba=spatne):
@@ -1382,20 +1382,21 @@ class TestOcrHledej(Projekt):
                 self.assertNotEqual(p.returncode, 0)
                 self.assertEqual(p.stdout, "")
                 self.assertIn("--volba", p.stderr)
-        self.nast("nastav", "ocr_hledej.deleni_slova", "ano")   # z nastavení bez --volba, --volba ho přebije
+        self.nast("nastav", "ocr_hledej.deleni_slova", "ne")   # z nastavení bez --volba, --volba ho přebije
         p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky")
-        self.assertIn("# Lhotecky: 1 výskytů", p.stderr)
-        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", "--volba", "deleni_slova=ne")
         self.assertIn("# Lhotecky: 0 výskytů", p.stderr)
+        p = self.nastroj("ocr_hledej.py", "hledej", "Lhotecky", "--volba", "deleni_slova=ano")
+        self.assertIn("# Lhotecky: 1 výskytů", p.stderr)
         self.nastroj("ocr_hledej.py", "pridej", "zamena", "d", "b")
         self.assertEqual(self.data("ocr_zameny"), {"zameny": {"d": ["b"]}})   # vnitřní volby se nezapíšou
 
     def test_kandidati_navrhne_nastaveni(self):
         self.ocr_txt("aus Lhote-\ncky Hof\n")
+        self.nast("nastav", "ocr_hledej.deleni_slova", "ne")   # návrh volby jen při vypnutém dělení
         p = self.nastroj("ocr_hledej.py", "kandidati", "Lhotecky")
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn("\tnastav ocr_hledej.deleni_slova ano\t", p.stdout)
-        self.assertFalse(os.path.exists(self.path("data", "nastaveni.json")))
+        self.assertEqual(self.data("nastaveni")["ocr_hledej"], {"deleni_slova": "ne"})   # kandidati nic nezapíše
 
     def test_neplatne_nastaveni_chyba_pred_hledanim(self):
         self.ocr_txt("Lhotecky\n")

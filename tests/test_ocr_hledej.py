@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(SKILL, "tools"))
 import ocr_hledej as oh  # noqa: E402
 
 DELENI = {"volby": {"deleni_slova": True}}
+BEZ_DELENI = {"volby": {"deleni_slova": False}}
 
 
 def tvary(slovo, text, pravidla=None, tvary=None):
@@ -27,8 +28,10 @@ class TestVzor(Zaklad):
     def test_01_presne_bez_pravidel(self):
         for text in ("Gansbauden", "22Gansbauden", "(Gansbauden)", "gansbauden", "GansbaudenNr"):   # velikost se nerozlišuje
             self.najde("Gansbauden", text, tv="presne")
-        for text in ("Gansbaudener", "XGansbauden", "ČGansbauden", "-Gansbauden", "Gans-bauden"):
+        for text in ("Gansbaudener", "XGansbauden", "ČGansbauden", "-Gansbauden"):
             self.nenajde("Gansbauden", text, tv="presne")
+        self.najde("Gansbauden", "Gans-bauden", tv="presne")   # dělení slova je výchozí
+        self.nenajde("Gansbauden", "Gans-bauden", BEZ_DELENI, tv="presne")
 
     def test_02_bez_escapovani(self):
         self.nenajde("a.b", "axb")
@@ -398,7 +401,7 @@ class TestRovnocennosti(Zaklad):
         self.assertIn("--volba deleni_slova=ano --volba chybi_prvni_pismeno=ano --volba tvary=ceske", h)
         jeden = oh.hlaska_prenosu({"rovnocennosti": {"nemcina_1901": True}}).splitlines()[-1]
         self.assertEqual(jeden.count("--volba "), 11)   # i volby, které soubor neměl (jinak by doplnil projekt)
-        self.assertIn("--volba deleni_slova=ne", jeden)
+        self.assertIn("--volba deleni_slova=ano", jeden)   # výchozí dělení (bez souboru i bez klíče)
         self.assertIn("--volba nemcina_1901=ano", jeden)
         self.assertIn("--volba prehlasky=ano", jeden)
         self.assertIn("nic k přenesení", oh.hlaska_prenosu({"rovnocennosti": True}))
@@ -411,9 +414,9 @@ class TestRovnocennosti(Zaklad):
         self.assertEqual(sch["tvary"]["hodnoty"], list(oh.TVARY))
         v = oh.volby_hledani()   # skill bez data/nastaveni.json = výchozí
         self.assertEqual(oh.zapnute({"volby": v}), oh.VYCHOZI)
-        self.assertEqual((v["deleni_slova"], v["chybi_prvni_pismeno"], v["tvary"]), (False, False, "ceske"))
-        v = oh.volby_hledani(["deleni_slova=ANO", "nemcina_1901=ano", "prehlasky=ne", "tvary=volne"])
-        self.assertTrue(v["deleni_slova"])
+        self.assertEqual((v["deleni_slova"], v["chybi_prvni_pismeno"], v["tvary"]), (True, False, "ceske"))
+        v = oh.volby_hledani(["deleni_slova=NE", "nemcina_1901=ano", "prehlasky=ne", "tvary=volne"])
+        self.assertFalse(v["deleni_slova"])
         self.assertEqual(v["tvary"], "volne")
         self.assertEqual(oh.zapnute({"volby": v}), oh.VYCHOZI - {"prehlasky"} | {"nemcina_1901"})
         for spatne in (["nesmysl=ano"], ["deleni_slova=snad"], ["deleni_slova"]):
@@ -441,8 +444,8 @@ class TestSoubory(unittest.TestCase):
     def test_14_deleni_pres_radek(self):
         for text in ("Gans-\nbauden\n", "Gans-\n   bauden\n"):
             f = self.soubor("a.txt", text)
-            self.assertEqual(self.nalezy("Gansbauden", [f], DELENI), [("Gans-⏎bauden", "a.txt", 1)])
-            self.assertEqual(self.nalezy("Gansbauden", [f]), [])
+            self.assertEqual(self.nalezy("Gansbauden", [f]), [("Gans-⏎bauden", "a.txt", 1)])   # výchozí
+            self.assertEqual(self.nalezy("Gansbauden", [f], BEZ_DELENI), [])
         f = self.soubor("a.txt", "Gansbauden-\nGansbauden\n")
         self.assertEqual(self.nalezy("Gansbauden", [f], DELENI), [("Gansbauden", "a.txt", 1), ("Gansbauden", "a.txt", 2)])
         f = self.soubor("a.txt", "x\nGans-")
@@ -632,7 +635,7 @@ class TestNavrh(unittest.TestCase):
             ("Zinecker", "Zine&er", ["skupina ck &"]),
             ("Zinecker", "Zineker", ["skupina ck k"]),
             ("Zinecker", "Bineder", ["zamena Z B", "skupina ck d"]),
-            ("Gansbauden", "Gans-bauden", ["nastav ocr_hledej.deleni_slova ano"]),
+            ("Gansbauden", "Gans-bauden", []),   # dělení slova je výchozí
             ("Gansbauden", "GanSbmlden", ["skupina au ml"]),   # velikost se nerozlišuje
             ("Zinecker", "Zineckers", []),       # koncovka: --tvary volne nebo samostatné slovo
             ("Zinecker", "ZINECKER", []),
@@ -641,6 +644,9 @@ class TestNavrh(unittest.TestCase):
         for cil, tvar, cekam in pripady:
             with self.subTest(tvar=tvar):
                 self.assertEqual(oh.navrh(cil, tvar), cekam)
+
+    def test_20b_navrh_vypnute_deleni(self):
+        self.assertEqual(oh.navrh("Gansbauden", "Gans-bauden", BEZ_DELENI), ["nastav ocr_hledej.deleni_slova ano"])
 
     def test_21_existujici_vynecha(self):
         self.assertEqual(oh.navrh("Gansbauden", "Gdnsbaudeh", {"zameny": {"a": ["d"]}}), ["zamena n h"])
@@ -656,7 +662,8 @@ class TestDokumentace(unittest.TestCase):
     def test_25_skill_md(self):
         with open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8") as f:
             text = f.read()
-        self.assertIn("ocr_hledej.py kandidati", text)
+        self.assertIn("ocr_hledej.py hledej", text)
+        self.assertIn("reference/ocr.md", text)   # podrobnosti jen v referenci, SKILL.md odkazuje
         self.assertIn("data/ocr_zameny.json", text)
         self.assertTrue(os.path.exists(os.path.join(SKILL, "reference", "ocr.md")))
         with open(os.path.join(SKILL, "reference", "ocr.md"), encoding="utf-8") as f:

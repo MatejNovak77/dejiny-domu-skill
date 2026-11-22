@@ -12,7 +12,7 @@ a složky. Soubory se čtou po řádcích (i stovky MB), kódování UTF-8 (jina
 ## Příkazy
 ```
 python3 -I tools/ocr_hledej.py hledej Gansbauden Zinecker [--tvary ceske|presne|volne] [-- složka/ soubor.txt]
-python3 -I tools/ocr_hledej.py hledej Lniště --volba deleni_slova=ano   # volba jen pro tento běh, nic nezapíše
+python3 -I tools/ocr_hledej.py hledej Lniště --volba deleni_slova=ne    # volba jen pro tento běh, nic nezapíše
 python3 -I tools/ocr_hledej.py hledej Zinecker --vypis radky   # řádek na každý nález místo souhrnu
 python3 -I tools/ocr_hledej.py kandidati Gansbauden [--vzdalenost N] [--max 40] [-- …]
 python3 -I tools/ocr_hledej.py pridej zamena s f &        # odeber … totéž obráceně
@@ -20,7 +20,7 @@ python3 -I tools/ocr_hledej.py pridej skupina ck d &
 python3 -I tools/ocr_hledej.py pridej vyloucit hald --proc "Gänshalde: b→h a au→al"
 python3 -I tools/ocr_hledej.py pravidla                    # pravidla + zapnuté rovnocennosti
 python3 -I tools/nastaveni.py ukaz ocr_hledej              # volby hledání s hodnotou, výchozí hodnotou a popisem
-python3 -I tools/nastaveni.py nastav ocr_hledej.deleni_slova ano   # volba; „vychozi“ ji vrátí na výchozí
+python3 -I tools/nastaveni.py nastav ocr_hledej.deleni_slova ne    # volba; „vychozi“ ji vrátí na výchozí
 ```
 `hledej` vypíše souhrn: řádek na každý nalezený tvar (doslova, jak stojí v textu) – slovo, tvar, počet×, první tři
 místa `soubor:řádek` (a kolik dalších), ukázka kolem prvního nálezu; od nejčastějšího tvaru. `--vypis radky` dá řádek
@@ -31,7 +31,8 @@ a první výskyt. Nic nezapíše. Slova do 4 písmen chtějí
 `--vzdalenost N` (jinak by kandidátů bylo moc).
 
 ## Formát `data/ocr_zameny.json`
-Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo s výchozími rovnocennostmi, českými koncovkami a genitivem `-s`/`-es`.
+Všechny sekce jsou volitelné. Bez souboru (nebo `{}`) hledá celé slovo i rozdělené přes řádek, s výchozími
+rovnocennostmi, českými koncovkami a genitivem `-s`/`-es`.
 ```json
 {"poznamka": "fraktura, Tesseract",
  "zameny":   {"s": ["f", "&"], "G": ["S", "B"], "m": ["rn"]},
@@ -52,7 +53,8 @@ Volby hledání nejsou v souboru pravidel, ale v nastavení projektu (`data/nast
 je `nastaveni.py ukaz ocr_hledej`, zapíše se souhlasem uživatele `nastaveni.py nastav ocr_hledej.<klíč> <hodnota>`, na jeden
 běh bez zápisu `--volba <klíč>=<hodnota>`. Soubor pravidel se starou sekcí `volby` nástroj odmítne a vypíše přesné
 příkazy, jak volby přenést – proveď je po souhlasu uživatele a sekci `volby` ze souboru smaž.
-- `deleni_slova` (ano/ne, výchozí ne): slovo rozdělené znakem `- ⸗ = ¬` (i přes konec řádku; nález se hlásí na prvním řádku, tvar s ⏎).
+- `deleni_slova` (ano/ne, výchozí ano): slovo rozdělené znakem `- ⸗ = ¬` (i přes konec řádku; nález se hlásí na
+  prvním řádku, tvar s ⏎). V adresářích a novinách je dělení časté: u názvů ulic přidá asi desetinu nálezů.
 - `chybi_prvni_pismeno` (ano/ne, výchozí ne): OCR vynechalo první písmeno (jen slova delší než 6; další dvě písmena musí sedět –
   rovnocennosti ano, ö = oe, záměny a skupiny projektu ne; zbytek slova se čte s pravidly): `5153.uchberger`, `12.önisch`.
 - `tvary`: `ceske` (výchozí) přidá české koncovky (`a e u y i em ů ům ech ovi ové ová ovou ových ovým ovými ův
@@ -75,11 +77,10 @@ hledání `--tvary volne`. Chybný soubor nástroj odmítne s číslem řádku.
 2. `kandidati` na totéž jméno – taky sám, bez ptaní (jen čte, nic nezapíše).
 3. **Počet z jednoho výpisu, ne od oka.** Navržená pravidla zapiš do `pracovni/navrh_zamen.json` (kopie
    `data/ocr_zameny.json`, pokud existuje, + návrhy z `kandidati`; `--pravidla` soubor projektu **nahrazuje**, proto
-   kopie). Soubor vytvoř nástrojem pro zápis souborů (Write), ne `cat >` ani heredocem v Bashi (ty můžou být
-   zamítnuté). Pak spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json`; `data/` se tím nemění. Řádek
+   kopie). Pak spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json`; `data/` se tím nemění. Řádek
    `# <jméno>: N výskytů` je počet; nikdy nesčítej nálezy z několika výpisů sám. Když návrh změníš, spusť výpis znovu.
-   Navrženou volbu (`nastav ocr_hledej.deleni_slova ano`) přidej do téhož výpisu jako `--volba deleni_slova=ano` –
-   počítá se stejně jako nezapsané pravidlo; dělení slova je ve výchozím stavu vypnuté.
+   Navrženou volbu (`nastav ocr_hledej.…`) přidej do téhož výpisu jako `--volba <klíč>=ano` – počítá se stejně
+   jako nezapsané pravidlo.
 4. Uživateli ukaž **dvě tabulky** z toho výpisu:
    - *nálezy*: řádek na tvar ze souhrnu – tvar doslova, počet, místa (první tři `soubor:řádek` a „+M dalších“),
      čím se našel (přesně / rovnocennost / navržené pravidlo); pod ní N. Všechna místa dá `--vypis radky`, když je
@@ -97,7 +98,7 @@ hledání `--tvary volne`. Chybný soubor nástroj odmítne s číslem řádku.
 Sloupec návrhu v `kandidati` obsahuje jen pravidla a volby, které jde provést tak, jak stojí (po souhlasu):
 - `zamena X Y` – OCR čte znak X jako Y → `pridej zamena X Y`;
 - `skupina xy Z` – OCR čte dvojici xy jako Z → `pridej skupina xy Z`;
-- `nastav ocr_hledej.deleni_slova ano` – slovo rozdělené znakem dělení → `nastaveni.py nastav ocr_hledej.deleni_slova ano`;
+- `nastav ocr_hledej.deleni_slova ano` – slovo rozdělené znakem dělení, když je dělení vypnuté → `nastaveni.py nastav ocr_hledej.deleni_slova ano`;
 - `nastav ocr_hledej.chybi_prvni_pismeno ano` – OCR vynechalo první písmeno →
   `nastaveni.py nastav ocr_hledej.chybi_prvni_pismeno ano`.
 

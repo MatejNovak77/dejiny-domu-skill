@@ -20,6 +20,7 @@ Data se točí kolem **čísla popisného** a jeho držitelů a obyvatel v čase
 - `reference/data.md` – formát dat, `reference/web.md` – web, `reference/pribehy.md` – zajímavosti a příběh domu,
   `reference/texty.md` – **jak psát texty na web** (krátce, bez žargonu, pro hosta; platí pro vše, co jde na web),
   `reference/soukromi.md` – soukromí
+- `reference/pomocnici.md` – proč pomocníci u rukopisů na Opusu a co dělat, když hostitel model volit nedovolí
 - `reference/metodika.md` – když běžný postup nestačí: čím spojit zápisy domu a lidí v čase, kdy zápis patří
   k tomuto domu a kdy jde o tutéž osobu, typické chyby, mrtvé body (vznik domu, staré číslo, před 1770, 20. století),
   prameny a lhůty mimo ČR
@@ -140,18 +141,9 @@ Pravidla kvality:
   odpověď (artefakt s ukládáním odpovědí, jinak HTML s tlačítkem „stáhnout odpovědi“). Odpovědi zapiš i do deníku.
 
 ### Hledání v OCR textech
-OCR staré sazby komolí jména („Gansbauden“ → „Sansbauben“). V textech hledej `tools/ocr_hledej.py hledej <jméno>`;
-stejné znaky jinak zapsané (ſ, ß/ss, ü/ue, rozložené ě) i jinou velikost písmen najde samo; vypíše souhrn podle
-nalezeného tvaru, všechny řádky dá `--vypis radky`. `ocr_hledej.py kandidati <jméno>` najde blízká
-slova, která pravidla minula, a navrhne pravidlo do `data/ocr_zameny.json` nebo volbu hledání (`nastav ocr_hledej.…`). `hledej` i `kandidati` jen čtou – spusť je
-sám, když přibyly OCR texty, když hledání čekaného jména vrátí méně než 3 nálezy, nebo když najdeš zkomoleninu, kterou
-nástroj minul. Zápis (`pridej`/`odeber` pravidla; volby a sady pravopisu přes `nastaveni.py nastav ocr_hledej.…`)
-jen po souhlasu uživatele;
-nabídni ho nejvýš jednou za konverzaci na slovo, nikdy po každém hledání. **Počet zmínek nikdy nesčítej sám**
-(ani z `hledej` + `kandidati`): návrhy z `kandidati` zapiš nástrojem Write do `pracovni/navrh_zamen.json` (pravidla
-projektu + navržená), spusť `hledej <jméno> --pravidla pracovni/navrh_zamen.json` (navrženou volbu přidej jako
-`--volba <klíč>=ano`) a číslo z řádku `# <jméno>: N výskytů`
-řekni i zapiš do deníku. Ukaž tabulku nálezů a tabulku navržených pravidel (`pridej …`, `nastav …`). Postup: `reference/ocr.md`.
+Jména v OCR textech (`pracovni/*.txt`) hledej `tools/ocr_hledej.py hledej <jméno>`, ne grepem: najde i ſ/ß/ü jinak
+zapsané, jinou velikost písmen, české tvary a slova rozdělená přes řádek. Při méně než 3 nálezech čekaného jména,
+nových OCR textech, před návrhem pravidel záměn a před sdělením počtu zmínek přečti `reference/ocr.md`.
 
 ### Webové aplikace bez API – prohlížeč
 Když portál nemá nástroj ani čitelné API (mapové aplikace, prohlížeče snímků, nahlizenidokn, chartae-antiquae),
@@ -182,8 +174,11 @@ trénink modelů (ClaudeBot, GPTBot) se tě netýká. V prohlížeči platí tot
 
 ### Pomocníci (subagenti) – šetrně
 Na velké kolo (projít matriku 1784–1850 a vypsat všechny zápisy z čp. 12, projít sčítání
-1857–1921) můžeš pustit 2–4 pomocníky na levnějším modelu (`model: "sonnet"`). Píšou jen do `pracovni/pom_<úkol>/`,
-**do `data/` nikdy** – do zadání napiš i „nespouštěj příkazy `… svazek` ani jiné, které zapisují do `data/`“. Jejich čtení **vždy ověř sám na snímku** (`tools/overit.py`), než ho zapíšeš jako `doc`.
+1857–1921) můžeš pustit 2–4 pomocníky. Pomocník, který čte **rukopis** (matriky, gruntovní a pozemkové knihy,
+sčítací archy, cokoli v kurentu), běží na Opusu (`model: "opus"`), ostatní (tisk, OCR, portály) na Sonnetu
+(`model: "sonnet"`); Opus je dražší, u rukopisů se vyplatí (`reference/pomocnici.md`). Na model se uživatele
+neptej; když chce jiný, vyhov mu. Pomocníci píšou jen do `pracovni/pom_<úkol>/`,
+**do `data/` nikdy** – do zadání napiš i „nespouštěj příkazy `… svazek` ani jiné, které zapisují do `data/`“. Jejich čtení **vždy ověř sám na snímku** (`tools/overit.py`), místa s „?“ přednostně, než ho zapíšeš jako `doc`.
 V zadání chtěj u každého prošlého snímku, co na něm skutečně přečetli (rok, číslo domu, první jméno).
 Před velkým kolem řekni uživateli, co plánuješ, a nech si to schválit (kredity).
 Pomocníci na **stejném portálu** se o limit dělí (1 dotaz za 2 s pro všechny) – víc pomocníků na jednom archivu
@@ -312,7 +307,7 @@ Vždy **projektovou kopii** `tools/`, nikdy `SKILL_DIR/tools/` (zapisovala by do
 | `vyrez.py <obrázek> <klíč> x0,y0,x1,y1` | výřez do `zdroje/` a `vyrezy/` (i mapy a fotky, celé = `0,0,1,1`) |
 | `zesil_snimek.py <obrázek> [x0,y0,x1,y1] [--zvetsit N]` | vybledlé písmo a tužka: šedý originál a zesílená verze pod sebou (`<jméno>_porovnani.jpg`) |
 | `ramecek.py <klíč> x0,y0,x1,y1 [--vyrez a0,b0,a1,b1]` | rámeček čteného místa (souřadnice výřezu; s `--vyrez` stránky) + kontrolní obrázek |
-| `elipsa.py <čistá mapa.jpg> <klíč> cx,cy,a,b[,úhel]` | dům na mapě označený modrou elipsou (pixely, natočení ve stupních) do `zdroje/` a `vyrezy/`; na všech mapách projektu, `--popisek` jen výjimečně |
+| `elipsa.py <čistá mapa.jpg> <klíč> cx,cy,a,b[,úhel]` | dům na mapě označený modrou elipsou (pixely, natočení ve stupních) do `zdroje/` a `vyrezy/`; na všech mapách projektu, `--popisek` jen výjimečně; šikmou parcelu spočítat `--uvnitr`/`--venku` (rohy budov), ne ladit od oka |
 | `mista.py ruian "Osada čp"` / `okoli "Ulice čp/čo"` / `parcely "Osada čp"` / `hledej "dotaz"` / `pridej "Název" …` | dům v RÚIAN (obec, parcela, k. ú., poloha; i „Ulice čo“) / všechny dnešní adresy v okolí (rohové domy, přečíslování) / sousední stavební parcely s odstupem (najdi dům na staré mapě) / souřadnice z OSM / body na mapu |
 | `ortofota.py serie <místo> [polomer] [--zapsat skupina]` | letecké snímky domu po letech 1998–2023 (ČÚZK, CC BY) a starší či chybějící ročníky krajů (jen ke čtení), stejný výřez (rovnou do `mapy.json`) |
 | `ipr_praha.py serie <místo> [polomer] [--zapsat skupina]` | Praha: staré plány 1791–1944 a letecké snímky 1938–2002 se stejným výřezem (rovnou do `mapy.json`) |

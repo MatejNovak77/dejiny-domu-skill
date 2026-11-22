@@ -2,7 +2,8 @@
 Výchozí rovnocennosti platí i bez souboru pravidel: ſ = s, ꝛ = r, ß = ss, ä ö ü = ae oe ue = aͤ oͤ uͤ, rozložené
 tvary písmen (e + U+030C = ě), měkké dělení U+00AD a česká sada pravopisu před 1849 (Wáclaw, Gilemnice). Jsou to
 čtení hledaného slova – prohledávaný text se nemění. Záměny písmen z OCR jsou pravidla projektu
-v data/ocr_zameny.json (bez souboru = celé slovo s rovnocennostmi, českými koncovkami a genitivem -s/-es). Postup: reference/ocr.md.
+v data/ocr_zameny.json (bez souboru = celé slovo i rozdělené přes řádek, s rovnocennostmi, českými koncovkami
+a genitivem -s/-es). Postup: reference/ocr.md.
 
 Volby hledání (dělení slov, vynechané první písmeno, tvary, rovnocennosti a sady pravopisu) jsou v nastavení
 projektu: python3 -I tools/nastaveni.py ukaz ocr_hledej / nastav ocr_hledej.<klíč> <hodnota|vychozi>.
@@ -16,7 +17,7 @@ Použití (z kořene projektu, volby kdekoli před --; bez -- se hledá ve všec
         FISCHERDAVID ne)
       --tvary ceske (výchozí): české koncovky a německý genitiv -s/-es (Zineckers, Krauses; ne Krauss),
         genitiv jen za slovem bez záměn a skupin projektu
-      --volba deleni_slova=ano: volba z nastavení jen pro tento běh (opakovatelná), nic nezapíše
+      --volba deleni_slova=ne: volba z nastavení jen pro tento běh (opakovatelná), nic nezapíše
   ocr_hledej.py kandidati <slovo>… [--vzdalenost N] [--max 40] [--tvary …] [--pravidla <json>] [--volba …]
                 [-- …]
       → slova blízká hledanému, která pravidla nenajdou, s počtem, ukázkou a návrhem pravidla nebo volby
@@ -50,6 +51,7 @@ NEMECKE = ("es", "s")   # německý genitiv (Zineckers, Krauses) jen za slovem b
                         # s ß ſ x z (Krauss je jiný pravopis)
 TVARY = ("ceske", "presne", "volne")
 SEKCE = ("poznamka", "zameny", "skupiny", "vyloucit")
+VYCHOZI_VOLBY = {"deleni_slova": True, "chybi_prvni_pismeno": False}   # volby ano/ne
 MEMO = 200_000        # slov v paměti kandidátů
 SLOVO_RE = re.compile(r"[^\s.,;:!?\"'„“”‚‘’»«()\[\]{}<>/|*]+")
 MEZERA_RE = re.compile(r"\s")
@@ -82,7 +84,7 @@ VYCHOZI = frozenset(VSE) - {"nemcina_1901"}
 # Volby hledání v nastavení projektu (data/nastaveni.json, tools/nastaveni.py). Literál: nastaveni.py ho čte přes ast.
 # Výchozí hodnoty = VYCHOZI a dřívější výchozí chování (hlídá test).
 NASTAVENI_SEKCE = {"ocr_hledej": {
-    "deleni_slova": {"vychozi": "ne", "hodnoty": ["ano", "ne"],
+    "deleni_slova": {"vychozi": "ano", "hodnoty": ["ano", "ne"],
                      "popis": "slovo rozdělené znakem dělení na konci řádku (Gans-⏎bauden)"},
     "chybi_prvni_pismeno": {"vychozi": "ne", "hodnoty": ["ano", "ne"],
                             "popis": "OCR vynechalo první písmeno (u slov delších než 6 písmen)"},
@@ -146,6 +148,11 @@ def chyby_pravidel(p):
             if not isinstance(v, str):
                 chyby.append(f"vyloucit „{k}“: důvod musí být text")
     return chyby
+
+
+def volba(pravidla, nazev):
+    """Volba ano/ne z pravidel, jinak výchozí."""
+    return (pravidla or {}).get("volby", {}).get(nazev, VYCHOZI_VOLBY[nazev])
 
 
 def prikazy_prenosu(volby):
@@ -445,11 +452,11 @@ class Vzor:
         self.tvary = tvary or volby.get("tvary", "ceske")
         if self.tvary not in TVARY:
             raise ValueError(f"tvary: {self.tvary} (povolené: {', '.join(TVARY)})")
-        self.znaky_deleni = (DELENI if volby.get("deleni_slova", False) else "") + \
+        self.znaky_deleni = (DELENI if volba(p, "deleni_slova") else "") + \
             (MEKKE if "mekke_deleni" in zap else "")
         R, zac = _slovo_re(slovo, zameny, skupiny, zap, self.znaky_deleni)
         jadro = R[0]
-        if volby.get("chybi_prvni_pismeno") and len(slovo) > 6:
+        if volba(p, "chybi_prvni_pismeno") and len(slovo) > 6:
             # OCR vynechalo první písmeno: další dvě písmena jen s rovnocennostmi (ö = oe, ß = ss), bez záměn
             # projektu (jinak Bönisch najde „Erich“), zbytek od pozice čtvrtého znaku (přehláska = dvě pozice)
             jadro = f"(?:{jadro}|{_cteni_re(slovo[1:3].lower(), zap)[1]}{R[zac[3]]})"
@@ -460,7 +467,7 @@ class Vzor:
             nem = [(len(k), re.escape(k)) for k in NEMECKE if k != "s" or slovo[-1].lower() not in "sßſxz"]
             Rc, zc = _slovo_re(slovo, *_uprav_pravidla(*_sloucena({}, zap), zap), zap, self.znaky_deleni)
             cele = Rc[0]
-            if volby.get("chybi_prvni_pismeno") and len(slovo) > 6:   # i bez prvního písmene (UCHBERGERS)
+            if volba(p, "chybi_prvni_pismeno") and len(slovo) > 6:   # i bez prvního písmene (UCHBERGERS)
                 cele = f"(?:{cele}|{_cteni_re(slovo[1:3].lower(), zap)[1]}{Rc[zc[3]]})"
             jadro = f"(?:{cele}{_nebo(nem)}|{jadro})"
         m = _tr(MALA)
@@ -598,7 +605,7 @@ def navrh(cil, tvar, pravidla=None):
     `nastaveni.py`); existující vynechá. Jen záměna, skupina a volba; jiný rozdíl (koncovka, předpona, mezera, víc znaků) návrh nemá. Velikost písmen
     se nerozlišuje stejně jako při hledání."""
     p, cil = pravidla or {}, slovo_pravidel(cil)
-    zameny, skupiny, volby = p.get("zameny", {}), p.get("skupiny", {}), p.get("volby", {})
+    zameny, skupiny = p.get("zameny", {}), p.get("skupiny", {})
     cil_cf, tvar_cf = [c.casefold() for c in cil], [c.casefold() for c in tvar]
     n, m = len(cil), len(tvar)
     D = [[0] * (m + 1) for _ in range(n + 1)]
@@ -630,12 +637,12 @@ def navrh(cil, tvar, pravidla=None):
         T = "".join(t for t, _ in ops[z:k])
         R = "".join(r for _, r in ops[z:k])
         if not T and any(c in DELENI for c in R):
-            if not volby.get("deleni_slova"):
+            if not volba(p, "deleni_slova"):
                 out.append("nastav ocr_hledej.deleni_slova ano")
         elif k == len(ops) and (not T or not R):
             pass               # koncovka: --tvary volne nebo samostatné slovo
         elif z == 0 and len(T) == 1 and not R:
-            if not volby.get("chybi_prvni_pismeno"):
+            if not volba(p, "chybi_prvni_pismeno"):
                 out.append("nastav ocr_hledej.chybi_prvni_pismeno ano")
         elif z == 0 and not T:
             pass               # předpona: samostatné slovo
@@ -692,7 +699,7 @@ def kandidati(slova, cesty, pravidla=None, mez=None, tvary=None):
     vyloucit = [t.casefold() for t in p.get("vyloucit", {})]
     nejkratsi = min(len(s) - k for s, k in zip(slova, meze))
     nejdelsi = max(len(s) + k for s, k in zip(slova, meze))
-    spojit = p.get("volby", {}).get("deleni_slova", False)
+    spojit = volba(p, "deleni_slova")
     mekke = "mekke_deleni" in zapnute(p)
     memo, nalez = {}, [dict() for _ in slova]
     for f in soubory(cesty):
@@ -942,13 +949,14 @@ def main(argv):
     if prikaz == "pravidla":
         p = _precti(PRAVIDLA)
         if p is None:
-            print("Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo s českými koncovkami a genitivem -s/-es.")
+            print("Pravidla zatím nejsou (data/ocr_zameny.json chybí) – hledá se celé slovo i rozdělené přes řádek, s českými koncovkami a genitivem -s/-es.")
         else:
             print(json.dumps(p, ensure_ascii=False, indent=1))
         v = volby_hledani()
         zap = zapnute({"volby": v})
-        print(f"Volby hledání (nastaveni.py ukaz ocr_hledej): deleni_slova={'ano' if v['deleni_slova'] else 'ne'}, "
-              f"chybi_prvni_pismeno={'ano' if v['chybi_prvni_pismeno'] else 'ne'}, tvary={v['tvary']}")
+        print(f"Volby: deleni_slova={'ano' if v['deleni_slova'] else 'ne'}, "
+              f"chybi_prvni_pismeno={'ano' if v['chybi_prvni_pismeno'] else 'ne'}, tvary={v['tvary']} "
+              "(nastaveni.py ukaz ocr_hledej)")
         print(f"Zapnuté rovnocennosti: {_popis_zapnutych(zap)}")
         for k in VSE:
             print(f"  {'+' if k in zap else '-'} {k}: {NASTAVENI_SEKCE['ocr_hledej'][k]['popis']}")
