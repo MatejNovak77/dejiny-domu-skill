@@ -268,6 +268,11 @@ class TestNastaveni(Projekt):
         self.assertIn("rozsirene.slozka = /x   (nastaveno;", self.nast("ukaz", "rozsirene").stdout)
         self.assertEqual(self.nast("nastav", "rozsirene.slozka", "vychozi").returncode, 0)
         self.assertIn("rozsirene.slozka nenastaveno", self.nast("ukaz", "rozsirene").stdout)
+        self.assertIn("ZEPTEJ_SE nejdřív nabídni", self.nast("ukaz", "rozsirene").stdout)
+        self.assertEqual(self.nast("nastav", "rozsirene.otazka", "a").returncode, 0)
+        p = self.nast("ukaz", "rozsirene")   # nenastavené jsou už jen nepovinné → žádná výzva
+        self.assertNotIn("ZEPTEJ_SE", p.stdout)
+        self.assertIn("rozsirene.argv nenastaveno", p.stdout)
         vadna = self.path("tools", "vadny.py")
         for text in ('NASTAVENI_SEKCE = {"x": {"k": {"vychozi": "a", "text": True, "nepovinne": True, '
                      '"popis": "p"}}}\n',
@@ -284,6 +289,7 @@ class TestNastaveni(Projekt):
             f.write(DRUHY)
         p = self.nast("nastav", "rozsirene.argv", '["ocr", "{x}"]')
         self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(p.stdout.strip(), 'rozsirene.argv = ["ocr", "{x}"]')   # JSON, jde zkopírovat zpět
         self.assertEqual(json.loads(self.bajty()), {"verze": 1, "rozsirene": {"argv": ["ocr", "{x}"]}})
         self.assertIn('rozsirene.argv = ["ocr", "{x}"]   (nastaveno;', self.nast("ukaz", "rozsirene").stdout)
         p = self.volej("print(nastaveni.sekce('rozsirene')['argv'])")

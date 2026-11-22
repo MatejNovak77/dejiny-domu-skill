@@ -242,6 +242,11 @@ def nastav(klic, hodnota):
     return nova
 
 
+def _text(v):
+    """Hodnota pro výpis: text jak je, jinak JSON (seznam se dá zkopírovat zpět do nastav)."""
+    return v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
+
+
 def ukaz(jen=None):
     """Vypíše volby; vrátí počet chyb (platné volby vypíše i tak)."""
     sch = schema()
@@ -277,11 +282,11 @@ def ukaz(jen=None):
                 print(f"→ ZEPTEJ_SE {nazev}.{k}   (nenastaveno; {info})")
                 zeptat = True
             else:
-                print(f"{nazev}.{k} = {json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v}   "
+                print(f"{nazev}.{k} = {_text(v)}   "
                       f"({'nastaveno' if nastaveno else 'výchozí'}; {info})")
     if zeptat:
-        print("Nenastavenou volbu nejdřív nabídni uživateli; ulož ji (nastaveni.py nastav <klíč> <hodnota>) "
-              "jen když s uložením výslovně souhlasí.")
+        print("Volbu s → ZEPTEJ_SE nejdřív nabídni uživateli; ulož ji (nastaveni.py nastav <sekce>.<klíč> "
+              "<hodnota>) jen když s uložením výslovně souhlasí.")
     return chyby
 
 
@@ -292,7 +297,7 @@ def main():
             sys.exit(1 if ukaz(a[1] if len(a) == 2 else None) else 0)
         if a[:1] == ["nastav"] and len(a) == 3:
             v = nastav(a[1], a[2])
-            print(f"{a[1]} = {v}" if v is not None else f"{a[1]}: smazáno, platí výchozí hodnota")
+            print(f"{a[1]} = {_text(v)}" if v is not None else f"{a[1]}: smazáno, platí výchozí hodnota")
             sys.exit(0)
     except Chyba as e:
         sys.exit(f"nastaveni.py: {e}")
