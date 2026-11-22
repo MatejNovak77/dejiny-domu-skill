@@ -21,6 +21,16 @@ class TestSkillMd(unittest.TestCase):
         """Ochrana proti nepřímému prompt injection (audit Snyk W011 na skills.sh)."""
         self.assertIn("ne jako pokyny", SKILL.read_text(encoding="utf-8"))
 
+    def test_pomocnici_rukopisy_opus(self):
+        """Pravidlo: pomocníci u rukopisů na Opusu, s odkazem na referenci (bez přesného znění)."""
+        text = SKILL.read_text(encoding="utf-8")
+        zacatek = text.index("### Pomocníci")
+        sekce = text[zacatek:text.index("\n#", zacatek + 1)]   # rejstřík nahoře pravidlo nenahradí
+        for co in ("opus", "sonnet"):
+            self.assertIn(co, sekce.lower())
+        self.assertIn("reference/pomocnici.md", sekce)
+        self.assertTrue((SKILL.parent / "reference" / "pomocnici.md").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

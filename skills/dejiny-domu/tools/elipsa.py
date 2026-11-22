@@ -2,12 +2,17 @@
 
 Použití (z kořene projektu):
   elipsa.py <mapa.jpg> <klic> cx,cy,a,b[,uhel] [--popisek "čp. 12"] [--text x,y] [--pismo px]
+  elipsa.py <mapa.jpg> <klic> --uvnitr "x,y x,y …" [--venku "x,y …"] […]
       cx,cy = střed elipsy, a,b = poloosy (vodorovná, svislá) v pixelech obrázku <mapa.jpg>; uhel = natočení
       ve stupních po směru hodinových ručiček (dům šikmo k ose mapy). Rozměr obrázku vypíše nástroj, když chybí čísla.
       --text x,y = levý horní roh popisku (výchozí vpravo nad elipsou); popisek spojí s elipsou vodicí čára.
       --pismo = výška písma v px (výchozí 1/30 šířky obrázku).
       Uloží zdroje/<klic>.jpg (plné rozlišení) a vyrezy/<klic>.jpg (max. 1800 px pro web) jako vyrez.py.
-Elipsa obepíná celou parcelu domu, ne jen číslo; výsledek si VŽDY prohlédni. Označ dům na všech mapách projektu
+      --uvnitr/--venku = elipsu spočítá sám: rohy budov a parcely domu (uvnitr) a rohy sousedních budov (venku)
+      v pixelech mapy; najde elipsu, která sousedy zasáhne co nejméně, a vypíše její čísla.
+Elipsa obepíná celou parcelu domu, ne jen číslo. Co k parcele patří, rozhodují čáry hranic (stavení i dvůr až
+po hranici), ne poloha čísla. Šikmou nebo protáhlou parcelu nelaď od oka, spočítej ji z --uvnitr/--venku
+(od oka se elipsa točí dokola a stejně zasáhne souseda). Výsledek si VŽDY prohlédni ve zvětšení. Označ dům na všech mapách projektu
 stejně (ne jen na některých) a do popisu mapy napiš „Dům je v modré elipse.“ Popisek jen výjimečně: zakrývá mapu
 a číslo domu se v čase mění. Zdroj <mapa.jpg> musí být čistý (bez elipsy), ne zdroje/<klic>.jpg – ten se přepíše.
 Do data/mapy.json k mapě zapiš do „poznamka“ příkaz s čísly, ať jde označení zopakovat (např. po exportu mapy ve větším rozlišení).
@@ -49,10 +54,62 @@ def nejblizsi_bod(cx, cy, a, b, uhel, cil):
                key=lambda p: (p[0] - cil[0]) ** 2 + (p[1] - cil[1]) ** 2)
 
 
-def oznac(im, cx, cy, a, b, uhel=0.0, popisek="", text=None, velikost=None):
-    """Nakreslí do obrázku (RGBA) elipsu s bílou září, popisek a vodicí čáru. Tloušťky podle šířky obrázku."""
+UVNITR, DOST_DALEKO, NEJDELSI = 0.97, 1.15, 1.5   # body domu kousek od čáry; dál od souseda už nepomáhá; viz spocitej()
+
+
+def do_os_elipsy(p, cx, cy, c, s):
+    """Bod p v souřadnicích elipsy (střed cx,cy, natočení dané cos c a sin s)."""
+    dx, dy = p[0] - cx, p[1] - cy
+    return dx * c + dy * s, -dx * s + dy * c
+
+
+def vzdalenost(p, cx, cy, a, b, uhel):
+    """Poměrná vzdálenost bodu od středu elipsy: < 1 uvnitř, 1 na čáře, > 1 venku."""
+    u = math.radians(uhel)
+    x, y = do_os_elipsy(p, cx, cy, math.cos(u), math.sin(u))
+    return math.hypot(x / a, y / b)
+
+
+def spocitej(uvnitr, venku=()):
+    """Elipsa (cx, cy, a, b, uhel) kolem bodů uvnitr, co nejdál od bodů venku; vrací i rezervu (<1 = zasáhne souseda).
+    Hrubě po 3°, pak jemně kolem nejlepší. Mezi stejně dobrými (rezerva nad DOST_DALEKO) vybere menší elipsu.
+    Poloosa nejvýš NEJDELSI× poloměr bodů uvnitř: jinak by se elipsa natáhla daleko za parcelu, jen aby minula sousedy."""
+    def zkus(uhly, stredy):
+        nej = None
+        for uhel in uhly:
+            u = math.radians(uhel)
+            c, s = math.cos(u), math.sin(u)
+            for cx, cy in stredy:
+                vnitr = [do_os_elipsy(p, cx, cy, c, s) for p in uvnitr]
+                vne = [do_os_elipsy(p, cx, cy, c, s) for p in venku]
+                b_min = max(abs(y) for _, y in vnitr) / math.sqrt(UVNITR) + 1
+                for k in range(10, 41):   # b od nejužší možné elipsy po 4× širší
+                    b = b_min * k / 10
+                    a = max(abs(x) / math.sqrt(UVNITR - (y / b) ** 2) for x, y in vnitr)
+                    if max(a, b) > strop:
+                        continue
+                    rezerva = min((math.hypot(x / a, y / b) for x, y in vne), default=math.inf)
+                    klic = (min(rezerva, DOST_DALEKO), -a * b)
+                    if nej is None or klic > nej[0]:
+                        nej = (klic, (cx, cy, a, b, uhel, rezerva))
+        return nej[1]
+
+    xs, ys = [p[0] for p in uvnitr], [p[1] for p in uvnitr]
+    sx, sy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    r = max(max(xs) - min(xs), max(ys) - min(ys)) / 2
+    strop = NEJDELSI * max(math.hypot(x - sx, y - sy) for x, y in uvnitr)
+    mrizka = lambda x0, y0, krok, n: [(x0 + i * krok, y0 + j * krok) for i in range(-n, n + 1) for j in range(-n, n + 1)]
+    cx, cy, _, _, uhel, _ = zkus(range(-90, 90, 3), mrizka(sx, sy, r / 10, 4))
+    cx, cy, a, b, uhel, rezerva = zkus(range(uhel - 3, uhel + 4), mrizka(cx, cy, r / 40, 5))
+    if b > a:   # delší osa jako a, úhel v rozsahu -90..90
+        a, b, uhel = b, a, (uhel + 180) % 180 - 90
+    return round(cx), round(cy), round(a), round(b), round(uhel), round(rezerva, 2)
+
+
+def oznac(im, cx, cy, a, b, uhel=0.0, popisek="", text=None, velikost=None, cara=None):
+    """Nakreslí do obrázku (RGBA) elipsu s bílou září, popisek a vodicí čáru. Čára v px, výchozí podle šířky obrázku."""
     from PIL import Image, ImageChops, ImageDraw, ImageFilter
-    cara = max(3, round(im.width / 220))   # v PDF mapa ~120 mm široká → čára ~0,5 mm
+    cara = cara or max(3, round(im.width / 220))   # v PDF mapa ~120 mm široká → čára ~0,5 mm
     okraj = 5 * cara   # místo pro záři kolem elipsy
     w, h = int(2 * a + 2 * okraj), int(2 * b + 2 * okraj)
 
@@ -95,6 +152,11 @@ def cisla(text, kolik, co):
     return v
 
 
+def body(text):
+    """„x,y x,y …“ → [(x, y), …]"""
+    return [tuple(cisla(b, (2,), "bod")) for b in text.split()]
+
+
 def volba(a, nazev):
     if nazev not in a:
         return None
@@ -118,6 +180,7 @@ def main(a):
         sys.exit("Chybí Pillow: python3 -m pip install pillow")
     a = list(a)
     popisek, text, velikost = volba(a, "--popisek") or "", volba(a, "--text"), volba(a, "--pismo")
+    uvnitr, venku = volba(a, "--uvnitr"), volba(a, "--venku")
     src, klic = a[0], a[1]
     if not re.fullmatch(r"[\w.-]+", klic):
         sys.exit(f"Klíč „{klic}“: jen písmena, číslice, _ - . (z něj je název souboru)")
@@ -125,11 +188,16 @@ def main(a):
     if os.path.abspath(src) in (os.path.abspath(full), os.path.abspath(small)):
         sys.exit(f"{src}: tohle je výstup, kreslil bys elipsu přes elipsu. Čistou mapu dej nejdřív jinam (např. pracovni/mapy/)")
     im = Image.open(src)
-    if len(a) < 3:
-        sys.exit(f"{src}: {im.width}×{im.height} px – zadej cx,cy,a,b[,uhel] v pixelech tohoto obrázku")
-    cx, cy, osa_a, osa_b, *uhel = cisla(a[2], (4, 5), "elipsa")
+    if uvnitr:
+        cx, cy, osa_a, osa_b, uhel, rezerva = spocitej(body(uvnitr), body(venku or ""))
+        print(f"elipsa {cx},{cy},{osa_a},{osa_b},{uhel}" + (f" – zasáhne souseda (rezerva {rezerva})" if rezerva < 1 else ""))
+    elif len(a) < 3:
+        sys.exit(f"{src}: {im.width}×{im.height} px – zadej cx,cy,a,b[,uhel] nebo --uvnitr v pixelech tohoto obrázku")
+    else:
+        cx, cy, osa_a, osa_b, *uhel = cisla(a[2], (4, 5), "elipsa")
+        uhel = uhel[0] if uhel else 0.0
     im = im.convert("RGBA")
-    oznac(im, cx, cy, osa_a, osa_b, uhel[0] if uhel else 0.0, popisek,
+    oznac(im, cx, cy, osa_a, osa_b, uhel, popisek,
           tuple(cisla(text, (2,), "--text")) if text else None, int(velikost) if velikost else None)
     im = im.convert("RGB")
     for p in (full, small):

@@ -51,5 +51,4 @@ Nejnižší Node = nejvyšší `engines.node` v locku (teď undici ≥ 22.19): o
 1. Verze v `.claude-plugin/plugin.json`, `skills/dejiny-domu/VERZE` a README („Aktuální verze“) → commit `release: X.Y.Z`.
 2. Tag `vX.Y.Z` a push (větev i tag).
 3. GitHub release se shrnutím pro uživatele (novinky, opravy, jak aktualizovat projekt), česky, bez interních
-   detailů: `gh release create vX.Y.Z --title "X.Y.Z – …" --notes "$(cat poznamky.md)"`
-   (`gh` ze snapu nečte soubory v `/tmp` ani stdin – poznámky předej přes `--notes`).
+   detailů: `gh release create vX.Y.Z --title "X.Y.Z – …" --notes-file poznamky.md`.
