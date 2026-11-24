@@ -25,6 +25,29 @@ def jload(name, default):
     return json.load(open(p, encoding="utf-8-sig")) if os.path.exists(p) else default
 
 
+def telo_pribehu(text):
+    """Text příběhu bez frontmatteru a komentářů."""
+    return re.sub(r"\A---\n.*?\n---\n", "", re.sub(r"<!--.*?-->", "", text, flags=re.S), flags=re.S)
+
+
+def chyby_poznamek(text):
+    """Poznámky pod čarou bez protějšku: odkaz [^x] bez textu poznámky (PDF ho vynechá, web ukáže „[^x]“),
+    text poznámky, na který nic neodkazuje, a dvakrát definovaná poznámka."""
+    text = telo_pribehu(text)
+    definice = re.findall(r"^\[\^([^\]]+)\]:", text, flags=re.M)
+    odkazy = set(re.findall(r"\[\^([^\]]+)\](?!:)", text))
+    return ([f"odkaz [^{x}] nemá text poznámky" for x in sorted(odkazy - set(definice))]
+            + [f"na poznámku [^{x}] nic neodkazuje" for x in sorted(set(definice) - odkazy)]
+            + [f"poznámka [^{x}] je definovaná víckrát" for x in sorted({x for x in definice if definice.count(x) > 1})])
+
+
+def odstavce_bez_dokladu(text):
+    """Odstavce příběhu s letopočtem bez poznámky pod čarou i bez odkazu na zápis (reference/pribehy.md)."""
+    odstavce = (o.strip() for o in re.split(r"\n\s*\n", telo_pribehu(text)))
+    return [o for o in odstavce if o and o[0] not in "#|>!"
+            and re.search(r"\b1\d{3}\b", o) and "[^" not in o and "/zdroj/" not in o]
+
+
 def main():
     if sys.argv[1:2] in (["-h"], ["--help"]):
         sys.exit(__doc__)
@@ -205,9 +228,14 @@ def main():
                 warn.append(f"SOUKROMÍ (dům {cp}, {o.get('n')}): narozen(a) po {hranice} a má podrobnosti – "
                             f"žijící lidé jen se souhlasem (reference/soukromi.md)")
 
-    ma_pribeh = os.path.exists(os.path.join(DATA, "pribeh.md")) or any(
-        f.startswith("pribeh_") and f.endswith(".md") for f in os.listdir(DATA))
-    if not ma_pribeh:
+    pribehy = [fn for fn in sorted(os.listdir(DATA)) if re.fullmatch(r"pribeh(_[a-z0-9-]+)?\.md", fn)]
+    for fn in pribehy:
+        text = open(os.path.join(DATA, fn), encoding="utf-8-sig").read()
+        err.extend(f"{fn}: {c}" for c in chyby_poznamek(text))
+        if bez := odstavce_bez_dokladu(text):
+            warn.append(f"{fn}: {len(bez)} odstavců s letopočtem bez poznámky pod čarou nebo odkazu na zápis "
+                        f"(„{bez[0][:60]}…“) – doplň doklad, nebo napiš jako domněnku (reference/pribehy.md)")
+    if not pribehy:
         hlavni = D.get(str(cfg.get("hlavni_dum", "")), {})
         if len(hlavni.get("drzitele", [])) >= 4:
             warn.append("hlavní dům má už 4+ držitele – je čas napsat příběh domu "

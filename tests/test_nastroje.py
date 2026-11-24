@@ -312,6 +312,26 @@ class TestKontrola(Projekt):
         self.assertEqual(rc, 1, out)
         self.assertIn("menu.navic musí být seznam", out)
 
+    def test_odstavec_pribehu_bez_dokladu(self):
+        with open(self.path("data", "pribeh_cp12.md"), "w", encoding="utf-8") as f:
+            f.write("---\ntitle: Příběh čp. 12\nlead: Roku 1650 …\n---\n## Novákovi (1786–1870)\n\n"
+                    "Roku 1786 koupil dům Jan Novák.[^1]\n\nRoku 1801 vyhořel. [Zápis](/zdroj/k1/)\n\n"
+                    "V kraji se roku 1805 pěstoval len.\n\nDům stál na kraji vsi.\n\n<!-- roku 1900 -->\n\n"
+                    "[^1]: Gruntovní kniha 1786, fol. 12.\n")
+        _, out = self.kontrola()
+        self.assertIn("pribeh_cp12.md: 1 odstavců s letopočtem bez poznámky", out)
+        self.assertIn("„V kraji se roku 1805", out)
+
+    def test_poznamky_pod_carou_bez_protejsku(self):
+        with open(self.path("data", "pribeh_cp12.md"), "w", encoding="utf-8") as f:
+            f.write("---\ntitle: Příběh\n---\nKoupil.[^1] Prodal.[^2] Znovu.[^1]\n\n"
+                    "[^1]: Gruntovní kniha.\n[^3]: Navíc.\n[^1]: Podruhé.\n<!-- [^4] -->\n")
+        rc, out = self.kontrola()
+        self.assertEqual(rc, 1, out)
+        for h in ("odkaz [^2] nemá text poznámky", "na poznámku [^3] nic neodkazuje", "poznámka [^1] je definovaná víckrát"):
+            self.assertIn(f"pribeh_cp12.md: {h}", out)
+        self.assertNotIn("[^4]", out)
+
     def test_pojmy_jen_jeden_tvar(self):
         for pojmy, hlaska in (({"misto": "enkláva"}, "pojmy.misto je vyplněné, pojmy.misto_2 ne"),
                               ({"misto_2": "enklávy"}, "pojmy.misto_2 je vyplněné, pojmy.misto ne"),
