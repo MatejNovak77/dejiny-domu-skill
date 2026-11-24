@@ -1,4 +1,5 @@
 import { defineConfig, fontProviders } from 'astro/config';
+import { satteri } from '@astrojs/markdown-satteri';
 
 // písma z balíčků @fontsource-variable (v projektu, bez Google Fonts); Astro je přednačte
 // a vygeneruje záložní písmo se stejnými rozměry → text při načtení písma neposkočí
@@ -15,6 +16,8 @@ const family = (name, pkg, file, cssVariable, fallbacks) => ({
 export default defineConfig({
   trailingSlash: 'always',
   build: { format: 'directory' },
+  // poznámky pod čarou v příbězích ([^1], reference/pribehy.md): česky místo „Footnotes“
+  markdown: { processor: satteri({ features: { gfm: { footnotes: { label: 'Zdroje', backLabel: 'Zpět do textu k odkazu {reference}' } } } }) },
   fonts: [
     family('Fraunces', 'fraunces', 'fraunces', '--font-serif', ['Georgia', 'serif']),
     family('Source Sans 3', 'source-sans-3', 'source-sans-3', '--font-sans', ['Arial', 'sans-serif']),
