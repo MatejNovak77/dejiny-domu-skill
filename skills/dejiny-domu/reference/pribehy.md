@@ -26,7 +26,10 @@ Nejlepší 2–4 dej na úvod webu (`web.json` → `zajimavosti_na_uvodu`).
 **Kdy:** když má hlavní dům zhruba 4 doložené držitele nebo pokrytí ~150 let (`kontrola.py` připomene).
 **Postup:**
 1. Sesbírej: události a držitele domu, obyvatele, zajímavosti, mapy, `pametnici.md`, dějiny obce.
-2. Napiš **koncept do chatu**. Pod něj připiš, co je z pramenů a co z literatury nebo od pamětníků. Uložíš ho až po schválení.
+2. Napiš **koncept do chatu** rovnou s poznámkami pod čarou (`[^1]` za tvrzením, `[^1]: …` pod textem), ať se dá
+   každá věta ověřit proti prameni. Poznámka = odkaz `[zápis](/zdroj/<klic>/)`, u literatury citace se stranou, u
+   pamětníka kdo a kdy. Obecné tvrzení o kraji nebo době označ v poznámce jako obecné, ne jako doklad pro dům; co
+   doklad nemá, napiš jako domněnku. Uložíš ho až po schválení.
 3. `data/pribeh.md`:
    ```markdown
    ---
@@ -58,6 +61,6 @@ Starý `pribeh.md` pak už nepoužívej (s rozcestníkem se neukáže) – přej
 
 **Tvar** (800–1500 slov): kapitoly po obdobích nebo po rodinách držitelů. Nadpis = rodina nebo období a roky.
 Začni krajinou a vsí (kdy vznikla, komu patřila), pak jednotliví držitelé a obyvatelé: kdo, odkud přišel, za kolik
-koupil, kolik měl dětí, co je potkalo. Konkrétně: roky, ceny, citace z pramenů v uvozovkách, odkazy `[zápis](/zdroj/<klic>/)`.
+koupil, kolik měl dětí, co je potkalo. Konkrétně: roky, ceny, citace z pramenů v uvozovkách, doklady v poznámkách pod čarou.
 Velké dějiny jen tam, kde se dotkly domu (robota, 1848, války, 1945, kolektivizace). Co nevíme, napiš jako otázku.
 Poslední kapitola „Dnes“: jen to, co majitel na web pustí.
