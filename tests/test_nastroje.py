@@ -312,6 +312,18 @@ class TestKontrola(Projekt):
         self.assertEqual(rc, 1, out)
         self.assertIn("menu.navic musí být seznam", out)
 
+    def test_pojmy_jen_jeden_tvar(self):
+        for pojmy, hlaska in (({"misto": "enkláva"}, "pojmy.misto je vyplněné, pojmy.misto_2 ne"),
+                              ({"misto_2": "enklávy"}, "pojmy.misto_2 je vyplněné, pojmy.misto ne"),
+                              ({"misto": "enkláva", "misto_2": "enklávy"}, None), ({"stred": "náměstí"}, None)):
+            p = self.nastroj("zapis.py", "web", "pojmy", "-", "--prepsat", vstup=json.dumps(pojmy, ensure_ascii=False))
+            self.assertEqual(p.returncode, 0, p.stderr)
+            _, out = self.kontrola()
+            if hlaska:
+                self.assertIn(hlaska, out)
+            else:
+                self.assertNotIn("web bude míchat tvary", out)
+
     def test_citace_neexistujiciho_zapisu(self):
         self.napln()
         with open(self.path("data", "domy.py"), "a", encoding="utf-8") as f:

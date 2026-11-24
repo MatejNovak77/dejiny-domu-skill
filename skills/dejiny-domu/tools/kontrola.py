@@ -190,6 +190,11 @@ def main():
             err.append(f"web.json: menu.navic {p.get('url')}: skupina musí být 1, 2 nebo 3 (je {p.get('skupina')!r})")
         if not str(p.get("url") or "").startswith("/"):
             err.append(f"web.json: menu.navic {p.get('nazev')}: adresa musí začínat / (stránka tohoto webu)")
+    pojmy = cfg.get("pojmy") if isinstance(cfg.get("pojmy"), dict) else {}
+    vyplnene = [k for k in ("misto", "misto_2") if str(pojmy.get(k) or "").strip()]
+    if len(vyplnene) == 1:   # šablona by chybějící tvar vzala z „obec“ / „obce“ a míchala by je („Enkláva“, ale „Dějiny obce“)
+        chybi = "misto_2" if vyplnene == ["misto"] else "misto"
+        warn.append(f"web.json: pojmy.{vyplnene[0]} je vyplněné, pojmy.{chybi} ne – web bude míchat tvary; vyplň oba")
 
     # Obyvatelé posledních ~100 let jsou možná žijící nebo jejich děti ano – soukromí (reference/soukromi.md).
     hranice = datetime.date.today().year - 100
