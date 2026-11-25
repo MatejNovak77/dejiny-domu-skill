@@ -153,7 +153,12 @@ input[type=range]:focus-visible { outline: none; box-shadow: var(--focus-ring); 
 .cmp-ctl input[type=range] { flex: 1 1 auto; min-width: 0; }
 .cmp-box { border-radius: 0 0 var(--radius) var(--radius); box-shadow: var(--shadow); }
 .cmp-names { display: flex; justify-content: space-between; gap: 1rem; margin: 0.5rem 0.2rem 0; }
-.cmp-names span:last-child { text-align: right; }
+.cmp-names > span:last-child { text-align: right; }
+.cmp-names a { margin-left: 0.5rem; white-space: nowrap; }
+/* mapa i s lištou a názvy se vejde na výšku okna (--ar = šířka / výška mapy, nastaví skript); vedle sebe dvě mapy */
+.cmp :is(.cmp-ctl, .cmp-box, .cmp-names) { max-width: calc((100svh - 10rem) * var(--ar, 100)); margin-inline: auto; }
+.cmp-2 :is(.cmp-ctl, .cmp-box, .cmp-names) { max-width: calc((100svh - 10rem) * var(--ar, 100) * 2); }
+.map-links { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0.3rem 0 0.1rem; }
 @media (max-width: 640px) {
   .cmp-ctl { flex-wrap: wrap; justify-content: space-between; padding: 0.7rem 0.8rem; }
   .cmp-ctl input[type=range] { order: 3; flex-basis: 100%; margin: 0.4rem 0 0.2rem; }

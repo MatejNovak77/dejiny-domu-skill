@@ -2,29 +2,34 @@
 import Base from '../layouts/Base.astro';
 import { maps, mapGroups, pojmy } from '../lib/data.js';
 // Prolínat jen mapy s ověřeně stejným výřezem (export_web.py → mapGroups), ostatní skupiny vedle sebe.
+const plne = (m) => (m.full ? `/zdroje/${m.img}.jpg` : `/img/${m.img}.jpg`);
 const groups = Object.entries(Object.groupBy ? Object.groupBy(maps.filter((m) => m.group), (m) => m.group)
   : maps.filter((m) => m.group).reduce((a, m) => ((a[m.group] ??= []).push(m), a), {})).filter(([, l]) => l.length > 1)
   .map(([g, list]) => [g, list, mapGroups[g]?.overlay === true] as const);
 ---
 <Base title="Staré mapy" wide>
   <h1>Staré mapy a letecké snímky</h1>
-  <p class="lead">{pojmy.vlastni ? `Proměny ${pojmy.misto_2} a okolí` : 'Jak se ves a okolí měnily'} – od vojenských mapování 18. století přes stabilní katastr po letecké snímky. Kliknutím mapu zvětšíte.</p>
+  <p class="lead">{pojmy.vlastni ? `Proměny ${pojmy.misto_2} a okolí` : 'Jak se ves a okolí měnily'} – od vojenských mapování 18. století přes stabilní katastr po letecké snímky. Mapu v plném rozlišení otevře odkaz pod ní.</p>
 
   {groups.map(([g, list, overlay]) => (
-    <section class="cmp" data-cmp>
+    <section class={overlay ? 'cmp' : 'cmp cmp-2'} data-cmp>
       <h2>Porovnání: {g}</h2>
       <p class="small muted">{overlay ? 'Vyberte dvě mapy a posuvníkem je prolínejte.'
         : 'Vyberte dvě mapy a porovnejte je vedle sebe. Výřezy se nemusí přesně krýt, proto je neprolínáme.'}</p>
       <p class="cmp-ctl">
-        <select data-a aria-label="první mapa">{list.map((m, i) => <option value={m.img} data-t={`${m.year} – ${m.title}`} selected={i === 0}>{m.year}</option>)}</select>
+        <select data-a aria-label="první mapa">{list.map((m, i) => <option value={m.img} data-t={`${m.year} – ${m.title}`} data-u={m.url} selected={i === 0}>{m.year}</option>)}</select>
         {overlay && <input type="range" min="0" max="100" value="50" data-r aria-label="prolnutí" />}
-        <select data-b aria-label="druhá mapa">{list.map((m, i) => <option value={m.img} data-t={`${m.year} – ${m.title}`} selected={i === list.length - 1}>{m.year}</option>)}</select>
+        <select data-b aria-label="druhá mapa">{list.map((m, i) => <option value={m.img} data-t={`${m.year} – ${m.title}`} data-u={m.url} selected={i === list.length - 1}>{m.year}</option>)}</select>
       </p>
       <div class={overlay ? 'cmp-box' : 'cmp-box cmp-side'}>
         <img data-ia src={`/img/${list[0].img}.jpg`} alt="" />
         <img data-ib src={`/img/${list[list.length - 1].img}.jpg`} alt="" style={overlay ? 'opacity:0.5' : undefined} />
       </div>
-      <p class="cmp-names small muted"><span data-na>{list[0].year} – {list[0].title}</span><span data-nb>{list[list.length - 1].year} – {list[list.length - 1].title}</span></p>
+      <p class="cmp-names small muted">{[list[0], list[list.length - 1]].map((m, i) => (
+        <span>
+          <span data-n={i}>{m.year} – {m.title}</span>
+          <a data-u={i} href={m.url} target="_blank" rel="noopener" hidden={!m.url}>originál</a>
+        </span>))}</p>
     </section>
   ))}
 
@@ -32,9 +37,11 @@ const groups = Object.entries(Object.groupBy ? Object.groupBy(maps.filter((m) =>
   <div class="docs">
     {maps.map((m) => (
       <figure>
-        <a href={m.full ? `/zdroje/${m.img}.jpg` : `/img/${m.img}.jpg`} target="_blank" rel="noopener"><img src={`/img/${m.img}.jpg`} alt={m.title} loading="lazy" /></a>
+        <a href={plne(m)} target="_blank" rel="noopener"><img src={`/img/${m.img}.jpg`} alt={m.title} loading="lazy" /></a>
         <figcaption><strong>{m.year}</strong> – {m.title}{m.desc && <><br />{m.desc}</>}<br />
-          <span class="small">Zdroj: {m.url ? <a href={m.url} target="_blank" rel="noopener">{m.source}</a> : m.source}</span></figcaption>
+          <span class="map-links small"><a href={plne(m)} target="_blank" rel="noopener">Plné rozlišení</a>
+            {m.url && <a href={m.url} target="_blank" rel="noopener">Originál u zdroje</a>}</span>
+          <span class="small muted">Zdroj: {m.source}</span></figcaption>
       </figure>
     ))}
   </div>
@@ -45,10 +52,19 @@ const groups = Object.entries(Object.groupBy ? Object.groupBy(maps.filter((m) =>
       const a = s.querySelector<HTMLSelectElement>('[data-a]')!, b = s.querySelector<HTMLSelectElement>('[data-b]')!;
       const ia = s.querySelector<HTMLImageElement>('[data-ia]')!, ib = s.querySelector<HTMLImageElement>('[data-ib]')!;
       const r = s.querySelector<HTMLInputElement>('[data-r]');
-      const na = s.querySelector<HTMLElement>('[data-na]')!, nb = s.querySelector<HTMLElement>('[data-nb]')!;
-      const name = (sel: HTMLSelectElement) => sel.selectedOptions[0]?.dataset.t ?? '';
-      a.addEventListener('change', () => { ia.src = `/img/${a.value}.jpg`; na.textContent = name(a); });
-      b.addEventListener('change', () => { ib.src = `/img/${b.value}.jpg`; nb.textContent = name(b); });
+      // Název a odkaz na originál vybrané mapy; poměr stran první mapy omezí šířku, aby se porovnávač vešel na výšku okna.
+      const vyber = (sel: HTMLSelectElement, img: HTMLImageElement, i: number) => {
+        const o = sel.selectedOptions[0]?.dataset ?? {}, u = s.querySelector<HTMLAnchorElement>(`[data-u="${i}"]`)!;
+        img.src = `/img/${sel.value}.jpg`;
+        s.querySelector<HTMLElement>(`[data-n="${i}"]`)!.textContent = o.t ?? '';
+        u.hidden = !o.u;
+        if (o.u) u.href = o.u;
+      };
+      const pomer = () => ia.naturalHeight && s.style.setProperty('--ar', String(ia.naturalWidth / ia.naturalHeight));
+      ia.addEventListener('load', pomer);
+      pomer();
+      a.addEventListener('change', () => vyber(a, ia, 0));
+      b.addEventListener('change', () => vyber(b, ib, 1));
       if (r) r.addEventListener('input', () => { ib.style.opacity = String(Number(r.value) / 100); r.style.setProperty('--p', `${r.value}%`); });
     }
   </script>
