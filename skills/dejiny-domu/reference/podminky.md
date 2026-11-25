@@ -107,6 +107,7 @@ Vždy uveďte archiv, fond, signaturu, číslo snímku a trvalý odkaz. Zjiště
 - `tools/podminky.json` je stejná tabulka pro nástroje. `slusne.py` ji kontroluje před každým požadavkem: portál, který stahování nedovoluje, skončí hláškou „PODMÍNKY: …“ s návodem, jak dál. Takhle stojí `trebon.py`, `portafontium.py`, `ebadatelna.py` a v `mza.py` vše kromě hledání knih (stránku knihy chrání ALTCHA). Zůstávají ve skillu pro případ, že archiv dá souhlas.
 - Pravidla platí i pro část webu (`vyjimky` podle adresy). Přesměrování na ověření proti robotům (`/challenge`, `/captcha`) nástroj zastaví hláškou „OCHRANA: …“, nikdy ho neřeší.
 - `python3 -I tools/podminky.py <adresa>` vypíše pravidla pro portál.
+- Portál, který tabulka nemá: přečtěte jeho podmínky a robots.txt, uživateli řekněte, co z nich plyne, a s jeho souhlasem doplňte položku do `data/podminky_projekt.json` (`{"portaly": {"doména": {…}}}`, tvar jako v `tools/podminky.json`, do `proc` odkaz na podmínky a datum). Aktualizace nástrojů ho nepřepíše. Platí jen pro domény, které skill nezná. `kontrola.py` doplněné portály vypíše. Když se doplněk osvědčí, pošlete ho jako issue nebo PR do skillu.
 - `vyrez.py` po uložení řekne, jestli obrázek smí na veřejný web. Otevřený web obrázek bez souhlasu vynechá (u zápisu zůstane přepis a odkaz), `kontrola.py` to vypíše. Na neveřejný web (za heslem) smí. Souhlas archivu zapište k zápisu nebo mapě do pole `souhlas` (kdo a kdy).
 - Hlášku „PODMÍNKY“ neobcházejte jiným nástrojem, curl ani prohlížečem řízeným skriptem.
 

@@ -24,7 +24,7 @@ class PodminkyTest(unittest.TestCase):
         p = podminky.portaly()
         self.assertIn("digi.ceskearchivy.cz", p)
         for host, x in p.items():
-            self.assertIn(x["vyrez"], ("ano", "neresi", "nekomercne", "souhlas", "ne"), host)
+            self.assertIn(x["vyrez"], podminky.VYREZ, host)
             self.assertIsInstance(x["dotazy"], bool, host)
             self.assertIsInstance(x["obrazky"], bool, host)
 
@@ -75,6 +75,25 @@ class PodminkyTest(unittest.TestCase):
         self.assertEqual(podminky.posoud_obrazek(self.tmp, "c")[0], "ok")
         self.assertEqual(podminky.posoud_obrazek(self.tmp, "foto")[0], "ok")   # vlastní fotka bez odkazu
         self.assertEqual(podminky.posoud_obrazek(self.tmp, "nic")[0], "pozor")
+
+    def doplnek(self, portaly):
+        self.data("podminky_projekt.json", {"portaly": portaly})
+        self.addCleanup(setattr, podminky, "PROJEKT", podminky.PROJEKT)
+        self.addCleanup(setattr, podminky, "_doplnky", None)
+        podminky.PROJEKT, podminky._doplnky = os.path.join(self.tmp, "data", "podminky_projekt.json"), None
+
+    def test_doplnek_projektu_plati_pro_neznamy_portal(self):
+        self.doplnek({"archive.org": {"nazev": "Internet Archive", "dotazy": False, "obrazky": False, "vyrez": "neresi"}})
+        self.assertEqual(podminky.pravidlo("https://www.archive.org/details/x")["nazev"], "Internet Archive")
+        with self.assertRaises(podminky.Zakazano):
+            slusne.pockej("archive.org", "dotaz")
+
+    def test_doplnek_neuvolni_pravidlo_skillu(self):   # projekt nesmí povolit, co archiv zakazuje
+        self.doplnek({"www.digi.ceskearchivy.cz": {"nazev": "x", "dotazy": True, "obrazky": True, "vyrez": "ano"},
+                      "spatny.cz": {"nazev": "y", "vyrez": "mozna"}})
+        self.assertEqual(podminky.pravidlo("digi.ceskearchivy.cz")["vyrez"], "souhlas")
+        self.assertIsNone(podminky.pravidlo("spatny.cz"))
+        self.assertEqual([h for h, _ in podminky.doplnky()[1]], ["www.digi.ceskearchivy.cz", "spatny.cz"])
 
 
 if __name__ == "__main__":

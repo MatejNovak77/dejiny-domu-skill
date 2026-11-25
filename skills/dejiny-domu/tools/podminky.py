@@ -5,6 +5,8 @@ Lidská verze s vysvětlením: reference/podminky.md. Jen veřejné zdroje, stav
 Použití (z kořene projektu):
   podminky.py <adresa | doména>   -> pravidla pro portál (stahování stránek, snímků, obrázky ve výstupu)
   podminky.py obrazky             -> výřezy ve vyrezy/, které podle podmínek potřebují souhlas archivu
+Portál, který skill nezná, doplní projekt do data/podminky_projekt.json ({"portaly": {doména: položka}}, stejný tvar
+jako tools/podminky.json); aktualizace nástrojů ho nepřepíše. Platí jen pro domény, které tools/podminky.json nemá.
 Nástroje to volají samy: slusne.py před každým požadavkem, vyrez.py, kontrola.py a export_web.py.
 """
 import json, os, sys, urllib.parse
@@ -13,20 +15,68 @@ for _s in (sys.stdout, sys.stderr):
         _s.reconfigure(encoding="utf-8", errors="replace")
 
 SOUBOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "podminky.json")
+PROJEKT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "podminky_projekt.json")
 VOLNE = ("ano", "neresi")
-_cache = None
+VYREZ = ("ano", "neresi", "nekomercne", "souhlas", "ne")
+_tabulka_skillu = None
+_doplnky = None
 
 
-def portaly():
-    global _cache
-    if _cache is None:
+def _najdi(tabulka, host):
+    """Položka pro doménu i s www. a bez něj, jinak None."""
+    return tabulka.get(host) or tabulka.get(host[4:] if host.startswith("www.") else "www." + host)
+
+
+def chyba_polozky(x):
+    if not isinstance(x, dict) or not x.get("nazev"):
+        return "chybí 'nazev'"
+    if x.get("vyrez") not in VYREZ:
+        return f"'vyrez' musí být jedno z {', '.join(VYREZ)}"
+    if not all(isinstance(x.get(k, True), bool) for k in ("dotazy", "obrazky")):
+        return "'dotazy' a 'obrazky' musí být true nebo false"
+    return None
+
+
+def doplnky():
+    """(platné, odmítnuté) z data/podminky_projekt.json: {doména: položka}, [(doména, důvod)]. Doménu, kterou skill zná,
+    projekt nepřepíše: doplněk by jinak mohl uvolnit pravidlo archivu (stahování nebo zveřejnění)."""
+    global _doplnky
+    if _doplnky is None:
+        try:
+            with open(PROJEKT, encoding="utf-8-sig") as f:
+                data = json.load(f).get("portaly", {})
+        except FileNotFoundError:
+            data = {}
+        except (OSError, ValueError, AttributeError) as e:
+            sys.exit(f"{PROJEKT} je poškozený ({e}). Oprav ho, nebo ho smaž, a pusť příkaz znovu.")
+        platne, odmitnute = {}, []
+        for host, x in data.items():
+            host = host_z(host)
+            if _najdi(tabulka_skillu(), host):
+                odmitnute.append((host, "skill tento portál zná, platí jeho pravidlo"))
+            elif c := chyba_polozky(x):
+                odmitnute.append((host, c))
+            else:
+                platne[host] = x
+        _doplnky = platne, odmitnute
+    return _doplnky
+
+
+def tabulka_skillu():
+    global _tabulka_skillu
+    if _tabulka_skillu is None:
         try:   # bez tabulky by nástroje tiše pustily stahování i zveřejnění, které archiv zakazuje
             with open(SOUBOR, encoding="utf-8") as f:
-                _cache = json.load(f)["portaly"]
+                _tabulka_skillu = json.load(f)["portaly"]
         except (OSError, ValueError, KeyError) as e:
             sys.exit(f"Tabulka podmínek archivů {SOUBOR} chybí nebo je poškozená ({e}). "
                      "Aktualizuj nástroje projektu (novy_projekt.py) a pusť příkaz znovu.")
-    return _cache
+    return _tabulka_skillu
+
+
+def portaly():
+    """Portály skillu a k nim doplňky projektu pro domény, které skill nezná."""
+    return {**doplnky()[0], **tabulka_skillu()}
 
 
 def host_z(adresa):
@@ -39,11 +89,7 @@ def host_z(adresa):
 def pravidlo(adresa, text=""):
     """Pravidlo pro adresu (nebo doménu); text = zdroj/název pro výjimky. None = portál v tabulce není."""
     host = host_z(adresa)
-    p = portaly().get(host)
-    if p is None and host.startswith("www."):
-        p = portaly().get(host[4:])
-    if p is None:
-        p = portaly().get("www." + host)
+    p = _najdi(portaly(), host)
     if p is None:
         return None
     p = dict(p, host=host)

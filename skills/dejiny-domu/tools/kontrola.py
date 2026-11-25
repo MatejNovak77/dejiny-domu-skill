@@ -243,6 +243,9 @@ def main():
 
     # podmínky archivů: obrázky, které se bez souhlasu nesmí zveřejnit (tools/podminky.py, reference/podminky.md)
     import podminky
+    platne, odmitnute = podminky.doplnky()
+    for host, duvod in odmitnute:
+        warn.append(f"data/podminky_projekt.json: {host} se nepoužije – {duvod}")
     root = os.path.dirname(DATA)
     otevreny = bool((cfg.get("prihlaseni") or {}).get("otevreny"))
     vd = os.path.join(root, "vyrezy")
@@ -262,6 +265,8 @@ def main():
     log = os.path.join(DATA, "research_log.md")
     rows = sum(1 for l in open(log, encoding="utf-8-sig") if re.match(r"^\| \d+ \|", l)) if os.path.exists(log) else 0
     print(f"{len(D)} domů, {len(ns.get('OBEC_UDALOSTI', []))} událostí obce, {len(zaz)} zápisů, {len(svazky)} svazků, {rows} řádků deníku")
+    if platne:   # ať uživatel ví, že pravidla těchto portálů nejsou ze skillu, ale doplnil je projekt
+        print(f"Podmínky doplněné v projektu (data/podminky_projekt.json): {', '.join(sorted(platne))}")
     for e in err:
         print("CHYBA:", e)
     for w in warn:
