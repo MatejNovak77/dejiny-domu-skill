@@ -211,6 +211,18 @@ vlastním nákladem, v malých nákladech; české knihovny je mají zřídka, D
   patronátního města, v Sudetendeutsches Museum nebo Sudetendeutsches Archiv (Mnichov): dotaz tam.
 - Weby Heimatkreisů (Ortsbilder, Häuserlisten) najde uživatel i přes vyhledávač („Heimatkreis Kaplitz“,
   „<německý název> Häuserliste“).
+- **Digitalizované Heimatbriefe a brožury:** katalog SLUB Dresden (katalog.slub-dresden.de; hledej „Heimatkreis
+  <okres>“, filtr „Online-Zugriff“) má časopisy a brožury vysídlených okresů, část i online celé. Claude ho smí
+  otevřít (robots.txt blokuje jen ClaudeBot), DNB doplňuje.
+- **Padlí z obce:** denkmalprojekt.org (jen `http://`, https neodpovídá), stránka „Tschechien“ (covers_intl/tschechien.htm)
+  má přes 900 českých obcí s přepisy pomníků padlých, Gedenkbücher a obětí vyhnání (české i německé jméno, okres).
+  Claude smí otevřít. Hroby vojáků: Volksbund Gräbersuche (volksbund.de) hledá uživatel sám: po hledání chce jméno,
+  adresu, datum narození a e-mail hledajícího, ty Claude nevyplňuje.
+- **Poválečné soupisy obyvatel** (Gemeindeseelenliste = rekonstrukce německých obyvatel obce před vyhnáním,
+  sestavená 1960–64, s ní Gemeindevermisstenliste; Bundesarchiv, fond B 530 Kirchlicher Suchdienst): popisy
+  po obcích na Archivportal-D (archivportal-d.de, hledej „Gemeindeseelenliste <německý název okresu>“, jeden
+  záznam pokrývá víc vsí abecedně, např. „Altenbuch–Bernsdorf“). Jen popis, bez skenu: kopii objednat v Bundesarchivu.
+  Ochrana Anubis: hledá uživatel, Claude poradí německý název obce a okresu.
 
 ## Bundesarchiv, Digitales Bildarchiv (bild.bundesarchiv.de) – jen ručně
 Fotky, letecké snímky a plakáty německých archivů; z Česka hlavně města v Sudetech 1938–1945 (propagandistické
@@ -721,7 +733,7 @@ Databáze míst, kde se točily filmy a seriály, často až na adresu s čísle
 - **Podmínky:** zakazují roboty, hromadné stahování a „scraping“; stahovat smí uživatel ručně pro osobní nekomerční
   potřebu. Žádné volání API ani stahování snímků z tvé strany.
 - Přihlášení je potřeba i na hledání v indexech. České matriky tam skoro zindexované nejsou (Slovensko ano, hlavně křty).
-- Užitečné na indexy matrik a hroby (BillionGraves, Find a Grave). Výsledek je vodítko – ověř v matrice.
+- Užitečné na indexy matrik. Výsledek je vodítko – ověř v matrice.
 - Postup: řekni uživateli, co hledat (příjmení, jméno otce, místo, roky). Výsledek nebo snímek pošle jako snímek
   obrazovky nebo uložený soubor do `pracovni/`, ty ho přečteš.
 
@@ -729,7 +741,8 @@ Databáze míst, kde se točily filmy a seriály, často až na adresu s čísle
 - Kde jsou předci pohřbeni, víš z rozhovoru s rodinou (Fáze 1). Fotky náhrobků (jména, data, rodná příjmení) jsou
   cenný pramen hlavně pro 20. století, kde matriky ještě nejsou přístupné.
 - Evidence hrobových míst: správa hřbitova (kdo je v hrobě uložen, kdo platí nájem – často žijící potomek);
-  řada měst má online vyhledávání hrobů. Mezinárodně BillionGraves a Find a Grave.
+  řada měst má online vyhledávání hrobů. Mezinárodně BillionGraves a Find a Grave: **hledá jen uživatel**, robots.txt
+  oba weby Claude-User celé zakazuje (`podminky.md`).
 - **Hřbitovní pasporty obcí (GisOnline.cz)** – `tools/hroby.py`: hroby a zemřelí se jménem, narozením, úmrtím a pohřbem,
   hlavně 1920–2020. `najdi "<obec>"` zkusí adresy app.gisonline.cz/<obec> a vypíše obec a okres podle RÚIAN (obce stejného
   jména!), `stahni <projekt>` uloží `data/hroby.json`, `hledej <příjmení>` vypíše zemřelé. Číslo popisné u hrobů není:

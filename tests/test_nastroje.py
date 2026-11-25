@@ -1064,6 +1064,18 @@ cuzk_archiv.rady("x")
         self.assertIn("→ export nonstable 1 D1_21__4453-5 | 1 D1_21__4453-6", p.stdout)
         self.assertIn("mapa kultur:\n   → list není naskenovaný", p.stdout)
 
+    def test_odkaz_na_list_podle_rady(self):
+        p = subprocess.run([sys.executable, "-I", "-X", "utf8", "-c", """
+import sys; sys.path.insert(0, 'tools'); import cuzk_archiv
+for n in ("D6-1_Trhove_Sviny_9-1_1953", "B2_a_6C_570-1_1", "BUD286018270A01A"):
+    print(cuzk_archiv.odkaz_listu(n))
+"""], cwd=self.root, capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(p.stdout.split(), [
+            "https://ags.cuzk.gov.cz/archiv/openmap.html?typ=sm5&idrastru=D6-1_Trhove_Sviny_9-1_1953",
+            "https://ags.cuzk.gov.cz/archiv/openmap.html?typ=cioc&idrastru=B2_a_6C_570-1_1",
+            "https://ags.cuzk.gov.cz/archiv/"])
+
 
 class TestOrtofota(Projekt):
     """ortofota.py serie bez sítě: služby ČÚZK a krajů, RÚIAN i volání vyrez.py a zapis.py jsou nahrazené.

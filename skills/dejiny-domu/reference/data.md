@@ -91,7 +91,7 @@ Gruntovní knihy: „Velkostatek Kamenice, gruntovní kniha Horní Lhota 1650–
 ## `mapy.json` – staré mapy a letecké snímky
 ```json
 [{"img": "mapa_lhota_1827_cisarsky_otisk", "rok": "1827", "nazev": "Stabilní katastr – císařský otisk",
-  "zdroj": "ČÚZK, Archiv ČÚZK, císařský otisk B2/a/6C 570, list 4", "url": "https://ags.cuzk.gov.cz/archiv/", "popis": "Čp. 12 je dřevěný dům (žlutě) u cesty…",
+  "zdroj": "ČÚZK, Archiv ČÚZK, císařský otisk B2/a/6C 570, list 4", "url": "https://ags.cuzk.gov.cz/archiv/openmap.html?typ=cioc&idrastru=B2_a_6C_570-1_4", "popis": "Čp. 12 je dřevěný dům (žlutě) u cesty…",
   "skupina": "ves", "vyrez": {"crs": "EPSG:5514", "bbox": [-747980.0, -1183760.0, -747680.0, -1183460.0]}}]
 ```
 - Obrázek přes `vyrez.py dokumenty/<soubor> <img> 0,0,1,1` (celý) nebo s výřezem (vznikne `vyrezy/` i `zdroje/`).

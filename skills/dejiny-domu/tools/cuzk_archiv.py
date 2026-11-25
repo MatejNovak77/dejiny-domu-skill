@@ -21,7 +21,8 @@ Použití (z kořene projektu):
   cuzk_archiv.py export <sluzba> <id> <vystup.jpg> [x0,y0,x1,y1] [sirka_px]
       list v plném rozlišení nebo jeho výřez. Výřez jako u vyrez.py: podíly 0–1 od levého horního rohu
       (celý list = 0,0,1,1; výchozí). Výchozí šířka 4000 px, max. asi 15000. Nejdřív stáhni celý list menší
-      (sirka 1500), najdi ves, pak výřez ve velkém.
+      (sirka 1500), najdi ves, pak výřez ve velkém. Vypíše i přímý odkaz na list v prohlížeči archivu (do „url“
+      v mapy.json); u indikačních skic a řad, kde odkaz není ověřený, jen úvodní stránku archivu.
   cuzk_archiv.py mapa <vrstva> "Horní Lhota 12" | lat,lon <vystup.jpg> [polomer_m] [px]
       georeferencovaná (spojená) vrstva kolem místa: pk = pozemkový katastr (~1900–1950, v S-JTSK, sedí na dnešní
       domy), originalni_mapy, cisarske_otisky, cenia50 = ortofoto CENIA z 50. let (většinou 1952–54, vypíše rok
@@ -167,8 +168,20 @@ def rastry(sluzba, vzor):
         print("nic – zkus kratší vzor")
 
 
+# typ prohlížeče openmap.html podle začátku názvu rastru; ověřeno v aplikaci 25. 11. 2026 (Lniště, Beroun)
+TYPY_PROHLIZECE = [("B2_a_4C_", "orm"), ("B2_a_6C_", "cioc"), ("B2_a_14C_", "kmevidc"), ("B3_3", "otiskyKM"),
+                   ("B5_1_", "menkyc"), ("B2_c_", "mapy_kult"), ("D6-1_", "sm5"), ("D1_21__", "3voj_sekce"),
+                   ("D1_22__", "3voj_spec")]
+
+
+def odkaz_listu(nazev):
+    """Přímý odkaz na list (rastr) v prohlížeči Archivu ČÚZK; u neověřené řady úvodní stránka archivu."""
+    typ = next((t for p, t in TYPY_PROHLIZECE if nazev.startswith(p)), None)
+    return f"{REFERER}openmap.html?typ={typ}&idrastru={urllib.parse.quote(nazev)}" if typ else REFERER
+
+
 def export(sluzba, rid, out, vyrez="0,0,1,1", sirka=4000):
-    d = archiv(f"archiv_nespojene_{sluzba}/ImageServer/query", {"objectIds": rid, "outFields": "OBJECTID",
+    d = archiv(f"archiv_nespojene_{sluzba}/ImageServer/query", {"objectIds": rid, "outFields": "OBJECTID,Name",
                                                                 "returnGeometry": "true", "f": "json"})
     r = d["features"][0]["geometry"]["rings"][0]
     X0, X1 = min(p[0] for p in r), max(p[0] for p in r)
@@ -184,6 +197,7 @@ def export(sluzba, rid, out, vyrez="0,0,1,1", sirka=4000):
         binary=True)
     save_jpeg(img, out)
     print(f"{out} {sirka}×{vyska}")
+    print(f"odkaz na list (url do mapy.json): {odkaz_listu(d['features'][0]['attributes']['Name'])}")
 
 
 def prehled(sluzba, vzor, out, sirka=600):
