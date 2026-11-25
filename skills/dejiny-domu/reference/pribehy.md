@@ -27,7 +27,8 @@ Nejlepší 2–4 dej na úvod webu (`web.json` → `zajimavosti_na_uvodu`).
 **Postup:**
 1. Sesbírej: události a držitele domu, obyvatele, zajímavosti, mapy, `pametnici.md`, dějiny obce.
 2. Napiš **koncept do chatu** rovnou s poznámkami pod čarou (`[^1]` za tvrzením, `[^1]: …` pod textem), ať se dá
-   každá věta ověřit proti prameni. Poznámka = odkaz `[zápis](/zdroj/<klic>/)`, u literatury citace se stranou, u
+   každá věta ověřit proti prameni. Poznámka = odkaz `[Druh pramene, rok](/zdroj/<klic>/)` a za ním případný komentář
+   (`– příjmení čtené nejistě.`; web kreslí odkaz jako štítek, dlouhý text v něm je nečitelný), u literatury citace se stranou, u
    pamětníka kdo a kdy. Obecné tvrzení o kraji nebo době označ v poznámce jako obecné, ne jako doklad pro dům; co
    doklad nemá, napiš jako domněnku. Uložíš ho až po schválení.
 3. `data/pribeh.md`:
