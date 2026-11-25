@@ -9,7 +9,7 @@ Položky do JSON souborů přidávej a měň přes `python3 -I tools/zapis.py` (
 | stav | význam |
 |---|---|
 | `doc` | přečteno přímo na snímku pramene (matrika, gruntovní kniha, sčítání, katastr, mapa). Vždy s `r` |
-| `lit` | z literatury (kniha, článek, vlastivěda), vždy se `zdroj` („Vlastivěda okresu, 1899, s. 389“) |
+| `lit` | z literatury (kniha, článek, vlastivěda), vždy se `zdroj` („Vlastivěda okresu, 1899, s. 389“); text online jako odkaz `[Vlastivěda, s. 389](https://…)`, na časové ose je klikací |
 | `prob` | pravděpodobné (shoda jména, doby a čísla, ale ne přímý doklad, třeba před ztotožněním přečíslování), v `note` proč |
 | `fam` | od majitele nebo pamětníka (vyprávění), případně z domovního dokumentu, který nemáš naskenovaný |
 | `unk` | neznámé |

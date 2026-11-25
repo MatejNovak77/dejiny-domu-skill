@@ -43,4 +43,17 @@ export function dateKey(date) {
 export const houseTitle = (h) => `${h.part ? `${h.part} ` : ''}čp. ${h.cp}${h.name ? ` – ${h.name}` : ''}`;
 export const houseAddress = (h) => `${h.part || village.name} čp. ${h.cp}`.trim();
 export const houseFullTitle = (h) => `${houseAddress(h)}${h.name ? ` – ${h.name}` : ''}`;
+// Text se zdrojem po kusech: odkaz [text](https://…) → { text, href }, zbytek → { text }. Jen http(s), takže z dat
+// nejde na stránku nic jiného než odkaz; ostatní zápisy zůstanou doslova jako text.
+export function odkazyVTextu(text) {
+  const s = String(text), kusy = [];
+  let konec = 0;
+  for (const m of s.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g)) {
+    if (m.index > konec) kusy.push({ text: s.slice(konec, m.index) });
+    kusy.push({ text: m[1], href: m[2] });
+    konec = m.index + m[0].length;
+  }
+  if (konec < s.length) kusy.push({ text: s.slice(konec) });
+  return kusy;
+}
 export const statusClass = (st) => ({ doc: 'st-doc', lit: 'st-fam', prob: 'st-prob', fam: 'st-fam' })[st] ?? 'st-unk';
