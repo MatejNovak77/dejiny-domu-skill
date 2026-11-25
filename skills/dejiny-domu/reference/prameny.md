@@ -236,6 +236,8 @@ Archiv ČÚZK je na https://ags.cuzk.gov.cz/archiv/ (staré archivnimapy.cuzk.cz
   na otisku žlutá, = nejspíš dřevěná stavba nahrazená zděnou. **Rozhoduje jen srovnání se stejným výřezem císařského
   otisku** (`export stable <id> … x0,y0,x1,y1`): co je na otisku, stálo při mapování; co tam není, nepiš „dům tu stál
   už v roce [mapování]“, ale „budova je do mapy dokreslená při opravě v roce [reambulace]“.
+  **Kultury a značky** (louka, pastvina, zahrada, les, kaple, kříž, hřbitov, mlýn…): legenda `legenda-katastru.md`
+  s obrázkem; barvu porovnej s obrázkem, neurčuj ji podle paměti.
 - **Císařský otisk** (cio, barevný, 1824–43) = podoba vsi při mapování. Budovy nespalné růžově, spalné žlutě,
   v budovách **čísla stavebních parcel, ne čísla popisná** (Lniště, Hlína, Nežetice). U části listů barvy a čísla chybí.
 - **Evidenční mapa** (sign. B2/a/14C, služba `nonstable`, vzor vypíše `listy`, když je naskenovaná) = pokračování
