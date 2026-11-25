@@ -229,10 +229,15 @@ main .lead, main .prose, main .next-step { max-width: none; }
 
 /* poznámky pod čarou v příbězích: číslo v textu, seznam „Zdroje“ pod příběhem */
 .prose [data-footnote-ref] { text-decoration: none; padding: 0 0.1em; }
+.prose sup { line-height: 0; } /* číslo poznámky jinak zvětší výšku řádku */
+.prose [data-footnote-ref] { scroll-margin-top: 25vh; } /* návrat do textu: vidět i začátek věty, ne jen řádek s číslem */
+.prose .footnotes li:target, .prose p:has([data-footnote-ref]:target) { background: var(--accent-soft); border-radius: 6px; box-shadow: 0 0 0 0.3rem var(--accent-soft); }
 .prose .footnotes { margin-top: 3rem; padding-top: 0.6rem; border-top: 1px solid var(--line); font-size: 0.92rem; }
 .prose .footnotes h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
 .prose .footnotes p { font-size: inherit; line-height: 1.55; margin: 0.2rem 0; }
-.prose .data-footnote-backref { text-decoration: none; font-variant-emoji: text; }
+.prose .data-footnote-backref { text-decoration: none; font-size: 0; } /* „↩“ od satteri kreslí Chrome jako emoji; čtečky čtou aria-label */
+.prose .data-footnote-backref::before { content: '↑'; font-size: 0.92rem; position: relative; top: -0.15em; }
+.prose .data-footnote-backref sup { font-size: 0.7rem; }
 
 @media (max-width: 600px) {
   .timeline li { grid-template-columns: 1fr; gap: 0.15rem; padding-left: 1.1rem; }

@@ -108,6 +108,7 @@ th { font-weight: 600; color: #5a4632; background: #f6f0e6; }
 .btn:hover { background: #5a4632; color: #fff; }
 
 /* amber top line separates the header from a dark browser toolbar; header stays visible while scrolling */
+html { scroll-padding-top: 5rem; } /* skok na kotvu (poznámka pod čarou) neskončí pod lepící hlavičkou */
 .site-header { border-top: 4px solid #e0952f; position: sticky; top: 0; z-index: 2000; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
 @media (max-width: 760px) { body.nav-open .site-header { max-height: 100vh; overflow-y: auto; } }
 
